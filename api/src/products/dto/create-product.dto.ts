@@ -1,0 +1,53 @@
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsInt,
+  IsNumber,
+  IsEnum,
+  IsPositive,
+  Min,
+} from 'class-validator';
+import { Type } from 'class-transformer';
+import { ProductCategory } from '../entities/product.entity';
+
+export class CreateProductDto {
+  @IsInt()
+  @IsPositive()
+  supplierId: number;
+
+  @IsString()
+  @IsNotEmpty()
+  articleNumber: string;
+
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @IsEnum(ProductCategory)
+  @IsOptional()
+  category?: ProductCategory;
+
+  @IsString()
+  @IsOptional()
+  description?: string;
+
+  @IsNumber()
+  @IsPositive()
+  @Type(() => Number)
+  unitPrice: number;
+
+  @IsString()
+  @IsOptional()
+  currency?: string;
+
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  moq?: number;
+
+  @IsNumber()
+  @IsOptional()
+  @Type(() => Number)
+  weightKg?: number;
+}

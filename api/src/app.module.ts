@@ -1,0 +1,38 @@
+import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+import { Supplier } from './suppliers/entities/supplier.entity';
+import { Product } from './products/entities/product.entity';
+import { PurchaseOrder } from './purchase-orders/entities/purchase-order.entity';
+import { PurchaseOrderLineItem } from './purchase-orders/entities/purchase-order-line-item.entity';
+import { SuppliersModule } from './suppliers/suppliers.module';
+import { ProductsModule } from './products/products.module';
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    TypeOrmModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: (config: ConfigService) => ({
+        type: 'postgres',
+        host: config.get('DATABASE_HOST'),
+        port: config.get<number>('DATABASE_PORT'),
+        username: config.get('DATABASE_USER'),
+        password: config.get('DATABASE_PASSWORD'),
+        database: config.get('DATABASE_NAME'),
+        entities: [Supplier, Product, PurchaseOrder, PurchaseOrderLineItem],
+        migrations: [__dirname + '/migrations/*{.ts,.js}'],
+        synchronize: false,
+        logging: config.get('NODE_ENV') === 'development',
+      }),
+      inject: [ConfigService],
+    }),
+    SuppliersModule,
+    ProductsModule,
+  ],
+  controllers: [AppController],
+  providers: [AppService],
+})
+export class AppModule {}
