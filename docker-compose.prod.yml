@@ -28,6 +28,8 @@ services:
       DATABASE_PASSWORD: ${DB_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
       NODE_ENV: production
+    ports:
+      - '3010:3000'
     depends_on:
       - postgres
     networks:
@@ -39,22 +41,8 @@ services:
       dockerfile: Dockerfile.prod
     container_name: kora_world_web
     restart: unless-stopped
-    networks:
-      - kora_network
-
-  nginx:
-    image: nginx:alpine
-    container_name: kora_world_nginx
-    restart: unless-stopped
     ports:
-      - '80:80'
-      - '443:443'
-    volumes:
-      - ./nginx/prod.conf:/etc/nginx/conf.d/default.conf
-      - /etc/letsencrypt:/etc/letsencrypt:ro
-    depends_on:
-      - api
-      - web
+      - '4210:80'
     networks:
       - kora_network
 
