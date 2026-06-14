@@ -56,6 +56,9 @@ export class Product {
   })
   weightKg: number;
 
+  @Column({ type: 'jsonb', nullable: true })
+  construction?: Record<string, string>;
+
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
 

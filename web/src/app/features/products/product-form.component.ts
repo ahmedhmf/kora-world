@@ -118,6 +118,64 @@ import { CreateProductDto } from '../../core/models/product.model';
             ></textarea>
           </div>
 
+          <!-- Construction Details (Only for Balls - Football/Handball) -->
+          @if (form.category === 'football' || form.category === 'handball') {
+            <div class="col-span-2 border-t border-zinc-800 pt-5 mt-2">
+              <div class="flex justify-between items-center mb-4">
+                <div>
+                  <h3 class="text-sm font-semibold text-white">Construction Details</h3>
+                  <p class="text-zinc-500 text-xs mt-0.5">Specify panels, stitching type, bladder, or outer material.</p>
+                </div>
+                <button
+                  type="button"
+                  (click)="addConstructionPair()"
+                  class="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium rounded-md transition-colors"
+                >
+                  + Add Detail
+                </button>
+              </div>
+
+              @for (pair of constructionPairs; track $index) {
+                <div class="flex gap-3 mb-3 items-center">
+                  <input
+                    type="text"
+                    [(ngModel)]="pair.key"
+                    [name]="'constKey_' + $index"
+                    required
+                    placeholder="Specification (e.g. Panels, Bladder)"
+                    class="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
+                  />
+                  <input
+                    type="text"
+                    [(ngModel)]="pair.value"
+                    [name]="'constVal_' + $index"
+                    required
+                    placeholder="Value (e.g. 32, Latex bladder)"
+                    class="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
+                  />
+                  <button
+                    type="button"
+                    (click)="removeConstructionPair($index)"
+                    class="text-red-400 hover:text-red-300 text-xs font-semibold px-2 py-1.5 transition-colors"
+                  >
+                    Delete
+                  </button>
+                </div>
+              } @empty {
+                <div class="bg-zinc-900/50 border border-dashed border-zinc-800 rounded-lg p-6 text-center">
+                  <p class="text-zinc-500 text-xs">No construction details added yet.</p>
+                  <button
+                    type="button"
+                    (click)="addConstructionPair()"
+                    class="text-white hover:underline text-xs font-medium mt-1 inline-block"
+                  >
+                    Add the first specification
+                  </button>
+                </div>
+              }
+            </div>
+          }
+
         </div>
 
         <div class="flex gap-3 pt-2">
@@ -149,6 +207,8 @@ export class ProductFormComponent implements OnInit {
   readonly isEdit = signal(false);
   private editId = signal<number | null>(null);
 
+  constructionPairs: { key: string; value: string }[] = [];
+
   form: CreateProductDto = {
     supplierId: 0,
     articleNumber: '',
@@ -160,6 +220,14 @@ export class ProductFormComponent implements OnInit {
     moq: undefined,
     weightKg: undefined,
   };
+
+  addConstructionPair(): void {
+    this.constructionPairs.push({ key: '', value: '' });
+  }
+
+  removeConstructionPair(index: number): void {
+    this.constructionPairs.splice(index, 1);
+  }
 
   ngOnInit(): void {
     this.suppliersStore.loadSuppliers();
@@ -180,6 +248,10 @@ export class ProductFormComponent implements OnInit {
           moq: product.moq,
           weightKg: product.weightKg,
         };
+        // Populate construction pairs
+        this.constructionPairs = Object.entries(product.construction || {}).map(
+          ([key, value]) => ({ key, value })
+        );
       });
     }
   }
@@ -193,6 +265,19 @@ export class ProductFormComponent implements OnInit {
 
     // supplierId must always be included
     dto.supplierId = this.form.supplierId;
+
+    // Serialize construction pairs if category is football or handball
+    if (this.form.category === 'football' || this.form.category === 'handball') {
+      const constructionObj: Record<string, string> = {};
+      for (const pair of this.constructionPairs) {
+        if (pair.key.trim()) {
+          constructionObj[pair.key.trim()] = pair.value;
+        }
+      }
+      dto.construction = Object.keys(constructionObj).length > 0 ? constructionObj : (null as any);
+    } else {
+      dto.construction = null as any;
+    }
 
     if (this.isEdit() && this.editId()) {
       this.store.updateProduct({ id: this.editId()!, dto });

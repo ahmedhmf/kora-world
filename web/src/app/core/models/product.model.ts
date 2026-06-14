@@ -16,6 +16,7 @@ export interface Product {
   isActive: boolean;
   createdAt?: string;
   supplier?: Supplier;
+  construction?: Record<string, string>;
 }
 
 export interface CreateProductDto {
@@ -28,4 +29,5 @@ export interface CreateProductDto {
   currency?: string;
   moq?: number;
   weightKg?: number;
+  construction?: Record<string, string>;
 }

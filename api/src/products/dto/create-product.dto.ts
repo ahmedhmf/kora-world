@@ -7,6 +7,7 @@ import {
   IsEnum,
   IsPositive,
   Min,
+  IsObject,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ProductCategory } from '../entities/product.entity';
@@ -50,4 +51,8 @@ export class CreateProductDto {
   @IsOptional()
   @Type(() => Number)
   weightKg?: number;
+
+  @IsObject()
+  @IsOptional()
+  construction?: Record<string, string>;
 }

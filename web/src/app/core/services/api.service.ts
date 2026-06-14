@@ -3,6 +3,9 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { Supplier, CreateSupplierDto } from '../models/supplier.model';
 import { Product, CreateProductDto } from '../models/product.model';
+import { Prototype, CreatePrototypeDto } from '../models/prototype.model';
+import { PurchaseOrder, CreatePurchaseOrderDto } from '../models/purchase-order.model';
+import { User, CreateUserDto } from '../models/user.model';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
@@ -54,5 +57,68 @@ export class ApiService {
 
   deleteProduct(id: number): Observable<void> {
     return this.http.delete<void>(`${this.base}/products/${id}`);
+  }
+
+  // Prototypes
+  getPrototypes(): Observable<Prototype[]> {
+    return this.http.get<Prototype[]>(`${this.base}/prototypes`);
+  }
+
+  getPrototype(id: number): Observable<Prototype> {
+    return this.http.get<Prototype>(`${this.base}/prototypes/${id}`);
+  }
+
+  createPrototype(dto: CreatePrototypeDto): Observable<Prototype> {
+    return this.http.post<Prototype>(`${this.base}/prototypes`, dto);
+  }
+
+  updatePrototype(id: number, dto: Partial<CreatePrototypeDto>): Observable<Prototype> {
+    return this.http.put<Prototype>(`${this.base}/prototypes/${id}`, dto);
+  }
+
+  deletePrototype(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.base}/prototypes/${id}`);
+  }
+
+  // Purchase Orders
+  getPurchaseOrders(): Observable<PurchaseOrder[]> {
+    return this.http.get<PurchaseOrder[]>(`${this.base}/purchase-orders`);
+  }
+
+  getPurchaseOrder(id: number): Observable<PurchaseOrder> {
+    return this.http.get<PurchaseOrder>(`${this.base}/purchase-orders/${id}`);
+  }
+
+  createPurchaseOrder(dto: CreatePurchaseOrderDto): Observable<PurchaseOrder> {
+    return this.http.post<PurchaseOrder>(`${this.base}/purchase-orders`, dto);
+  }
+
+  updatePurchaseOrder(id: number, dto: Partial<CreatePurchaseOrderDto>): Observable<PurchaseOrder> {
+    return this.http.put<PurchaseOrder>(`${this.base}/purchase-orders/${id}`, dto);
+  }
+
+  deletePurchaseOrder(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.base}/purchase-orders/${id}`);
+  }
+
+  // Users
+  getUsers(): Observable<User[]> {
+    return this.http.get<User[]>(`${this.base}/users`);
+  }
+
+  getUser(id: number): Observable<User> {
+    return this.http.get<User>(`${this.base}/users/${id}`);
+  }
+
+  createUser(dto: CreateUserDto): Observable<User> {
+    return this.http.post<User>(`${this.base}/users`, dto);
+  }
+
+  updateUser(id: number, dto: Partial<CreateUserDto>): Observable<User> {
+    return this.http.put<User>(`${this.base}/users/${id}`, dto);
+  }
+
+  deleteUser(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.base}/users/${id}`);
   }
 }

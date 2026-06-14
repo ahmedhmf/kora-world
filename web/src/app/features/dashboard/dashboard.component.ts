@@ -2,6 +2,8 @@ import { Component, inject, OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { SuppliersStore } from '../../store/suppliers.store';
 import { ProductsStore } from '../../store/products.store';
+import { PurchaseOrdersStore } from '../../store/purchase-orders.store';
+import { PrototypesStore } from '../../store/prototypes.store';
 
 @Component({
   selector: 'app-dashboard',
@@ -14,20 +16,32 @@ import { ProductsStore } from '../../store/products.store';
         <p class="text-zinc-400 text-sm mt-1">Welcome to Kora World</p>
       </div>
 
-      <div class="grid grid-cols-3 gap-4 mb-8">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+        <!-- Suppliers -->
         <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
           <p class="text-zinc-400 text-sm mb-1">Suppliers</p>
           <p class="text-3xl font-bold text-white">{{ suppliersStore.totalSuppliers() }}</p>
           <a routerLink="/suppliers" class="text-zinc-500 text-xs hover:text-zinc-300 mt-2 inline-block">View all →</a>
         </div>
+
+        <!-- Products -->
         <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
           <p class="text-zinc-400 text-sm mb-1">Products</p>
           <p class="text-3xl font-bold text-white">{{ productsStore.totalProducts() }}</p>
           <a routerLink="/products" class="text-zinc-500 text-xs hover:text-zinc-300 mt-2 inline-block">View all →</a>
         </div>
+
+        <!-- Prototypes -->
+        <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+          <p class="text-zinc-400 text-sm mb-1">Prototypes</p>
+          <p class="text-3xl font-bold text-white">{{ prototypesStore.totalPrototypes() }}</p>
+          <a routerLink="/prototypes" class="text-zinc-500 text-xs hover:text-zinc-300 mt-2 inline-block">View all →</a>
+        </div>
+
+        <!-- Purchase Orders -->
         <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
           <p class="text-zinc-400 text-sm mb-1">Purchase Orders</p>
-          <p class="text-3xl font-bold text-white">—</p>
+          <p class="text-3xl font-bold text-white">{{ purchaseOrdersStore.totalOrders() }}</p>
           <a routerLink="/purchase-orders" class="text-zinc-500 text-xs hover:text-zinc-300 mt-2 inline-block">View all →</a>
         </div>
       </div>
@@ -37,9 +51,13 @@ import { ProductsStore } from '../../store/products.store';
 export class DashboardComponent implements OnInit {
   readonly suppliersStore = inject(SuppliersStore);
   readonly productsStore = inject(ProductsStore);
+  readonly prototypesStore = inject(PrototypesStore);
+  readonly purchaseOrdersStore = inject(PurchaseOrdersStore);
 
   ngOnInit(): void {
     this.suppliersStore.loadSuppliers();
     this.productsStore.loadProducts({});
+    this.prototypesStore.loadPrototypes();
+    this.purchaseOrdersStore.loadPurchaseOrders();
   }
 }

@@ -94,7 +94,18 @@ import { ProductCategory } from '../../core/models/product.model';
               @for (product of store.filteredProducts(); track product.id) {
                 <tr class="border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors">
                   <td class="px-6 py-4 text-zinc-400 font-mono text-xs">{{ product.articleNumber }}</td>
-                  <td class="px-6 py-4 font-medium text-white">{{ product.name }}</td>
+                  <td class="px-6 py-4 font-medium text-white">
+                    <div>{{ product.name }}</div>
+                    @if (product.construction && Object.keys(product.construction).length > 0) {
+                      <div class="flex flex-wrap gap-1.5 mt-1.5">
+                        @for (entry of Object.entries(product.construction); track entry[0]) {
+                          <span class="text-[10px] bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded border border-zinc-700/50">
+                            {{ entry[0] }}: {{ entry[1] }}
+                          </span>
+                        }
+                      </div>
+                    }
+                  </td>
                   <td class="px-6 py-4">
                     <span class="px-2 py-1 rounded-md text-xs font-medium"
                       [class]="categoryClass(product.category)">
@@ -128,6 +139,8 @@ import { ProductCategory } from '../../core/models/product.model';
 export class ProductsListComponent implements OnInit {
   readonly store = inject(ProductsStore);
   readonly suppliersStore = inject(SuppliersStore);
+
+  readonly Object = Object;
 
   selectedSupplier: number | null = null;
   selectedCategory: ProductCategory | null = null;

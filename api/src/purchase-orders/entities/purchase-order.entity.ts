@@ -35,7 +35,7 @@ export class PurchaseOrder {
   orderDate: Date;
 
   @Column({ name: 'expected_delivery', type: 'date', nullable: true })
-  expectedDelivery: Date;
+  expectedDelivery: Date | null;
 
   @Column({
     type: 'enum',
@@ -58,6 +58,9 @@ export class PurchaseOrder {
 
   @Column({ length: 10, nullable: true })
   currency: string;
+
+  @Column({ name: 'shipping_cost', type: 'numeric', precision: 12, scale: 2, default: 0 })
+  shippingCost: number;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

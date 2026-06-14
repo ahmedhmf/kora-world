@@ -40,6 +40,9 @@ export class Supplier {
   @Column({ type: 'text', nullable: true })
   notes: string;
 
+  @Column({ name: 'shipping_rate_per_kg', type: 'numeric', precision: 10, scale: 2, default: 0 })
+  shippingRatePerKg: number;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

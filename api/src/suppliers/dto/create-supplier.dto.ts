@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsInt, IsEmail, Min } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsInt, IsEmail, Min, IsIn, IsNumber } from 'class-validator';
 
 export class CreateSupplierDto {
   @IsString()
@@ -6,20 +6,20 @@ export class CreateSupplierDto {
   name: string;
 
   @IsString()
-  @IsOptional()
-  country?: string;
+  @IsNotEmpty()
+  country: string;
 
   @IsString()
-  @IsOptional()
-  contactName?: string;
+  @IsNotEmpty()
+  contactName: string;
 
   @IsEmail()
-  @IsOptional()
-  contactEmail?: string;
+  @IsNotEmpty()
+  contactEmail: string;
 
   @IsString()
-  @IsOptional()
-  contactPhone?: string;
+  @IsNotEmpty()
+  contactPhone: string;
 
   @IsString()
   @IsOptional()
@@ -31,10 +31,16 @@ export class CreateSupplierDto {
   leadTimeDays?: number;
 
   @IsString()
-  @IsOptional()
-  currency?: string;
+  @IsNotEmpty()
+  @IsIn(['USD', 'EUR', 'EGP'])
+  currency: string;
 
   @IsString()
   @IsOptional()
   notes?: string;
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  shippingRatePerKg?: number;
 }
