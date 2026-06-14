@@ -103,6 +103,27 @@ import { CreatePurchaseOrderDto, POStatus } from '../../core/models/purchase-ord
                 <option value="cancelled">Cancelled</option>
               </select>
             </div>
+
+            <!-- Carrier & Tracking -->
+            <div>
+              <label class="block text-sm font-medium text-zinc-400 mb-1.5">Carrier</label>
+              <input
+                type="text"
+                [(ngModel)]="form.carrier" name="carrier"
+                placeholder="e.g. DHL, Maersk, Fedex"
+                class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
+              />
+            </div>
+            
+            <div>
+              <label class="block text-sm font-medium text-zinc-400 mb-1.5">Tracking Number / Container ID</label>
+              <input
+                type="text"
+                [(ngModel)]="form.trackingNumber" name="trackingNumber"
+                placeholder="e.g. 1Z999AA10123456784"
+                class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
+              />
+            </div>
           } @else {
             <div class="flex items-center pt-6 text-zinc-500 text-xs">
               <span>* PO number is automatically generated sequentially on save.</span>
@@ -328,6 +349,8 @@ export class PurchaseOrderFormComponent implements OnInit {
     status: 'draft',
     notes: '',
     currency: 'USD',
+    carrier: '',
+    trackingNumber: '',
   };
 
   ngOnInit(): void {
@@ -345,6 +368,8 @@ export class PurchaseOrderFormComponent implements OnInit {
           status: po.status,
           notes: po.notes || '',
           currency: po.currency || 'USD',
+          carrier: po.carrier || '',
+          trackingNumber: po.trackingNumber || '',
         };
         this.supplierName = po.supplier?.name || '';
         this.readOnlyLineItems = po.lineItems || [];
@@ -452,6 +477,8 @@ export class PurchaseOrderFormComponent implements OnInit {
         status: this.form.status,
         notes: this.form.notes || undefined,
         expectedDelivery: this.form.expectedDelivery || undefined,
+        carrier: this.form.carrier || undefined,
+        trackingNumber: this.form.trackingNumber || undefined,
       };
 
       this.store.updatePurchaseOrder({ id: this.editId()!, dto: payload });

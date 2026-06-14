@@ -6,10 +6,12 @@ import { SuppliersStore } from '../../store/suppliers.store';
 import { ApiService } from '../../core/services/api.service';
 import { CreatePrototypeDto } from '../../core/models/prototype.model';
 
+import { FileUploadComponent } from '../../shared/components/file-upload.component';
+
 @Component({
   selector: 'app-prototype-form',
   standalone: true,
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, FileUploadComponent],
   template: `
     <div class="p-8 max-w-2xl">
 
@@ -97,6 +99,28 @@ import { CreatePrototypeDto } from '../../core/models/prototype.model';
             }
           </div>
 
+          <!-- Carrier (Optional) -->
+          <div>
+            <label class="block text-sm font-medium text-zinc-400 mb-1.5">Carrier</label>
+            <input
+              type="text"
+              [(ngModel)]="form.carrier" name="carrier"
+              placeholder="e.g. DHL, Fedex, UPS"
+              class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
+            />
+          </div>
+
+          <!-- Tracking Number (Optional) -->
+          <div>
+            <label class="block text-sm font-medium text-zinc-400 mb-1.5">Tracking Number</label>
+            <input
+              type="text"
+              [(ngModel)]="form.trackingNumber" name="trackingNumber"
+              placeholder="e.g. 1Z999AA10123456784"
+              class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
+            />
+          </div>
+
           <!-- Comments (Optional) -->
           <div class="col-span-2">
             <label class="block text-sm font-medium text-zinc-400 mb-1.5">Comments / Evaluation Notes</label>
@@ -105,6 +129,17 @@ import { CreatePrototypeDto } from '../../core/models/prototype.model';
               class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600 resize-none"
               placeholder="Record feedback, test performance, or reasons for approval/rejection..."
             ></textarea>
+          </div>
+
+          <!-- Tech Pack File (Optional) -->
+          <div class="col-span-2 border-t border-zinc-800 pt-5 mt-2">
+            <app-file-upload
+              label="Digital Tech Pack Spec Sheet"
+              [filePath]="form.techPackPath || ''"
+              [fileName]="form.techPackName || ''"
+              (fileUploaded)="onTechPackUploaded($event)"
+              (fileRemoved)="onTechPackRemoved()"
+            ></app-file-upload>
           </div>
 
           <!-- Construction Details (Only for Balls - Football/Handball) -->
@@ -205,6 +240,10 @@ export class PrototypeFormComponent implements OnInit {
     category: undefined,
     status: 'requested',
     comments: '',
+    techPackPath: '',
+    techPackName: '',
+    carrier: '',
+    trackingNumber: '',
   };
 
   addConstructionPair(): void {
@@ -229,6 +268,10 @@ export class PrototypeFormComponent implements OnInit {
           category: proto.category,
           status: proto.status,
           comments: proto.comments || '',
+          techPackPath: proto.techPackPath || '',
+          techPackName: proto.techPackName || '',
+          carrier: proto.carrier || '',
+          trackingNumber: proto.trackingNumber || '',
         };
         // Populate construction pairs
         this.constructionPairs = Object.entries(proto.construction || {}).map(
@@ -268,5 +311,15 @@ export class PrototypeFormComponent implements OnInit {
     }
 
     this.router.navigate(['/prototypes']);
+  }
+
+  onTechPackUploaded(file: { path: string; name: string }): void {
+    this.form.techPackPath = file.path;
+    this.form.techPackName = file.name;
+  }
+
+  onTechPackRemoved(): void {
+    this.form.techPackPath = '';
+    this.form.techPackName = '';
   }
 }

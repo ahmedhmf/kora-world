@@ -15,6 +15,7 @@ import { PrototypesModule } from './prototypes/prototypes.module';
 import { PurchaseOrdersModule } from './purchase-orders/purchase-orders.module';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
+import { AttachmentsModule } from './attachments/attachments.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { AuthModule } from './auth/auth.module';
         database: config.get('DATABASE_NAME'),
         entities: [Supplier, Product, PurchaseOrder, PurchaseOrderLineItem, Prototype, User],
         migrations: [__dirname + '/migrations/*{.ts,.js}'],
+        migrationsRun: true,
         synchronize: false,
         logging: config.get('NODE_ENV') === 'development',
       }),
@@ -41,6 +43,7 @@ import { AuthModule } from './auth/auth.module';
     PurchaseOrdersModule,
     UsersModule,
     AuthModule,
+    AttachmentsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

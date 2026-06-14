@@ -18,9 +18,13 @@ export class AuthService {
     this.loadUserFromToken();
   }
 
+  private get base(): string {
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    return isLocal ? 'http://localhost:3000' : '/api';
+  }
+
   login(credentials: { email: string; password: string }): Observable<any> {
-    // Port 3000 is our NestJS backend
-    return this.http.post<any>('http://localhost:3000/auth/login', credentials).pipe(
+    return this.http.post<any>(`${this.base}/auth/login`, credentials).pipe(
       tap((res) => {
         if (res && res.token) {
           localStorage.setItem('kora_token', res.token);

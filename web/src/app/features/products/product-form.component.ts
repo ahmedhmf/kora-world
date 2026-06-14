@@ -6,10 +6,12 @@ import { SuppliersStore } from '../../store/suppliers.store';
 import { ApiService } from '../../core/services/api.service';
 import { CreateProductDto } from '../../core/models/product.model';
 
+import { FileUploadComponent } from '../../shared/components/file-upload.component';
+
 @Component({
   selector: 'app-product-form',
   standalone: true,
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, FileUploadComponent],
   template: `
     <div class="p-8 max-w-2xl">
 
@@ -23,6 +25,19 @@ import { CreateProductDto } from '../../core/models/product.model';
       @if (store.error()) {
         <div class="bg-red-900/30 border border-red-800 text-red-300 px-4 py-3 rounded-lg mb-6 text-sm">
           {{ store.error() }}
+        </div>
+      }
+
+      <!-- Prototype Prefill Info Banner -->
+      @if (fromPrototypeName()) {
+        <div class="bg-zinc-900 border border-zinc-800 text-zinc-300 px-4 py-3.5 rounded-lg mb-6 text-sm flex items-center space-x-3">
+          <svg class="h-5 w-5 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <div>
+            <span class="font-semibold text-white">Pre-filled from Prototype:</span> {{ fromPrototypeName() }}. 
+            Please review the prefilled details and specify the production <span class="text-white font-semibold">Article Number</span> and <span class="text-white font-semibold">Unit Price</span>.
+          </div>
         </div>
       }
 
@@ -118,6 +133,17 @@ import { CreateProductDto } from '../../core/models/product.model';
             ></textarea>
           </div>
 
+          <!-- Tech Pack File (Optional) -->
+          <div class="col-span-2 border-t border-zinc-800 pt-5 mt-2">
+            <app-file-upload
+              label="Digital Tech Pack Spec Sheet"
+              [filePath]="form.techPackPath || ''"
+              [fileName]="form.techPackName || ''"
+              (fileUploaded)="onTechPackUploaded($event)"
+              (fileRemoved)="onTechPackRemoved()"
+            ></app-file-upload>
+          </div>
+
           <!-- Construction Details (Only for Balls - Football/Handball) -->
           @if (form.category === 'football' || form.category === 'handball') {
             <div class="col-span-2 border-t border-zinc-800 pt-5 mt-2">
@@ -206,6 +232,7 @@ export class ProductFormComponent implements OnInit {
 
   readonly isEdit = signal(false);
   private editId = signal<number | null>(null);
+  readonly fromPrototypeName = signal<string | null>(null);
 
   constructionPairs: { key: string; value: string }[] = [];
 
@@ -219,6 +246,8 @@ export class ProductFormComponent implements OnInit {
     currency: '',
     moq: undefined,
     weightKg: undefined,
+    techPackPath: '',
+    techPackName: '',
   };
 
   addConstructionPair(): void {
@@ -247,12 +276,35 @@ export class ProductFormComponent implements OnInit {
           currency: product.currency,
           moq: product.moq,
           weightKg: product.weightKg,
+          techPackPath: product.techPackPath || '',
+          techPackName: product.techPackName || '',
         };
         // Populate construction pairs
         this.constructionPairs = Object.entries(product.construction || {}).map(
           ([key, value]) => ({ key, value })
         );
       });
+    } else {
+      // Check if prefilling from a prototype promotion
+      const fromProtoId = this.route.snapshot.queryParamMap.get('fromPrototypeId');
+      if (fromProtoId) {
+        this.api.getPrototype(+fromProtoId).subscribe((proto) => {
+          this.fromPrototypeName.set(proto.name);
+          this.form = {
+            ...this.form,
+            supplierId: proto.supplierId,
+            name: proto.name,
+            category: proto.category,
+            techPackPath: proto.techPackPath || '',
+            techPackName: proto.techPackName || '',
+          };
+          if (proto.construction) {
+            this.constructionPairs = Object.entries(proto.construction).map(
+              ([key, value]) => ({ key, value })
+            );
+          }
+        });
+      }
     }
   }
 
@@ -286,5 +338,15 @@ export class ProductFormComponent implements OnInit {
     }
 
     this.router.navigate(['/products']);
+  }
+
+  onTechPackUploaded(file: { path: string; name: string }): void {
+    this.form.techPackPath = file.path;
+    this.form.techPackName = file.name;
+  }
+
+  onTechPackRemoved(): void {
+    this.form.techPackPath = '';
+    this.form.techPackName = '';
   }
 }

@@ -10,7 +10,10 @@ import { User, CreateUserDto } from '../models/user.model';
 @Injectable({ providedIn: 'root' })
 export class ApiService {
   private readonly http = inject(HttpClient);
-  private readonly base = 'http://localhost:3000';
+  private get base(): string {
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    return isLocal ? 'http://localhost:3000' : '/api';
+  }
 
   // Suppliers
   getSuppliers(): Observable<Supplier[]> {
@@ -120,5 +123,18 @@ export class ApiService {
 
   deleteUser(id: number): Observable<void> {
     return this.http.delete<void>(`${this.base}/users/${id}`);
+  }
+
+  // Attachments
+  uploadFile(file: File): Observable<{ path: string; name: string }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.http.post<{ path: string; name: string }>(`${this.base}/attachments/upload`, formData);
+  }
+
+  downloadFile(path: string): Observable<Blob> {
+    return this.http.get(`${this.base}/attachments/download/${path}`, {
+      responseType: 'blob',
+    });
   }
 }

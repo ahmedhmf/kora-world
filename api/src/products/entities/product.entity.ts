@@ -59,6 +59,12 @@ export class Product {
   @Column({ type: 'jsonb', nullable: true })
   construction?: Record<string, string>;
 
+  @Column({ name: 'tech_pack_path', length: 255, nullable: true })
+  techPackPath?: string;
+
+  @Column({ name: 'tech_pack_name', length: 255, nullable: true })
+  techPackName?: string;
+
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
 

@@ -35,4 +35,20 @@ export class CreatePrototypeDto {
   @IsString()
   @IsOptional()
   comments?: string;
+
+  @IsString()
+  @IsOptional()
+  techPackPath?: string;
+
+  @IsString()
+  @IsOptional()
+  techPackName?: string;
+
+  @IsString()
+  @IsOptional()
+  carrier?: string;
+
+  @IsString()
+  @IsOptional()
+  trackingNumber?: string;
 }

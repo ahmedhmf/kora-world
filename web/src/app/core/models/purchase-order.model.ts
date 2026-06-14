@@ -30,6 +30,8 @@ export interface PurchaseOrder {
   supplier?: Supplier;
   lineItems?: PurchaseOrderLineItem[];
   shippingCost?: number;
+  carrier?: string;
+  trackingNumber?: string;
 }
 
 export interface CreatePurchaseOrderLineItemDto {
@@ -45,4 +47,6 @@ export interface CreatePurchaseOrderDto {
   notes?: string;
   lineItems: CreatePurchaseOrderLineItemDto[];
   shippingCost?: number;
+  carrier?: string;
+  trackingNumber?: string;
 }

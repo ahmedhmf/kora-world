@@ -55,4 +55,12 @@ export class CreateProductDto {
   @IsObject()
   @IsOptional()
   construction?: Record<string, string>;
+
+  @IsString()
+  @IsOptional()
+  techPackPath?: string;
+
+  @IsString()
+  @IsOptional()
+  techPackName?: string;
 }

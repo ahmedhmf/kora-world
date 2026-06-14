@@ -45,6 +45,18 @@ export class Prototype {
   @Column({ type: 'jsonb', nullable: true })
   construction?: Record<string, string>;
 
+  @Column({ name: 'tech_pack_path', length: 255, nullable: true })
+  techPackPath?: string;
+
+  @Column({ name: 'tech_pack_name', length: 255, nullable: true })
+  techPackName?: string;
+
+  @Column({ length: 100, nullable: true })
+  carrier?: string;
+
+  @Column({ name: 'tracking_number', length: 100, nullable: true })
+  trackingNumber?: string;
+
   @Column({ type: 'text', nullable: true })
   comments?: string;
 

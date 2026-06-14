@@ -62,6 +62,12 @@ export class PurchaseOrder {
   @Column({ name: 'shipping_cost', type: 'numeric', precision: 12, scale: 2, default: 0 })
   shippingCost: number;
 
+  @Column({ length: 100, nullable: true })
+  carrier?: string;
+
+  @Column({ name: 'tracking_number', length: 100, nullable: true })
+  trackingNumber?: string;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

@@ -1,6 +1,7 @@
 import { Component, inject, OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { PrototypesStore } from '../../store/prototypes.store';
+import { ApiService } from '../../core/services/api.service';
 
 @Component({
   selector: 'app-prototypes-list',
@@ -74,6 +75,17 @@ import { PrototypesStore } from '../../store/prototypes.store';
                         }
                       </div>
                     }
+                    @if (prototype.techPackPath) {
+                      <div
+                        (click)="downloadTechPack(prototype.techPackPath, prototype.techPackName || '')"
+                        class="mt-2 flex items-center space-x-1.5 text-xs text-zinc-400 hover:text-white cursor-pointer select-none"
+                      >
+                        <svg class="h-3.5 w-3.5 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        <span class="underline truncate max-w-[180px]">{{ prototype.techPackName || 'Download Tech Pack' }}</span>
+                      </div>
+                    }
                   </td>
                   <td class="px-6 py-4 text-zinc-400">{{ prototype.supplier?.name ?? '—' }}</td>
                   <td class="px-6 py-4">
@@ -92,6 +104,19 @@ import { PrototypesStore } from '../../store/prototypes.store';
                     {{ prototype.comments || '—' }}
                   </td>
                   <td class="px-6 py-4 text-right">
+                    @if (prototype.status === 'approved') {
+                      <a
+                        [routerLink]="['/products/new']"
+                        [queryParams]="{ fromPrototypeId: prototype.id }"
+                        class="text-emerald-400 hover:text-emerald-300 text-xs font-semibold mr-4 inline-flex items-center"
+                        title="Promote approved prototype to Product"
+                      >
+                        <svg class="h-3.5 w-3.5 mr-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 11l3-3m0 0l3 3m-3-3v8m0-13a9 9 0 110 18 9 9 0 010-18z" />
+                        </svg>
+                        <span>Promote</span>
+                      </a>
+                    }
                     <a
                       [routerLink]="['/prototypes', prototype.id, 'edit']"
                       class="text-zinc-400 hover:text-white text-xs underline mr-4"
@@ -112,6 +137,7 @@ import { PrototypesStore } from '../../store/prototypes.store';
 })
 export class PrototypesListComponent implements OnInit {
   readonly store = inject(PrototypesStore);
+  private readonly api = inject(ApiService);
   readonly Object = Object;
 
   ngOnInit(): void {
@@ -122,6 +148,23 @@ export class PrototypesListComponent implements OnInit {
     if (confirm('Delete this prototype record?')) {
       this.store.deletePrototype(id);
     }
+  }
+
+  downloadTechPack(path: string, originalName: string): void {
+    this.api.downloadFile(path).subscribe({
+      next: (blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = originalName || 'tech-pack';
+        a.click();
+        window.URL.revokeObjectURL(url);
+      },
+      error: (err) => {
+        alert('Could not download file. You may not have access permission.');
+        console.error('Download error:', err);
+      }
+    });
   }
 
   categoryClass(category?: string): string {

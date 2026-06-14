@@ -53,4 +53,12 @@ export class CreatePurchaseOrderDto {
   @Type(() => CreatePurchaseOrderLineItemDto)
   @ArrayNotEmpty()
   lineItems: CreatePurchaseOrderLineItemDto[];
+
+  @IsString()
+  @IsOptional()
+  carrier?: string;
+
+  @IsString()
+  @IsOptional()
+  trackingNumber?: string;
 }

@@ -17,6 +17,8 @@ export interface Product {
   createdAt?: string;
   supplier?: Supplier;
   construction?: Record<string, string>;
+  techPackPath?: string;
+  techPackName?: string;
 }
 
 export interface CreateProductDto {
@@ -30,4 +32,6 @@ export interface CreateProductDto {
   moq?: number;
   weightKg?: number;
   construction?: Record<string, string>;
+  techPackPath?: string;
+  techPackName?: string;
 }

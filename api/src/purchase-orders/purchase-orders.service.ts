@@ -114,6 +114,8 @@ export class PurchaseOrdersService {
       totalValue,
       currency: supplier.currency || 'USD',
       lineItems: lineItemsData,
+      carrier: dto.carrier,
+      trackingNumber: dto.trackingNumber,
     });
 
     return this.poRepo.save(po);
@@ -137,6 +139,8 @@ export class PurchaseOrdersService {
     if (dto.status) po.status = dto.status;
     if (dto.expectedDelivery !== undefined) po.expectedDelivery = dto.expectedDelivery ? new Date(dto.expectedDelivery) : null;
     if (dto.notes !== undefined) po.notes = dto.notes;
+    if (dto.carrier !== undefined) po.carrier = dto.carrier;
+    if (dto.trackingNumber !== undefined) po.trackingNumber = dto.trackingNumber;
 
     return this.poRepo.save(po);
   }

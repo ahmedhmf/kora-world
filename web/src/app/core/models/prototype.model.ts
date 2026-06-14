@@ -11,6 +11,10 @@ export interface Prototype {
   status: PrototypeStatus;
   construction?: Record<string, string>;
   comments?: string;
+  techPackPath?: string;
+  techPackName?: string;
+  carrier?: string;
+  trackingNumber?: string;
   createdAt?: string;
   supplier?: Supplier;
 }
@@ -22,4 +26,8 @@ export interface CreatePrototypeDto {
   status: PrototypeStatus;
   construction?: Record<string, string>;
   comments?: string;
+  techPackPath?: string;
+  techPackName?: string;
+  carrier?: string;
+  trackingNumber?: string;
 }

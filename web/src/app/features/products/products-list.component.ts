@@ -5,6 +5,7 @@ import { DecimalPipe } from '@angular/common';
 import { ProductsStore } from '../../store/products.store';
 import { SuppliersStore } from '../../store/suppliers.store';
 import { ProductCategory } from '../../core/models/product.model';
+import { ApiService } from '../../core/services/api.service';
 
 @Component({
   selector: 'app-products-list',
@@ -105,6 +106,17 @@ import { ProductCategory } from '../../core/models/product.model';
                         }
                       </div>
                     }
+                    @if (product.techPackPath) {
+                      <div
+                        (click)="downloadTechPack(product.techPackPath, product.techPackName || '')"
+                        class="mt-2 flex items-center space-x-1.5 text-xs text-zinc-400 hover:text-white cursor-pointer select-none"
+                      >
+                        <svg class="h-3.5 w-3.5 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        <span class="underline truncate max-w-[180px]">{{ product.techPackName || 'Download Tech Pack' }}</span>
+                      </div>
+                    }
                   </td>
                   <td class="px-6 py-4">
                     <span class="px-2 py-1 rounded-md text-xs font-medium"
@@ -139,6 +151,7 @@ import { ProductCategory } from '../../core/models/product.model';
 export class ProductsListComponent implements OnInit {
   readonly store = inject(ProductsStore);
   readonly suppliersStore = inject(SuppliersStore);
+  private readonly api = inject(ApiService);
 
   readonly Object = Object;
 
@@ -161,6 +174,23 @@ export class ProductsListComponent implements OnInit {
     if (confirm('Delete this product?')) {
       this.store.deleteProduct(id);
     }
+  }
+
+  downloadTechPack(path: string, originalName: string): void {
+    this.api.downloadFile(path).subscribe({
+      next: (blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = originalName || 'tech-pack';
+        a.click();
+        window.URL.revokeObjectURL(url);
+      },
+      error: (err) => {
+        alert('Could not download file. You may not have access permission.');
+        console.error('Download error:', err);
+      }
+    });
   }
 
   categoryClass(category?: string): string {
