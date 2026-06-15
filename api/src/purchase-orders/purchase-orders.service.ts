@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { PurchaseOrder, POStatus } from './entities/purchase-order.entity';
@@ -30,7 +34,9 @@ export class PurchaseOrdersService {
     const po = await this.poRepo.findOne({
       where: { id },
       relations: {
-        supplier: true,
+        supplier: {
+          contacts: true,
+        },
         lineItems: {
           product: true,
         },
@@ -64,11 +70,11 @@ export class PurchaseOrdersService {
 
     for (const item of dto.lineItems) {
       const product = await this.productsService.findOne(item.productId);
-      
+
       // Ensure product belongs to supplier
       if (product.supplierId !== dto.supplierId) {
         throw new BadRequestException(
-          `Product #${product.id} (${product.name}) does not belong to Supplier #${dto.supplierId} (${supplier.name})`
+          `Product #${product.id} (${product.name}) does not belong to Supplier #${dto.supplierId} (${supplier.name})`,
         );
       }
 
@@ -99,7 +105,9 @@ export class PurchaseOrdersService {
       expectedDelivery = new Date(dto.expectedDelivery);
     } else if (supplier.leadTimeDays) {
       const orderDate = new Date(dto.orderDate);
-      expectedDelivery = new Date(orderDate.getTime() + supplier.leadTimeDays * 24 * 60 * 60 * 1000);
+      expectedDelivery = new Date(
+        orderDate.getTime() + supplier.leadTimeDays * 24 * 60 * 60 * 1000,
+      );
     }
 
     // 5. Create and Save Purchase Order
@@ -121,26 +129,37 @@ export class PurchaseOrdersService {
     return this.poRepo.save(po);
   }
 
-  async update(id: number, dto: UpdatePurchaseOrderDto): Promise<PurchaseOrder> {
+  async update(
+    id: number,
+    dto: UpdatePurchaseOrderDto,
+  ): Promise<PurchaseOrder> {
     const po = await this.findOne(id);
 
     // If updating supplier or line items, we restrict this in update (business rule)
     // To update line items, users should cancel and make a new PO, or we only update basic properties
     if (dto.supplierId && dto.supplierId !== po.supplierId) {
-      throw new BadRequestException('Cannot change supplier of an existing Purchase Order');
+      throw new BadRequestException(
+        'Cannot change supplier of an existing Purchase Order',
+      );
     }
 
     if (dto.lineItems) {
       // For simplicity, we only allow modifying status/dates/notes.
       // Re-calculating nested line items on update requires deleting old line items, but for now we block it.
-      throw new BadRequestException('Line items cannot be modified after creation. Please recreate the order if changes are needed.');
+      throw new BadRequestException(
+        'Line items cannot be modified after creation. Please recreate the order if changes are needed.',
+      );
     }
 
     if (dto.status) po.status = dto.status;
-    if (dto.expectedDelivery !== undefined) po.expectedDelivery = dto.expectedDelivery ? new Date(dto.expectedDelivery) : null;
+    if (dto.expectedDelivery !== undefined)
+      po.expectedDelivery = dto.expectedDelivery
+        ? new Date(dto.expectedDelivery)
+        : null;
     if (dto.notes !== undefined) po.notes = dto.notes;
     if (dto.carrier !== undefined) po.carrier = dto.carrier;
-    if (dto.trackingNumber !== undefined) po.trackingNumber = dto.trackingNumber;
+    if (dto.trackingNumber !== undefined)
+      po.trackingNumber = dto.trackingNumber;
 
     return this.poRepo.save(po);
   }

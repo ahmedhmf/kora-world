@@ -1,4 +1,9 @@
-import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
 import { verifyJwt } from './crypto-auth.helper';
@@ -8,7 +13,9 @@ export class AuthGuard implements CanActivate {
   private jwtSecret: string;
 
   constructor(private configService: ConfigService) {
-    this.jwtSecret = this.configService.get<string>('JWT_SECRET') || 'kora_super_secret_jwt_key_2026';
+    this.jwtSecret =
+      this.configService.get<string>('JWT_SECRET') ||
+      'kora_super_secret_jwt_key_2026';
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -20,7 +27,9 @@ export class AuthGuard implements CanActivate {
 
     const payload = verifyJwt(token, this.jwtSecret);
     if (!payload) {
-      throw new UnauthorizedException('Invalid or expired authentication token');
+      throw new UnauthorizedException(
+        'Invalid or expired authentication token',
+      );
     }
 
     // Attach user payload to request

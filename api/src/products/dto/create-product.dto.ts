@@ -63,4 +63,30 @@ export class CreateProductDto {
   @IsString()
   @IsOptional()
   techPackName?: string;
+
+  @IsString()
+  @IsOptional()
+  imagePath?: string;
+
+  @IsString()
+  @IsOptional()
+  imageName?: string;
+
+  @IsString()
+  @IsOptional()
+  collection?: string;
+
+  @IsInt()
+  @IsOptional()
+  @Type(() => Number)
+  year?: number;
+
+  @IsInt()
+  @IsOptional()
+  @Type(() => Number)
+  articleCounter?: number;
+
+  @IsString()
+  @IsOptional()
+  pricepoint?: string;
 }

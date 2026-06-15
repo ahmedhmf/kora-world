@@ -31,6 +31,20 @@ export class ProductsController {
     return this.productsService.findAll(supplierId, category);
   }
 
+  @Get('next-counter')
+  async getNextCounter(
+    @Query('collection') collection: string,
+    @Query('year') year: string,
+    @Query('category') category: string,
+  ) {
+    const nextCounter = await this.productsService.getNextCounter(
+      collection,
+      year ? parseInt(year, 10) : 0,
+      category,
+    );
+    return { counter: nextCounter };
+  }
+
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.productsService.findOne(id);

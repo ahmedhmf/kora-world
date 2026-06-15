@@ -1,4 +1,8 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
@@ -12,13 +16,22 @@ export class UsersService {
   ) {}
 
   async findByEmail(email: string): Promise<User | null> {
-    return this.usersRepository.findOneBy({ email: email.toLowerCase().trim() });
+    return this.usersRepository.findOneBy({
+      email: email.toLowerCase().trim(),
+    });
   }
 
   async findAll(): Promise<User[]> {
     // Select specific columns to securely exclude password hashes
     return this.usersRepository.find({
-      select: { id: true, email: true, name: true, role: true, createdAt: true, updatedAt: true },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        createdAt: true,
+        updatedAt: true,
+      },
       order: { id: 'ASC' },
     });
   }
@@ -26,7 +39,14 @@ export class UsersService {
   async findOne(id: number): Promise<User> {
     const user = await this.usersRepository.findOne({
       where: { id },
-      select: { id: true, email: true, name: true, role: true, createdAt: true, updatedAt: true },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     });
     if (!user) {
       throw new NotFoundException(`User with ID ${id} not found`);
@@ -38,7 +58,9 @@ export class UsersService {
     const email = dto.email.toLowerCase().trim();
     const existing = await this.findByEmail(email);
     if (existing) {
-      throw new BadRequestException('A user with this email address already exists');
+      throw new BadRequestException(
+        'A user with this email address already exists',
+      );
     }
 
     if (!dto.password) {
@@ -69,7 +91,9 @@ export class UsersService {
       if (email !== user.email) {
         const existing = await this.findByEmail(email);
         if (existing) {
-          throw new BadRequestException('A user with this email address already exists');
+          throw new BadRequestException(
+            'A user with this email address already exists',
+          );
         }
         user.email = email;
       }

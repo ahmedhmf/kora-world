@@ -1,9 +1,9 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectorRef, Component, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { SuppliersStore } from '../../store/suppliers.store';
 import { ApiService } from '../../core/services/api.service';
-import { CreateSupplierDto } from '../../core/models/supplier.model';
+import { CreateSupplierDto, SupplierContact } from '../../core/models/supplier.model';
 import { COUNTRIES } from '../../core/constants/countries';
 
 @Component({
@@ -27,7 +27,7 @@ import { COUNTRIES } from '../../core/constants/countries';
       }
 
       <!-- Form -->
-      <form #supplierForm="ngForm" (ngSubmit)="supplierForm.valid && submit()" class="space-y-5">
+      <form #supplierForm="ngForm" (ngSubmit)="supplierForm.valid && contacts.length > 0 && submit()" class="space-y-5">
 
         <div class="grid grid-cols-2 gap-5">
           
@@ -132,54 +132,122 @@ import { COUNTRIES } from '../../core/constants/countries';
             }
           </div>
 
-          <!-- Contact Name (Required) -->
-          <div>
-            <label class="block text-sm font-medium text-zinc-400 mb-1.5">Contact Name *</label>
-            <input
-              [(ngModel)]="form.contactName" name="contactName" required #contactNameInput="ngModel"
-              class="w-full bg-zinc-900 border rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
-              [class.border-zinc-700]="!contactNameInput.invalid || (!contactNameInput.dirty && !contactNameInput.touched)"
-              [class.border-red-500]="contactNameInput.invalid && (contactNameInput.dirty || contactNameInput.touched)"
-              placeholder="Full name"
-            />
-            @if (contactNameInput.invalid && (contactNameInput.dirty || contactNameInput.touched)) {
-              <p class="text-red-500 text-xs mt-1.5">Contact Name is required</p>
-            }
-          </div>
+          <!-- Supplier Contacts builder -->
+          <div class="col-span-2 border-t border-zinc-800 pt-5 mt-2">
+            <div class="flex justify-between items-center mb-4">
+              <div>
+                <h3 class="text-sm font-semibold text-white">Supplier Contacts *</h3>
+                <p class="text-zinc-500 text-xs mt-0.5 font-normal">Add contacts and designated roles for POs and information notifications.</p>
+              </div>
+              <button
+                type="button"
+                (click)="addContact()"
+                class="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold rounded-md transition-colors"
+              >
+                + Add Contact
+              </button>
+            </div>
 
-          <!-- Contact Email (Required + Email Validation) -->
-          <div>
-            <label class="block text-sm font-medium text-zinc-400 mb-1.5">Contact Email *</label>
-            <input
-              [(ngModel)]="form.contactEmail" name="contactEmail" type="email" required email #contactEmailInput="ngModel"
-              class="w-full bg-zinc-900 border rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
-              [class.border-zinc-700]="!contactEmailInput.invalid || (!contactEmailInput.dirty && !contactEmailInput.touched)"
-              [class.border-red-500]="contactEmailInput.invalid && (contactEmailInput.dirty || contactEmailInput.touched)"
-              placeholder="email@supplier.com"
-            />
-            @if (contactEmailInput.invalid && (contactEmailInput.dirty || contactEmailInput.touched)) {
-              <p class="text-red-500 text-xs mt-1.5">
-                @if (contactEmailInput.errors?.['required']) {
-                  Contact Email is required
-                } @else {
-                  Must be a valid email address
-                }
-              </p>
-            }
-          </div>
+            @for (c of contacts; track $index) {
+              <div class="bg-zinc-950/40 border border-zinc-800/80 rounded-lg p-4 mb-4 space-y-4">
+                <div class="flex justify-between items-center border-b border-zinc-800/50 pb-2">
+                  <span class="text-xs font-semibold text-zinc-400">Contact #{{ $index + 1 }}</span>
+                  <button
+                    type="button"
+                    (click)="removeContact($index)"
+                    class="text-red-400 hover:text-red-300 text-xs font-semibold"
+                  >
+                    Remove
+                  </button>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4">
+                  <!-- Contact Name -->
+                  <div>
+                    <label class="block text-xs font-medium text-zinc-500 mb-1">Name *</label>
+                    <input
+                      type="text"
+                      [(ngModel)]="c.name"
+                      [name]="'contactName_' + $index"
+                      required
+                      placeholder="Contact name"
+                      class="w-full bg-zinc-900 border border-zinc-800 rounded-md px-3 py-2 text-white text-xs focus:outline-none focus:border-zinc-500"
+                    />
+                  </div>
+                  
+                  <!-- Contact Email -->
+                  <div>
+                    <label class="block text-xs font-medium text-zinc-500 mb-1">Email *</label>
+                    <input
+                      type="email"
+                      [(ngModel)]="c.email"
+                      [name]="'contactEmail_' + $index"
+                      required
+                      email
+                      placeholder="email@supplier.com"
+                      class="w-full bg-zinc-900 border border-zinc-800 rounded-md px-3 py-2 text-white text-xs focus:outline-none focus:border-zinc-500"
+                    />
+                  </div>
 
-          <!-- Contact Phone (Required) -->
-          <div>
-            <label class="block text-sm font-medium text-zinc-400 mb-1.5">Contact Phone *</label>
-            <input
-              [(ngModel)]="form.contactPhone" name="contactPhone" required #contactPhoneInput="ngModel"
-              class="w-full bg-zinc-900 border rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
-              [class.border-zinc-700]="!contactPhoneInput.invalid || (!contactPhoneInput.dirty && !contactPhoneInput.touched)"
-              [class.border-red-500]="contactPhoneInput.invalid && (contactPhoneInput.dirty || contactPhoneInput.touched)"
-              placeholder="+92 ..."
-            />
-            @if (contactPhoneInput.invalid && (contactPhoneInput.dirty || contactPhoneInput.touched)) {
-              <p class="text-red-500 text-xs mt-1.5">Contact Phone is required</p>
+                  <!-- Contact Phone -->
+                  <div>
+                    <label class="block text-xs font-medium text-zinc-500 mb-1">Phone</label>
+                    <input
+                      type="text"
+                      [(ngModel)]="c.phone"
+                      [name]="'contactPhone_' + $index"
+                      placeholder="Phone number"
+                      class="w-full bg-zinc-900 border border-zinc-800 rounded-md px-3 py-2 text-white text-xs focus:outline-none focus:border-zinc-500"
+                    />
+                  </div>
+
+                  <!-- Contact Role -->
+                  <div>
+                    <label class="block text-xs font-medium text-zinc-500 mb-1">Role / Title</label>
+                    <input
+                      type="text"
+                      [(ngModel)]="c.role"
+                      [name]="'contactRole_' + $index"
+                      placeholder="e.g. Sales, Account, Logistics"
+                      class="w-full bg-zinc-900 border border-zinc-800 rounded-md px-3 py-2 text-white text-xs focus:outline-none focus:border-zinc-500"
+                    />
+                  </div>
+
+                  <!-- Notification Designation Checkboxes -->
+                  <div class="col-span-2 flex flex-col sm:flex-row gap-3 pt-1">
+                    <label class="inline-flex items-center text-xs text-zinc-400 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        [(ngModel)]="c.sendInfo"
+                        [name]="'contactSendInfo_' + $index"
+                        class="rounded border-zinc-700 bg-zinc-900 text-white focus:ring-0 mr-2"
+                      />
+                      Send Information Emails & Messages
+                    </label>
+
+                    <label class="inline-flex items-center text-xs text-zinc-400 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        [(ngModel)]="c.sendPo"
+                        [name]="'contactSendPo_' + $index"
+                        class="rounded border-zinc-700 bg-zinc-900 text-white focus:ring-0 mr-2"
+                      />
+                      Send Purchase Orders (POs)
+                    </label>
+                  </div>
+                </div>
+              </div>
+            } @empty {
+              <div class="bg-zinc-900/50 border border-dashed border-zinc-800 rounded-lg p-6 text-center">
+                <p class="text-zinc-500 text-xs">No contacts added yet. At least one contact is required.</p>
+                <button
+                  type="button"
+                  (click)="addContact()"
+                  class="text-white hover:underline text-xs font-medium mt-1 inline-block"
+                >
+                  Add the first contact
+                </button>
+              </div>
             }
           </div>
 
@@ -228,7 +296,7 @@ import { COUNTRIES } from '../../core/constants/countries';
         <div class="flex gap-3 pt-2">
           <button
             type="submit"
-            [disabled]="store.loading() || supplierForm.invalid"
+            [disabled]="store.loading() || supplierForm.invalid || contacts.length === 0"
             class="px-6 py-2.5 bg-white text-zinc-900 text-sm font-semibold rounded-lg hover:bg-zinc-100 transition-colors disabled:opacity-50"
           >
             {{ store.loading() ? 'Saving...' : (isEdit() ? 'Update Supplier' : 'Create Supplier') }}
@@ -250,6 +318,7 @@ export class SupplierFormComponent implements OnInit {
   private readonly api = inject(ApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly cdr = inject(ChangeDetectorRef);
 
   readonly isEdit = signal(false);
   private editId = signal<number | null>(null);
@@ -257,12 +326,11 @@ export class SupplierFormComponent implements OnInit {
   showCountryDropdown = false;
   countrySearchQuery = '';
 
-  form: CreateSupplierDto = {
+  contacts: SupplierContact[] = [];
+
+  form: Partial<CreateSupplierDto> = {
     name: '',
     country: '',
-    contactName: '',
-    contactEmail: '',
-    contactPhone: '',
     paymentTerms: '',
     leadTimeDays: undefined,
     currency: '',
@@ -282,35 +350,93 @@ export class SupplierFormComponent implements OnInit {
     this.countrySearchQuery = '';
   }
 
+  addContact(): void {
+    this.contacts.push({
+      name: '',
+      email: '',
+      phone: '',
+      role: '',
+      sendInfo: false,
+      sendPo: false,
+    });
+  }
+
+  removeContact(index: number): void {
+    this.contacts.splice(index, 1);
+  }
+
   ngOnInit(): void {
-    const id = this.route.snapshot.paramMap.get('id');
-    if (id) {
-      this.isEdit.set(true);
-      this.editId.set(+id);
-      this.api.getSupplier(+id).subscribe((supplier) => {
+    this.route.paramMap.subscribe((params) => {
+      const id = params.get('id');
+      if (id) {
+        this.isEdit.set(true);
+        this.editId.set(+id);
+        this.api.getSupplier(+id).subscribe({
+          next: (supplier) => {
+            this.form = {
+              name: supplier.name,
+              country: supplier.country,
+              paymentTerms: supplier.paymentTerms,
+              leadTimeDays: supplier.leadTimeDays,
+              currency: supplier.currency,
+              notes: supplier.notes,
+              shippingRatePerKg: supplier.shippingRatePerKg,
+            };
+            this.contacts = supplier.contacts ? JSON.parse(JSON.stringify(supplier.contacts)) : [];
+            this.cdr.detectChanges();
+          },
+          error: (err) => {
+            console.error('SupplierForm: error fetching supplier:', err);
+          }
+        });
+      } else {
+        this.isEdit.set(false);
+        this.editId.set(null);
         this.form = {
-          name: supplier.name,
-          country: supplier.country,
-          contactName: supplier.contactName,
-          contactEmail: supplier.contactEmail,
-          contactPhone: supplier.contactPhone,
-          paymentTerms: supplier.paymentTerms,
-          leadTimeDays: supplier.leadTimeDays,
-          currency: supplier.currency,
-          notes: supplier.notes,
-          shippingRatePerKg: supplier.shippingRatePerKg,
+          name: '',
+          country: '',
+          paymentTerms: '',
+          leadTimeDays: undefined,
+          currency: '',
+          notes: '',
+          shippingRatePerKg: undefined,
         };
-      });
-    }
+        // Default with 1 contact
+        this.contacts = [{
+          name: '',
+          email: '',
+          phone: '',
+          role: 'Sales',
+          sendInfo: true,
+          sendPo: true,
+        }];
+        this.cdr.detectChanges();
+      }
+    });
   }
 
   submit(): void {
-    if (!this.form.name) return;
+    if (!this.form.name || this.contacts.length === 0) return;
 
-    // Strip empty strings so validation doesn't fail on optional fields
-    const dto = Object.fromEntries(
-      Object.entries(this.form).filter(([_, v]) => v !== '' && v !== null && v !== undefined)
-    ) as CreateSupplierDto;
+    // Filter empty strings and format payload
+    const dto: CreateSupplierDto = {
+      name: this.form.name,
+      country: this.form.country || '',
+      currency: this.form.currency || '',
+      paymentTerms: this.form.paymentTerms || undefined,
+      leadTimeDays: this.form.leadTimeDays ? +this.form.leadTimeDays : undefined,
+      notes: this.form.notes || undefined,
+      shippingRatePerKg: this.form.shippingRatePerKg ? +this.form.shippingRatePerKg : undefined,
+      contacts: this.contacts.map((c) => ({
+        id: c.id,
+        name: c.name,
+        email: c.email,
+        phone: c.phone || '',
+        role: c.role || '',
+        sendInfo: !!c.sendInfo,
+        sendPo: !!c.sendPo,
+      })),
+    };
 
     if (this.isEdit() && this.editId()) {
       this.store.updateSupplier({ id: this.editId()!, dto });

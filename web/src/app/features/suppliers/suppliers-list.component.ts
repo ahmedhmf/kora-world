@@ -69,7 +69,7 @@ import { SuppliersStore } from '../../store/suppliers.store';
                   <td class="px-6 py-4 text-zinc-400">
                     {{ supplier.leadTimeDays ? supplier.leadTimeDays + ' days' : '—' }}
                   </td>
-                  <td class="px-6 py-4 text-zinc-400">{{ supplier.contactEmail ?? '—' }}</td>
+                  <td class="px-6 py-4 text-zinc-400">{{ getPrimaryContact(supplier) }}</td>
                   <td class="px-6 py-4 text-right">
                     <a
                       [routerLink]="['/suppliers', supplier.id, 'edit']"
@@ -100,5 +100,13 @@ export class SuppliersListComponent implements OnInit {
     if (confirm('Delete this supplier?')) {
       this.store.deleteSupplier(id);
     }
+  }
+
+  getPrimaryContact(supplier: any): string {
+    if (!supplier.contacts || supplier.contacts.length === 0) return '—';
+    const contact = supplier.contacts.find((c: any) => c.sendInfo) || 
+                    supplier.contacts.find((c: any) => c.sendPo) || 
+                    supplier.contacts[0];
+    return contact ? `${contact.name} (${contact.email})` : '—';
   }
 }

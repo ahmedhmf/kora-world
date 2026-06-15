@@ -19,11 +19,17 @@ export interface Product {
   construction?: Record<string, string>;
   techPackPath?: string;
   techPackName?: string;
+  imagePath?: string;
+  imageName?: string;
+  collection?: string;
+  year?: number;
+  articleCounter?: number;
+  pricepoint?: string;
 }
 
 export interface CreateProductDto {
   supplierId: number;
-  articleNumber: string;
+  articleNumber?: string;
   name: string;
   category?: ProductCategory;
   description?: string;
@@ -34,4 +40,10 @@ export interface CreateProductDto {
   construction?: Record<string, string>;
   techPackPath?: string;
   techPackName?: string;
+  imagePath?: string;
+  imageName?: string;
+  collection?: string;
+  year?: number;
+  articleCounter?: number;
+  pricepoint?: string;
 }

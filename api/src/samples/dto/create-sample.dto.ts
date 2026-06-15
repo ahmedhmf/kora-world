@@ -8,9 +8,9 @@ import {
   IsObject,
 } from 'class-validator';
 import { ProductCategory } from '../../products/entities/product.entity';
-import { PrototypeStatus } from '../entities/prototype.entity';
+import { SampleStatus } from '../entities/sample.entity';
 
-export class CreatePrototypeDto {
+export class CreateSampleDto {
   @IsInt()
   @IsPositive()
   @IsNotEmpty()
@@ -24,9 +24,9 @@ export class CreatePrototypeDto {
   @IsOptional()
   category?: ProductCategory;
 
-  @IsEnum(PrototypeStatus)
+  @IsEnum(SampleStatus)
   @IsNotEmpty()
-  status: PrototypeStatus;
+  status: SampleStatus;
 
   @IsObject()
   @IsOptional()
@@ -51,4 +51,32 @@ export class CreatePrototypeDto {
   @IsString()
   @IsOptional()
   trackingNumber?: string;
+
+  @IsInt()
+  @IsOptional()
+  parentSampleId?: number | null;
+
+  @IsInt()
+  @IsOptional()
+  roundNumber?: number;
+
+  @IsObject()
+  @IsOptional()
+  receiptProtocol?: any;
+
+  @IsString()
+  @IsOptional()
+  articleNumber?: string;
+
+  @IsString()
+  @IsOptional()
+  collection?: string;
+
+  @IsInt()
+  @IsOptional()
+  year?: number;
+
+  @IsInt()
+  @IsOptional()
+  articleCounter?: number;
 }

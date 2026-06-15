@@ -1,0 +1,285 @@
+import { ChangeDetectorRef, Component, inject, OnInit, signal } from '@angular/core';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { DatePipe, DecimalPipe } from '@angular/common';
+import { ApiService } from '../../core/services/api.service';
+import { Product } from '../../core/models/product.model';
+import { ProductsStore } from '../../store/products.store';
+
+@Component({
+  selector: 'app-product-detail',
+  standalone: true,
+  imports: [RouterLink, DatePipe, DecimalPipe],
+  template: `
+    <div class="p-8 max-w-5xl">
+
+      <!-- Navigation & Actions -->
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+        <div>
+          <a routerLink="/products" class="text-zinc-500 hover:text-zinc-300 text-sm mb-2 inline-block">← Back to Products</a>
+          @if (product(); as p) {
+            <h1 class="text-3xl font-bold text-white flex items-center gap-3 flex-wrap">
+              {{ p.name }}
+              <span class="text-xs font-mono bg-zinc-800 text-zinc-400 border border-zinc-700 px-2.5 py-1 rounded">
+                {{ p.articleNumber }}
+              </span>
+            </h1>
+          }
+        </div>
+
+        @if (product(); as p) {
+          <div class="flex flex-wrap gap-3">
+            <a
+              [routerLink]="['/products', p.id, 'edit']"
+              class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-semibold rounded-lg border border-zinc-700 transition-colors"
+            >
+              Edit Product
+            </a>
+            <button
+              (click)="deleteProduct(p.id)"
+              class="px-4 py-2 bg-red-950/40 hover:bg-red-900/60 text-red-200 hover:text-red-100 text-sm font-semibold rounded-lg border border-red-900/50 transition-colors"
+            >
+              Delete Product
+            </button>
+          </div>
+        }
+      </div>
+
+      @if (loading()) {
+        <div class="flex items-center justify-center py-20">
+          <div class="w-8 h-8 border-2 border-zinc-600 border-t-white rounded-full animate-spin"></div>
+        </div>
+      } @else if (error()) {
+        <div class="bg-red-900/30 border border-red-800 text-red-300 px-4 py-3 rounded-lg mb-6 text-sm">
+          {{ error() }}
+        </div>
+      } @else if (product(); as p) {
+        
+        <!-- Details Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+          <!-- Core details -->
+          <div class="md:col-span-2 space-y-6">
+
+            <!-- Summary Card -->
+            <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+              <h2 class="text-lg font-bold text-white mb-4">Product Details</h2>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 text-sm">
+                <div>
+                  <span class="block text-zinc-500 font-medium mb-1">Supplier</span>
+                  <span class="text-white font-semibold">{{ p.supplier?.name || '—' }}</span>
+                  @if (p.supplier?.country) {
+                    <span class="block text-xs text-zinc-400 mt-0.5">({{ p.supplier?.country }})</span>
+                  }
+                </div>
+                <div>
+                  <span class="block text-zinc-500 font-medium mb-1">Category</span>
+                  <div>
+                    <span class="inline-block px-2.5 py-1 rounded-md text-xs font-semibold capitalize mt-0.5"
+                      [class]="categoryClass(p.category)">
+                      {{ p.category ?? '—' }}
+                    </span>
+                  </div>
+                </div>
+                @if (p.pricepoint) {
+                  <div>
+                    <span class="block text-zinc-500 font-medium mb-1">Pricepoint</span>
+                    <span class="text-white font-semibold">{{ p.pricepoint }}</span>
+                  </div>
+                }
+                <div>
+                  <span class="block text-zinc-500 font-medium mb-1">Unit Price</span>
+                  <span class="text-white font-semibold text-base">
+                    {{ p.unitPrice | number:'1.2-2' }} {{ p.currency || 'USD' }}
+                  </span>
+                </div>
+                <div>
+                  <span class="block text-zinc-500 font-medium mb-1">Minimum Order Quantity (MOQ)</span>
+                  <span class="text-white font-semibold">{{ p.moq ? (p.moq | number) : '—' }}</span>
+                </div>
+                <div>
+                  <span class="block text-zinc-500 font-medium mb-1">Weight (kg)</span>
+                  <span class="text-white font-semibold">{{ p.weightKg ? (p.weightKg | number:'1.1-2') + ' kg' : '—' }}</span>
+                </div>
+                <div>
+                  <span class="block text-zinc-500 font-medium mb-1">Created Date</span>
+                  <span class="text-white font-semibold">{{ p.createdAt | date: 'mediumDate' }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Description -->
+            <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+              <h2 class="text-lg font-bold text-white mb-3">Description</h2>
+              <div class="text-sm leading-relaxed text-zinc-300 bg-zinc-950/40 p-4 rounded-lg border border-zinc-800/50 min-h-[80px]">
+                {{ p.description || 'No description recorded for this product.' }}
+              </div>
+            </div>
+
+            <!-- Construction Details (Optional, only for Balls) -->
+            @if (p.category === 'football' || p.category === 'handball') {
+              <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                <h2 class="text-lg font-bold text-white mb-4">Technical Specifications</h2>
+                @if (p.construction && Object.keys(p.construction).length > 0) {
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    @for (entry of Object.entries(p.construction); track entry[0]) {
+                      <div class="bg-zinc-950/40 border border-zinc-800/80 rounded-lg p-3">
+                        <span class="block text-zinc-500 text-xs font-semibold uppercase tracking-wider mb-1">{{ entry[0] }}</span>
+                        <span class="text-white text-sm font-semibold">{{ entry[1] }}</span>
+                      </div>
+                    }
+                  </div>
+                } @else {
+                  <div class="text-center py-6 bg-zinc-950/20 border border-dashed border-zinc-800 rounded-lg">
+                    <p class="text-zinc-500 text-xs">No construction specifications defined.</p>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+
+          <!-- Sidebar details -->
+          <div class="space-y-6">
+
+            <!-- Product Photo -->
+            <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+              <h2 class="text-lg font-bold text-white mb-4">Product Photo</h2>
+              @if (p.imagePath) {
+                <div class="relative rounded-lg overflow-hidden border border-zinc-700 bg-zinc-950 flex items-center justify-center p-2">
+                  <img
+                    [src]="getPublicUrl(p.imagePath)"
+                    class="w-full h-auto object-contain max-h-[300px] hover:scale-105 transition-transform duration-300"
+                    [alt]="p.name"
+                  />
+                </div>
+              } @else {
+                <div class="flex flex-col items-center justify-center py-12 bg-zinc-950/40 border border-dashed border-zinc-800 rounded-lg select-none text-zinc-500">
+                  <span class="text-6xl mb-2">{{ getCategoryPlaceholder(p.category) }}</span>
+                  <p class="text-xs mt-1">No product photo uploaded.</p>
+                </div>
+              }
+            </div>
+
+            <!-- Tech Pack Card -->
+            <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+              <h2 class="text-lg font-bold text-white mb-4">Digital Tech Pack</h2>
+              @if (p.techPackPath) {
+                <div class="bg-zinc-950/50 border border-zinc-800 rounded-lg p-4 text-center">
+                  <div class="text-3xl mb-2">📄</div>
+                  <span class="block text-white text-xs font-semibold truncate mb-3" [title]="p.techPackName ?? ''">
+                    {{ p.techPackName || 'tech-pack.pdf' }}
+                  </span>
+                  <button
+                    (click)="downloadTechPack(p.techPackPath, p.techPackName || '')"
+                    class="w-full py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold rounded-md border border-zinc-700 transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Download Tech Pack
+                  </button>
+                </div>
+              } @else {
+                <div class="text-center py-6 bg-zinc-950/20 border border-dashed border-zinc-800 rounded-lg">
+                  <p class="text-zinc-500 text-xs">No Tech Pack uploaded.</p>
+                </div>
+              }
+            </div>
+
+          </div>
+
+        </div>
+
+      }
+    </div>
+  `,
+})
+export class ProductDetailComponent implements OnInit {
+  private readonly api = inject(ApiService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+  private readonly productsStore = inject(ProductsStore);
+  private readonly cdr = inject(ChangeDetectorRef);
+
+  product = signal<Product | null>(null);
+  loading = signal(true);
+  error = signal<string | null>(null);
+
+  readonly Object = Object;
+
+  ngOnInit(): void {
+    this.route.paramMap.subscribe((params) => {
+      const id = params.get('id');
+      if (id) {
+        this.loadProductDetails(+id);
+      } else {
+        this.error.set('Product ID not specified.');
+        this.loading.set(false);
+      }
+    });
+  }
+
+  private loadProductDetails(id: number): void {
+    this.loading.set(true);
+    this.error.set(null);
+
+    this.api.getProduct(id).subscribe({
+      next: (product) => {
+        this.product.set(product);
+        this.loading.set(false);
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        console.error('Error loading product detail:', err);
+        this.error.set('Could not load product details. It may not exist.');
+        this.loading.set(false);
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  deleteProduct(id: number): void {
+    if (confirm('Delete this product permanently?')) {
+      this.productsStore.deleteProduct(id);
+      this.router.navigate(['/products']);
+    }
+  }
+
+  downloadTechPack(path: string, originalName: string): void {
+    this.api.downloadFile(path).subscribe({
+      next: (blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = originalName || 'tech-pack';
+        a.click();
+        window.URL.revokeObjectURL(url);
+      },
+      error: (err) => {
+        alert('Could not download file. You may not have access permission.');
+        console.error('Download error:', err);
+      }
+    });
+  }
+
+  categoryClass(category?: string): string {
+    switch (category) {
+      case 'football': return 'bg-green-900/40 text-green-400';
+      case 'handball': return 'bg-blue-900/40 text-blue-400';
+      case 'lifestyle': return 'bg-purple-900/40 text-purple-400';
+      default: return 'bg-zinc-800 text-zinc-400';
+    }
+  }
+
+  getCategoryPlaceholder(category?: string): string {
+    switch (category) {
+      case 'football': return '⚽';
+      case 'handball': return '🤾';
+      case 'lifestyle': return '👟';
+      default: return '📦';
+    }
+  }
+
+  getPublicUrl(path: string): string {
+    return this.api.getPublicImageUrl(path);
+  }
+}

@@ -64,24 +64,39 @@ export const routes: Routes = [
           import('./features/products/product-form.component').then((m) => m.ProductFormComponent),
       },
       {
+        path: 'products/:id',
+        loadComponent: () =>
+          import('./features/products/product-detail.component').then((m) => m.ProductDetailComponent),
+      },
+      {
         path: 'products/:id/edit',
         loadComponent: () =>
           import('./features/products/product-form.component').then((m) => m.ProductFormComponent),
       },
       {
-        path: 'prototypes',
+        path: 'samples',
         loadComponent: () =>
-          import('./features/prototypes/prototypes-list.component').then((m) => m.PrototypesListComponent),
+          import('./features/samples/samples-list.component').then((m) => m.SamplesListComponent),
       },
       {
-        path: 'prototypes/new',
+        path: 'samples/new',
         loadComponent: () =>
-          import('./features/prototypes/prototype-form.component').then((m) => m.PrototypeFormComponent),
+          import('./features/samples/sample-form.component').then((m) => m.SampleFormComponent),
       },
       {
-        path: 'prototypes/:id/edit',
+        path: 'samples/:id',
         loadComponent: () =>
-          import('./features/prototypes/prototype-form.component').then((m) => m.PrototypeFormComponent),
+          import('./features/samples/sample-detail.component').then((m) => m.SampleDetailComponent),
+      },
+      {
+        path: 'samples/:id/edit',
+        loadComponent: () =>
+          import('./features/samples/sample-form.component').then((m) => m.SampleFormComponent),
+      },
+      {
+        path: 'samples/:id/receipt-protocol',
+        loadComponent: () =>
+          import('./features/samples/sample-receipt-protocol.component').then((m) => m.SampleReceiptProtocolComponent),
       },
       {
         path: 'purchase-orders',

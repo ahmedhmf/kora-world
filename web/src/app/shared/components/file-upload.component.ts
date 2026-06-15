@@ -12,12 +12,16 @@ import { ApiService } from '../../core/services/api.service';
         <!-- Uploaded File Card -->
         <div class="flex items-center justify-between bg-zinc-900 border border-zinc-700 rounded-lg p-4 transition-all duration-300 hover:border-zinc-500">
           <div class="flex items-center space-x-3 truncate">
-            <svg class="h-6 w-6 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
+            @if (isImage(filePath)) {
+              <img [src]="getPublicUrl(filePath)" class="h-12 w-12 object-cover rounded-md flex-shrink-0 border border-zinc-700" alt="Preview" />
+            } @else {
+              <svg class="h-6 w-6 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            }
             <div class="truncate">
               <p class="text-sm font-medium text-white truncate">{{ fileName || 'Uploaded Attachment' }}</p>
-              <p class="text-xs text-zinc-500">Securely stored on server</p>
+              <p class="text-xs text-zinc-500">Stored on server</p>
             </div>
           </div>
           <div class="flex items-center space-x-2 flex-shrink-0 ml-4">
@@ -71,7 +75,7 @@ import { ApiService } from '../../core/services/api.service';
           @if (uploading()) {
             <div class="flex flex-col items-center space-y-2">
               <span class="animate-spin inline-block w-8 h-8 border-4 border-zinc-700 border-t-white rounded-full"></span>
-              <p class="text-sm text-zinc-400">Uploading Tech Pack...</p>
+              <p class="text-sm text-zinc-400">Uploading {{ label }}...</p>
             </div>
           } @else {
             <svg class="h-10 w-10 text-zinc-500 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -152,6 +156,8 @@ export class FileUploadComponent {
     this.api.uploadFile(file).subscribe({
       next: (res) => {
         this.uploading.set(false);
+        this.filePath = res.path;
+        this.fileName = res.name;
         this.fileUploaded.emit({ path: res.path, name: res.name });
       },
       error: (err) => {
@@ -187,5 +193,15 @@ export class FileUploadComponent {
     this.filePath = '';
     this.fileName = '';
     this.fileRemoved.emit();
+  }
+
+  isImage(path: string): boolean {
+    if (!path) return false;
+    const lower = path.toLowerCase();
+    return lower.endsWith('.png') || lower.endsWith('.jpg') || lower.endsWith('.jpeg');
+  }
+
+  getPublicUrl(path: string): string {
+    return this.api.getPublicImageUrl(path);
   }
 }

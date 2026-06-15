@@ -32,7 +32,8 @@ export class AttachmentsController {
       storage: diskStorage({
         destination: UPLOAD_DIR,
         filename: (req, file, cb) => {
-          const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+          const uniqueSuffix =
+            Date.now() + '-' + Math.round(Math.random() * 1e9);
           const ext = path.extname(file.originalname);
           cb(null, `${uniqueSuffix}${ext}`);
         },
@@ -68,6 +69,22 @@ export class AttachmentsController {
 
     // Streams the file with its original file name resolved via HTTP headers if desired,
     // or let the browser handle it. sendFile is safe and efficient.
+    return res.sendFile(filePath);
+  }
+
+  @Get('public/:filename')
+  servePublicFile(@Param('filename') filename: string, @Res() res: any) {
+    // Validate filename to prevent path traversal vulnerability
+    if (!/^[a-zA-Z0-9.\-_]+$/.test(filename)) {
+      throw new BadRequestException('Invalid filename');
+    }
+
+    const filePath = path.join(UPLOAD_DIR, filename);
+
+    if (!fs.existsSync(filePath)) {
+      throw new NotFoundException('File not found');
+    }
+
     return res.sendFile(filePath);
   }
 }

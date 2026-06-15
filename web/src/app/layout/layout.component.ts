@@ -95,7 +95,7 @@ export class LayoutComponent {
     { label: 'Dashboard', route: '/dashboard', icon: '⚡' },
     { label: 'Suppliers', route: '/suppliers', icon: '🏭' },
     { label: 'Products', route: '/products', icon: '⚽' },
-    { label: 'Prototypes', route: '/prototypes', icon: '🧪' },
+    { label: 'Samples', route: '/samples', icon: '🧪' },
     { label: 'Purchase Orders', route: '/purchase-orders', icon: '📋' },
     { label: 'Employees', route: '/users', icon: '👥', roles: ['admin'] },
   ];

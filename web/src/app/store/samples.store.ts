@@ -3,38 +3,38 @@ import { signalStore, withState, withMethods, withComputed, patchState } from '@
 import { rxMethod } from '@ngrx/signals/rxjs-interop';
 import { computed } from '@angular/core';
 import { pipe, switchMap, tap } from 'rxjs';
-import { Prototype, CreatePrototypeDto } from '../core/models/prototype.model';
+import { Sample, CreateSampleDto } from '../core/models/sample.model';
 import { ApiService } from '../core/services/api.service';
 import { tapResponse } from '@ngrx/operators';
 
-interface PrototypesState {
-  prototypes: Prototype[];
-  selectedPrototype: Prototype | null;
+interface SamplesState {
+  samples: Sample[];
+  selectedSample: Sample | null;
   loading: boolean;
   error: string | null;
 }
 
-const initialState: PrototypesState = {
-  prototypes: [],
-  selectedPrototype: null,
+const initialState: SamplesState = {
+  samples: [],
+  selectedSample: null,
   loading: false,
   error: null,
 };
 
-export const PrototypesStore = signalStore(
+export const SamplesStore = signalStore(
   { providedIn: 'root' },
   withState(initialState),
   withComputed((store) => ({
-    totalPrototypes: computed(() => store.prototypes().length),
+    totalSamples: computed(() => store.samples().length),
   })),
   withMethods((store, api = inject(ApiService)) => ({
-    loadPrototypes: rxMethod<void>(
+    loadSamples: rxMethod<void>(
       pipe(
         tap(() => patchState(store, { loading: true, error: null })),
         switchMap(() =>
-          api.getPrototypes().pipe(
+          api.getSamples().pipe(
             tapResponse({
-              next: (prototypes: Prototype[]) => patchState(store, { prototypes, loading: false }),
+              next: (samples: Sample[]) => patchState(store, { samples, loading: false }),
               error: (error: Error) => patchState(store, { error: error.message, loading: false }),
             })
           )
@@ -42,15 +42,15 @@ export const PrototypesStore = signalStore(
       )
     ),
 
-    createPrototype: rxMethod<CreatePrototypeDto>(
+    createSample: rxMethod<CreateSampleDto>(
       pipe(
         tap(() => patchState(store, { loading: true, error: null })),
         switchMap((dto) =>
-          api.createPrototype(dto).pipe(
+          api.createSample(dto).pipe(
             tapResponse({
-              next: (prototype: Prototype) =>
+              next: (sample: Sample) =>
                 patchState(store, {
-                  prototypes: [prototype, ...store.prototypes()],
+                  samples: [sample, ...store.samples()],
                   loading: false,
                 }),
               error: (error: Error) => patchState(store, { error: error.message, loading: false }),
@@ -60,15 +60,15 @@ export const PrototypesStore = signalStore(
       )
     ),
 
-    updatePrototype: rxMethod<{ id: number; dto: Partial<CreatePrototypeDto> }>(
+    updateSample: rxMethod<{ id: number; dto: Partial<CreateSampleDto> }>(
       pipe(
         tap(() => patchState(store, { loading: true, error: null })),
         switchMap(({ id, dto }) =>
-          api.updatePrototype(id, dto).pipe(
+          api.updateSample(id, dto).pipe(
             tapResponse({
-              next: (updated: Prototype) =>
+              next: (updated: Sample) =>
                 patchState(store, {
-                  prototypes: store.prototypes().map((p) => (p.id === id ? updated : p)),
+                  samples: store.samples().map((s) => (s.id === id ? updated : s)),
                   loading: false,
                 }),
               error: (error: Error) => patchState(store, { error: error.message, loading: false }),
@@ -78,14 +78,14 @@ export const PrototypesStore = signalStore(
       )
     ),
 
-    deletePrototype: rxMethod<number>(
+    deleteSample: rxMethod<number>(
       pipe(
         switchMap((id) =>
-          api.deletePrototype(id).pipe(
+          api.deleteSample(id).pipe(
             tapResponse({
               next: () =>
                 patchState(store, {
-                  prototypes: store.prototypes().filter((p) => p.id !== id),
+                  samples: store.samples().filter((s) => s.id !== id),
                 }),
               error: (error: Error) => patchState(store, { error: error.message }),
             })
@@ -94,8 +94,8 @@ export const PrototypesStore = signalStore(
       )
     ),
 
-    selectPrototype(prototype: Prototype | null): void {
-      patchState(store, { selectedPrototype: prototype });
+    selectSample(sample: Sample | null): void {
+      patchState(store, { selectedSample: sample });
     },
   }))
 );

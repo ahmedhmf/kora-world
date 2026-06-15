@@ -9,7 +9,7 @@ import {
 import { Supplier } from '../../suppliers/entities/supplier.entity';
 import { ProductCategory } from '../../products/entities/product.entity';
 
-export enum PrototypeStatus {
+export enum SampleStatus {
   REQUESTED = 'requested',
   SHIPPED = 'shipped',
   RECEIVED = 'received',
@@ -17,8 +17,8 @@ export enum PrototypeStatus {
   REJECTED = 'rejected',
 }
 
-@Entity('prototypes')
-export class Prototype {
+@Entity('samples')
+export class Sample {
   @PrimaryGeneratedColumn()
   id: number;
 
@@ -38,9 +38,9 @@ export class Prototype {
   @Column({
     type: 'varchar',
     length: 50,
-    default: PrototypeStatus.REQUESTED,
+    default: SampleStatus.REQUESTED,
   })
-  status: PrototypeStatus;
+  status: SampleStatus;
 
   @Column({ type: 'jsonb', nullable: true })
   construction?: Record<string, string>;
@@ -60,10 +60,37 @@ export class Prototype {
   @Column({ type: 'text', nullable: true })
   comments?: string;
 
+  @Column({ name: 'parent_sample_id', nullable: true })
+  parentSampleId?: number | null;
+
+  @Column({ name: 'round_number', default: 1 })
+  roundNumber: number;
+
+  @ManyToOne(() => Sample, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'parent_sample_id' })
+  parentSample?: Sample | null;
+
+  @Column({ name: 'receipt_protocol', type: 'jsonb', nullable: true })
+  receiptProtocol?: any;
+
+  @Column({ name: 'article_number', length: 50, nullable: true })
+  articleNumber?: string;
+
+  @Column({ length: 10, nullable: true })
+  collection?: string;
+
+  @Column({ type: 'integer', nullable: true })
+  year?: number;
+
+  @Column({ name: 'article_counter', type: 'integer', nullable: true })
+  articleCounter?: number;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
-  @ManyToOne(() => Supplier, (supplier) => supplier.purchaseOrders, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Supplier, (supplier) => supplier.purchaseOrders, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'supplier_id' })
   supplier: Supplier;
 }

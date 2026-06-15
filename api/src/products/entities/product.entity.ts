@@ -65,6 +65,24 @@ export class Product {
   @Column({ name: 'tech_pack_name', length: 255, nullable: true })
   techPackName?: string;
 
+  @Column({ name: 'image_path', length: 255, nullable: true })
+  imagePath?: string;
+
+  @Column({ name: 'image_name', length: 255, nullable: true })
+  imageName?: string;
+
+  @Column({ name: 'collection', length: 10, nullable: true })
+  collection?: string;
+
+  @Column({ name: 'year', type: 'integer', nullable: true })
+  year?: number;
+
+  @Column({ name: 'article_counter', type: 'integer', nullable: true })
+  articleCounter?: number;
+
+  @Column({ name: 'pricepoint', length: 50, nullable: true })
+  pricepoint?: string;
+
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
 

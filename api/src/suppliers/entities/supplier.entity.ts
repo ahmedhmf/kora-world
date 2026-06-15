@@ -6,6 +6,7 @@ import {
   OneToMany,
 } from 'typeorm';
 import { Product } from 'src/products/entities/product.entity';
+import { SupplierContact } from './supplier-contact.entity';
 import { PurchaseOrder } from 'src/purchase-orders/entities/purchase-order.entity';
 
 @Entity('suppliers')
@@ -19,14 +20,11 @@ export class Supplier {
   @Column({ length: 100, nullable: true })
   country: string;
 
-  @Column({ name: 'contact_name', length: 100, nullable: true })
-  contactName: string;
-
-  @Column({ name: 'contact_email', length: 150, nullable: true })
-  contactEmail: string;
-
-  @Column({ name: 'contact_phone', length: 50, nullable: true })
-  contactPhone: string;
+  @OneToMany(() => SupplierContact, (contact) => contact.supplier, {
+    cascade: true,
+    orphanedRowAction: 'delete',
+  })
+  contacts: SupplierContact[];
 
   @Column({ name: 'payment_terms', length: 100, nullable: true })
   paymentTerms: string;
@@ -40,7 +38,13 @@ export class Supplier {
   @Column({ type: 'text', nullable: true })
   notes: string;
 
-  @Column({ name: 'shipping_rate_per_kg', type: 'numeric', precision: 10, scale: 2, default: 0 })
+  @Column({
+    name: 'shipping_rate_per_kg',
+    type: 'numeric',
+    precision: 10,
+    scale: 2,
+    default: 0,
+  })
   shippingRatePerKg: number;
 
   @CreateDateColumn({ name: 'created_at' })

@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectorRef, Component, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { UsersStore } from '../../store/users.store';
@@ -126,6 +126,7 @@ export class UserFormComponent implements OnInit {
   private readonly api = inject(ApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly cdr = inject(ChangeDetectorRef);
 
   readonly isEdit = signal(false);
   private editId = signal<number | null>(null);
@@ -138,19 +139,32 @@ export class UserFormComponent implements OnInit {
   };
 
   ngOnInit(): void {
-    const id = this.route.snapshot.paramMap.get('id');
-    if (id) {
-      this.isEdit.set(true);
-      this.editId.set(+id);
-      this.api.getUser(+id).subscribe((user) => {
+    this.route.paramMap.subscribe((params) => {
+      const id = params.get('id');
+      if (id) {
+        this.isEdit.set(true);
+        this.editId.set(+id);
+        this.api.getUser(+id).subscribe((user) => {
+          this.form = {
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            password: '',
+          };
+          this.cdr.detectChanges();
+        });
+      } else {
+        this.isEdit.set(false);
+        this.editId.set(null);
         this.form = {
-          name: user.name,
-          email: user.email,
-          role: user.role,
+          name: '',
+          email: '',
+          role: '',
           password: '',
         };
-      });
-    }
+        this.cdr.detectChanges();
+      }
+    });
   }
 
   submit(): void {

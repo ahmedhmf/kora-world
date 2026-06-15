@@ -11,7 +11,9 @@ export class AuthService {
     private usersService: UsersService,
     private configService: ConfigService,
   ) {
-    this.jwtSecret = this.configService.get<string>('JWT_SECRET') || 'kora_super_secret_jwt_key_2026';
+    this.jwtSecret =
+      this.configService.get<string>('JWT_SECRET') ||
+      'kora_super_secret_jwt_key_2026';
   }
 
   async login(email: string, pass: string) {
@@ -25,7 +27,12 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
 
-    const payload = { sub: user.id, email: user.email, name: user.name, role: user.role };
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+    };
     // Token valid for 24 hours (86400 seconds)
     const token = signJwt(payload, this.jwtSecret, 86400);
 

@@ -4,14 +4,15 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { Supplier } from './suppliers/entities/supplier.entity';
+import { SupplierContact } from './suppliers/entities/supplier-contact.entity';
 import { Product } from './products/entities/product.entity';
 import { PurchaseOrder } from './purchase-orders/entities/purchase-order.entity';
 import { PurchaseOrderLineItem } from './purchase-orders/entities/purchase-order-line-item.entity';
-import { Prototype } from './prototypes/entities/prototype.entity';
+import { Sample } from './samples/entities/sample.entity';
 import { User } from './users/entities/user.entity';
 import { SuppliersModule } from './suppliers/suppliers.module';
 import { ProductsModule } from './products/products.module';
-import { PrototypesModule } from './prototypes/prototypes.module';
+import { SamplesModule } from './samples/samples.module';
 import { PurchaseOrdersModule } from './purchase-orders/purchase-orders.module';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
@@ -29,7 +30,15 @@ import { AttachmentsModule } from './attachments/attachments.module';
         username: config.get('DATABASE_USER'),
         password: config.get('DATABASE_PASSWORD'),
         database: config.get('DATABASE_NAME'),
-        entities: [Supplier, Product, PurchaseOrder, PurchaseOrderLineItem, Prototype, User],
+        entities: [
+          Supplier,
+          SupplierContact,
+          Product,
+          PurchaseOrder,
+          PurchaseOrderLineItem,
+          Sample,
+          User,
+        ],
         migrations: [__dirname + '/migrations/*{.ts,.js}'],
         migrationsRun: true,
         synchronize: false,
@@ -39,7 +48,7 @@ import { AttachmentsModule } from './attachments/attachments.module';
     }),
     SuppliersModule,
     ProductsModule,
-    PrototypesModule,
+    SamplesModule,
     PurchaseOrdersModule,
     UsersModule,
     AuthModule,

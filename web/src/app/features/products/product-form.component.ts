@@ -1,10 +1,12 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectorRef, Component, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { forkJoin } from 'rxjs';
 import { ProductsStore } from '../../store/products.store';
 import { SuppliersStore } from '../../store/suppliers.store';
 import { ApiService } from '../../core/services/api.service';
-import { CreateProductDto } from '../../core/models/product.model';
+import { CreateProductDto, ProductCategory } from '../../core/models/product.model';
+
 
 import { FileUploadComponent } from '../../shared/components/file-upload.component';
 
@@ -28,14 +30,14 @@ import { FileUploadComponent } from '../../shared/components/file-upload.compone
         </div>
       }
 
-      <!-- Prototype Prefill Info Banner -->
-      @if (fromPrototypeName()) {
+      <!-- Sample Prefill Info Banner -->
+      @if (fromSampleName()) {
         <div class="bg-zinc-900 border border-zinc-800 text-zinc-300 px-4 py-3.5 rounded-lg mb-6 text-sm flex items-center space-x-3">
           <svg class="h-5 w-5 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           <div>
-            <span class="font-semibold text-white">Pre-filled from Prototype:</span> {{ fromPrototypeName() }}. 
+            <span class="font-semibold text-white">Pre-filled from Sample:</span> {{ fromSampleName() }}.
             Please review the prefilled details and specify the production <span class="text-white font-semibold">Article Number</span> and <span class="text-white font-semibold">Unit Price</span>.
           </div>
         </div>
@@ -57,27 +59,111 @@ import { FileUploadComponent } from '../../shared/components/file-upload.compone
             </select>
           </div>
 
-          <div>
-            <label class="block text-sm font-medium text-zinc-400 mb-1.5">Article Number *</label>
-            <input
-              [(ngModel)]="form.articleNumber" name="articleNumber" required
-              class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
-              placeholder="e.g. KOR-FB-001"
-            />
-          </div>
+          @if (!isEdit()) {
+            <div>
+              <label class="block text-sm font-medium text-zinc-400 mb-1.5">Collection *</label>
+              <select
+                [(ngModel)]="form.collection" name="collection" required
+                (change)="updateArticleNumberPreview()"
+                class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-zinc-500"
+              >
+                <option value="" disabled>Select collection</option>
+                <option value="SS">SS (Spring/Summer)</option>
+                <option value="FW">FW (Fall/Winter)</option>
+              </select>
+            </div>
 
-          <div>
-            <label class="block text-sm font-medium text-zinc-400 mb-1.5">Category</label>
-            <select
-              [(ngModel)]="form.category" name="category"
-              class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-zinc-500"
-            >
-              <option [ngValue]="undefined">Select category</option>
-              <option value="football">Football</option>
-              <option value="handball">Handball</option>
-              <option value="lifestyle">Lifestyle</option>
-            </select>
-          </div>
+            <div>
+              <label class="block text-sm font-medium text-zinc-400 mb-1.5">Year *</label>
+              <input
+                [(ngModel)]="form.year" name="year" type="number" required
+                (input)="updateArticleNumberPreview()"
+                class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
+                placeholder="e.g. 2026"
+              />
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-zinc-400 mb-1.5">Category *</label>
+              <select
+                [(ngModel)]="form.category" name="category" required
+                (change)="updateArticleNumberPreview()"
+                class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-zinc-500"
+              >
+                <option [ngValue]="undefined" disabled>Select category</option>
+                <option value="football">Football</option>
+                <option value="handball">Handball</option>
+                <option value="lifestyle">Lifestyle</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-zinc-400 mb-1.5">Article Number Preview</label>
+              <input
+                [value]="articleNumberPreview()"
+                readonly
+                disabled
+                class="w-full bg-zinc-950 border border-zinc-800 text-zinc-400 rounded-lg px-4 py-2.5 text-sm select-all"
+              />
+            </div>
+
+            @if (form.category === 'football' || form.category === 'handball') {
+              <div>
+                <label class="block text-sm font-medium text-zinc-400 mb-1.5">Pricepoint *</label>
+                <select
+                  [(ngModel)]="form.pricepoint" name="pricepoint" required
+                  class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-zinc-500"
+                >
+                  <option value="" disabled>Select pricepoint</option>
+                  <option value="Club">Club</option>
+                  <option value="Training">Training</option>
+                  <option value="League">League</option>
+                  <option value="Competition">Competition</option>
+                  <option value="Match Pro">Match Pro</option>
+                </select>
+              </div>
+            }
+          } @else {
+            <div>
+              <label class="block text-sm font-medium text-zinc-400 mb-1.5">Article Number</label>
+              <input
+                [value]="form.articleNumber"
+                readonly
+                disabled
+                class="w-full bg-zinc-950 border border-zinc-800 text-zinc-400 rounded-lg px-4 py-2.5 text-sm"
+              />
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-zinc-400 mb-1.5">Category</label>
+              <select
+                [(ngModel)]="form.category" name="category" disabled
+                class="w-full bg-zinc-950 border border-zinc-800 text-zinc-400 rounded-lg px-4 py-2.5 text-sm focus:outline-none"
+              >
+                <option [ngValue]="undefined">Select category</option>
+                <option value="football">Football</option>
+                <option value="handball">Handball</option>
+                <option value="lifestyle">Lifestyle</option>
+              </select>
+            </div>
+
+            @if (form.category === 'football' || form.category === 'handball') {
+              <div>
+                <label class="block text-sm font-medium text-zinc-400 mb-1.5">Pricepoint *</label>
+                <select
+                  [(ngModel)]="form.pricepoint" name="pricepoint" required
+                  class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-zinc-500"
+                >
+                  <option value="" disabled>Select pricepoint</option>
+                  <option value="Club">Club</option>
+                  <option value="Training">Training</option>
+                  <option value="League">League</option>
+                  <option value="Competition">Competition</option>
+                  <option value="Match Pro">Match Pro</option>
+                </select>
+              </div>
+            }
+          }
 
           <div class="col-span-2">
             <label class="block text-sm font-medium text-zinc-400 mb-1.5">Product Name *</label>
@@ -144,61 +230,118 @@ import { FileUploadComponent } from '../../shared/components/file-upload.compone
             ></app-file-upload>
           </div>
 
-          <!-- Construction Details (Only for Balls - Football/Handball) -->
+          <!-- Product Photo (Optional) -->
+          <div class="col-span-2 border-t border-zinc-800 pt-5 mt-2">
+            <app-file-upload
+              label="Product Photo"
+              [filePath]="form.imagePath || ''"
+              [fileName]="form.imageName || ''"
+              (fileUploaded)="onProductPhotoUploaded($event)"
+              (fileRemoved)="onProductPhotoRemoved()"
+            ></app-file-upload>
+          </div>
+
+          <!-- Ball Construction Details (Football & Handball only) -->
           @if (form.category === 'football' || form.category === 'handball') {
             <div class="col-span-2 border-t border-zinc-800 pt-5 mt-2">
-              <div class="flex justify-between items-center mb-4">
-                <div>
-                  <h3 class="text-sm font-semibold text-white">Construction Details</h3>
-                  <p class="text-zinc-500 text-xs mt-0.5">Specify panels, stitching type, bladder, or outer material.</p>
-                </div>
-                <button
-                  type="button"
-                  (click)="addConstructionPair()"
-                  class="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium rounded-md transition-colors"
-                >
-                  + Add Detail
-                </button>
-              </div>
+              <h3 class="text-sm font-semibold text-white mb-4">Construction Details</h3>
+              <div class="grid grid-cols-2 gap-4">
 
-              @for (pair of constructionPairs; track $index) {
-                <div class="flex gap-3 mb-3 items-center">
+                <div>
+                  <label class="block text-xs font-medium text-zinc-400 mb-1.5">Backing</label>
                   <input
-                    type="text"
-                    [(ngModel)]="pair.key"
-                    [name]="'constKey_' + $index"
-                    required
-                    placeholder="Specification (e.g. Panels, Bladder)"
-                    class="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
+                    type="text" [(ngModel)]="ballConstruction.backing" name="backing"
+                    placeholder="e.g. 4 layers poly-cotton"
+                    class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
                   />
+                </div>
+
+                <div>
+                  <label class="block text-xs font-medium text-zinc-400 mb-1.5">Bladder</label>
                   <input
-                    type="text"
-                    [(ngModel)]="pair.value"
-                    [name]="'constVal_' + $index"
-                    required
-                    placeholder="Value (e.g. 32, Latex bladder)"
-                    class="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
+                    type="text" [(ngModel)]="ballConstruction.bladder" name="bladder"
+                    placeholder="e.g. SR bladder, Latex bladder"
+                    class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
                   />
-                  <button
-                    type="button"
-                    (click)="removeConstructionPair($index)"
-                    class="text-red-400 hover:text-red-300 text-xs font-semibold px-2 py-1.5 transition-colors"
-                  >
-                    Delete
-                  </button>
                 </div>
-              } @empty {
-                <div class="bg-zinc-900/50 border border-dashed border-zinc-800 rounded-lg p-6 text-center">
-                  <p class="text-zinc-500 text-xs">No construction details added yet.</p>
-                  <button
-                    type="button"
-                    (click)="addConstructionPair()"
-                    class="text-white hover:underline text-xs font-medium mt-1 inline-block"
-                  >
-                    Add the first specification
-                  </button>
+
+                <div>
+                  <label class="block text-xs font-medium text-zinc-400 mb-1.5">Cover Material</label>
+                  <input
+                    type="text" [(ngModel)]="ballConstruction.coverMaterial" name="coverMaterial"
+                    placeholder="e.g. PU leather, TPU"
+                    class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
+                  />
                 </div>
-              }
+
+                <div>
+                  <label class="block text-xs font-medium text-zinc-400 mb-1.5">Cutting Die / Panels</label>
+                  <input
+                    type="number" step="0.01" [(ngModel)]="ballConstruction.cuttingDiePanels" name="cuttingDiePanels"
+                    placeholder="e.g. 32.00"
+                    class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
+                  />
+                </div>
+
+                <div>
+                  <label class="block text-xs font-medium text-zinc-400 mb-1.5">Number of Colors</label>
+                  <input
+                    type="number" step="1" [(ngModel)]="ballConstruction.numberOfColors" name="numberOfColors"
+                    placeholder="e.g. 3"
+                    class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
+                  />
+                </div>
+
+                <div>
+                  <label class="block text-xs font-medium text-zinc-400 mb-1.5">Bonding</label>
+                  <select
+                    [(ngModel)]="ballConstruction.bonding" name="bonding"
+                    class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-zinc-500"
+                  >
+                    <option value="">Select bonding</option>
+                    <option value="machine stitched">Machine Stitched</option>
+                    <option value="hand stitched">Hand Stitched</option>
+                    <option value="hybrid">Hybrid</option>
+                    <option value="thermal bonding">Thermal Bonding</option>
+                  </select>
+                </div>
+
+                <div class="col-span-2">
+                  <label class="block text-xs font-medium text-zinc-400 mb-1.5">Carcass</label>
+                  <input
+                    type="text" [(ngModel)]="ballConstruction.carcass" name="carcass"
+                    placeholder="e.g. Wound carcass"
+                    class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
+                  />
+                </div>
+
+                <div class="flex items-center space-x-3 py-2">
+                  <input
+                    type="checkbox"
+                    [(ngModel)]="ballConstruction.debossing"
+                    name="debossing"
+                    id="debossingCheckbox"
+                    class="h-4 w-4 rounded border-zinc-700 bg-zinc-900 text-white focus:ring-0 focus:ring-offset-0 cursor-pointer"
+                  />
+                  <label for="debossingCheckbox" class="text-sm font-medium text-zinc-400 cursor-pointer select-none">
+                    Debossing
+                  </label>
+                </div>
+
+                <div class="flex items-center space-x-3 py-2">
+                  <input
+                    type="checkbox"
+                    [(ngModel)]="ballConstruction.finishes"
+                    name="finishes"
+                    id="finishesCheckbox"
+                    class="h-4 w-4 rounded border-zinc-700 bg-zinc-900 text-white focus:ring-0 focus:ring-offset-0 cursor-pointer"
+                  />
+                  <label for="finishesCheckbox" class="text-sm font-medium text-zinc-400 cursor-pointer select-none">
+                    Finishes
+                  </label>
+                </div>
+
+              </div>
             </div>
           }
 
@@ -229,104 +372,210 @@ export class ProductFormComponent implements OnInit {
   private readonly api = inject(ApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly cdr = inject(ChangeDetectorRef);
 
   readonly isEdit = signal(false);
   private editId = signal<number | null>(null);
-  readonly fromPrototypeName = signal<string | null>(null);
+  readonly fromSampleName = signal<string | null>(null);
+  readonly articleNumberPreview = signal<string>('Select collection, year, & category');
 
-  constructionPairs: { key: string; value: string }[] = [];
-
-  form: CreateProductDto = {
+  form = {
     supplierId: 0,
     articleNumber: '',
     name: '',
-    category: undefined,
+    category: undefined as ProductCategory | undefined,
     description: '',
     unitPrice: 0,
     currency: '',
-    moq: undefined,
-    weightKg: undefined,
+    moq: undefined as number | undefined,
+    weightKg: undefined as number | undefined,
     techPackPath: '',
     techPackName: '',
+    imagePath: '',
+    imageName: '',
+    collection: '',
+    year: new Date().getFullYear(),
+    pricepoint: '',
   };
 
-  addConstructionPair(): void {
-    this.constructionPairs.push({ key: '', value: '' });
+  ballConstruction = {
+    backing: '',
+    bladder: '',
+    coverMaterial: '',
+    cuttingDiePanels: null as number | null,
+    numberOfColors: null as number | null,
+    bonding: '',
+    debossing: false,
+    finishes: false,
+    carcass: ''
+  };
+
+  loadConstruction(construction?: Record<string, any>): void {
+    if (!construction) return;
+    this.ballConstruction = {
+      backing: String(construction['Backing'] || ''),
+      bladder: String(construction['Bladder'] || ''),
+      coverMaterial: String(construction['Cover Material'] || ''),
+      cuttingDiePanels: construction['Cutting Die / Panels'] ? parseFloat(String(construction['Cutting Die / Panels'])) : null,
+      numberOfColors: construction['Number of Colors'] ? parseInt(String(construction['Number of Colors']), 10) : null,
+      bonding: String(construction['Bonding'] || ''),
+      debossing: construction['Debossing'] === 'Yes',
+      finishes: construction['Finishes'] === 'Yes',
+      carcass: String(construction['Carcass'] || '')
+    };
   }
 
-  removeConstructionPair(index: number): void {
-    this.constructionPairs.splice(index, 1);
+  serializeConstruction(): Record<string, string | number> | null {
+    const obj: Record<string, string | number> = {};
+    if (this.ballConstruction.backing) obj['Backing'] = this.ballConstruction.backing;
+    if (this.ballConstruction.bladder) obj['Bladder'] = this.ballConstruction.bladder;
+    if (this.ballConstruction.coverMaterial) obj['Cover Material'] = this.ballConstruction.coverMaterial;
+    if (this.ballConstruction.cuttingDiePanels !== null) obj['Cutting Die / Panels'] = this.ballConstruction.cuttingDiePanels;
+    if (this.ballConstruction.numberOfColors !== null) obj['Number of Colors'] = this.ballConstruction.numberOfColors;
+    if (this.ballConstruction.bonding) obj['Bonding'] = this.ballConstruction.bonding;
+    obj['Debossing'] = this.ballConstruction.debossing ? 'Yes' : 'No';
+    obj['Finishes'] = this.ballConstruction.finishes ? 'Yes' : 'No';
+    if (this.ballConstruction.carcass) obj['Carcass'] = this.ballConstruction.carcass;
+
+    return Object.keys(obj).length > 0 ? obj : null;
   }
 
   ngOnInit(): void {
-    this.suppliersStore.loadSuppliers();
-
-    const id = this.route.snapshot.paramMap.get('id');
-    if (id) {
-      this.isEdit.set(true);
-      this.editId.set(+id);
-      this.api.getProduct(+id).subscribe((product) => {
+    this.route.paramMap.subscribe((params) => {
+      const id = params.get('id');
+      if (id) {
+        this.isEdit.set(true);
+        this.editId.set(+id);
+        this.fromSampleName.set(null);
+        forkJoin({
+          suppliers: this.api.getSuppliers(),
+          product: this.api.getProduct(+id)
+        }).subscribe({
+          next: ({ suppliers, product }) => {
+            this.suppliersStore.setSuppliers(suppliers);
+            this.form = {
+              supplierId: product.supplierId,
+              articleNumber: product.articleNumber,
+              name: product.name,
+              category: product.category,
+              description: product.description || '',
+              unitPrice: product.unitPrice,
+              currency: product.currency || '',
+              moq: product.moq,
+              weightKg: product.weightKg,
+              techPackPath: product.techPackPath || '',
+              techPackName: product.techPackName || '',
+              imagePath: product.imagePath || '',
+              imageName: product.imageName || '',
+              collection: product.collection || '',
+              year: product.year || new Date().getFullYear(),
+              pricepoint: product.pricepoint || '',
+            };
+            // Populate construction details
+            this.loadConstruction(product.construction);
+            this.cdr.detectChanges();
+          },
+          error: (err) => console.error('ProductForm: error loading data:', err)
+        });
+      } else {
+        this.isEdit.set(false);
+        this.editId.set(null);
         this.form = {
-          supplierId: product.supplierId,
-          articleNumber: product.articleNumber,
-          name: product.name,
-          category: product.category,
-          description: product.description,
-          unitPrice: product.unitPrice,
-          currency: product.currency,
-          moq: product.moq,
-          weightKg: product.weightKg,
-          techPackPath: product.techPackPath || '',
-          techPackName: product.techPackName || '',
+          supplierId: 0,
+          articleNumber: '',
+          name: '',
+          category: undefined,
+          description: '',
+          unitPrice: 0,
+          currency: '',
+          moq: undefined,
+          weightKg: undefined,
+          techPackPath: '',
+          techPackName: '',
+          imagePath: '',
+          imageName: '',
+          collection: '',
+          year: new Date().getFullYear(),
+          pricepoint: '',
         };
-        // Populate construction pairs
-        this.constructionPairs = Object.entries(product.construction || {}).map(
-          ([key, value]) => ({ key, value })
-        );
-      });
-    } else {
-      // Check if prefilling from a prototype promotion
-      const fromProtoId = this.route.snapshot.queryParamMap.get('fromPrototypeId');
-      if (fromProtoId) {
-        this.api.getPrototype(+fromProtoId).subscribe((proto) => {
-          this.fromPrototypeName.set(proto.name);
-          this.form = {
-            ...this.form,
-            supplierId: proto.supplierId,
-            name: proto.name,
-            category: proto.category,
-            techPackPath: proto.techPackPath || '',
-            techPackName: proto.techPackName || '',
-          };
-          if (proto.construction) {
-            this.constructionPairs = Object.entries(proto.construction).map(
-              ([key, value]) => ({ key, value })
-            );
-          }
+        this.articleNumberPreview.set('Pending required fields...');
+        this.ballConstruction = {
+          backing: '',
+          bladder: '',
+          coverMaterial: '',
+          cuttingDiePanels: null,
+          numberOfColors: null,
+          bonding: '',
+          debossing: false,
+          finishes: false,
+          carcass: ''
+        };
+
+        this.api.getSuppliers().subscribe({
+          next: (suppliers) => {
+            this.suppliersStore.setSuppliers(suppliers);
+
+            // Check if prefilling from a sample promotion
+            const fromSampleId = this.route.snapshot.queryParamMap.get('fromSampleId');
+            if (fromSampleId) {
+              this.api.getSample(+fromSampleId).subscribe((sample) => {
+                this.fromSampleName.set(sample.name);
+                this.form = {
+                  ...this.form,
+                  supplierId: sample.supplierId,
+                  name: sample.name,
+                  category: sample.category,
+                  techPackPath: sample.techPackPath || '',
+                  techPackName: sample.techPackName || '',
+                  imagePath: '',
+                  imageName: '',
+                  collection: sample.collection || '',
+                  year: sample.year || new Date().getFullYear(),
+                  pricepoint: '',
+                };
+                this.updateArticleNumberPreview();
+                this.loadConstruction(sample.construction);
+                this.cdr.detectChanges();
+              });
+            } else {
+              this.cdr.detectChanges();
+            }
+          },
+          error: (err) => console.error('ProductForm: error loading suppliers:', err)
         });
       }
-    }
+    });
   }
 
   submit(): void {
-    if (!this.form.name || !this.form.articleNumber || !this.form.supplierId) return;
+    if (!this.form.name || !this.form.supplierId) return;
+    if (!this.isEdit() && (!this.form.collection || !this.form.year || !this.form.category)) return;
 
     const dto = Object.fromEntries(
       Object.entries(this.form).filter(([_, v]) => v !== '' && v !== null && v !== undefined && v !== 0)
-    ) as CreateProductDto;
+    ) as unknown as CreateProductDto;
 
     // supplierId must always be included
     dto.supplierId = this.form.supplierId;
 
-    // Serialize construction pairs if category is football or handball
+    // Explicitly allow empty/null values for paths and names to allow removing them
+    dto.techPackPath = this.form.techPackPath || null as any;
+    dto.techPackName = this.form.techPackName || null as any;
+    dto.imagePath = this.form.imagePath || null as any;
+    dto.imageName = this.form.imageName || null as any;
+
+    if (this.form.collection) dto.collection = this.form.collection;
+    if (this.form.year) dto.year = this.form.year;
+
+    // If category is not a ball, clear pricepoint
+    if (this.form.category !== 'football' && this.form.category !== 'handball') {
+      this.form.pricepoint = '';
+    }
+    dto.pricepoint = this.form.pricepoint || null as any;
+
+    // Serialize construction if category is football or handball
     if (this.form.category === 'football' || this.form.category === 'handball') {
-      const constructionObj: Record<string, string> = {};
-      for (const pair of this.constructionPairs) {
-        if (pair.key.trim()) {
-          constructionObj[pair.key.trim()] = pair.value;
-        }
-      }
-      dto.construction = Object.keys(constructionObj).length > 0 ? constructionObj : (null as any);
+      dto.construction = this.serializeConstruction() as any;
     } else {
       dto.construction = null as any;
     }
@@ -340,6 +589,33 @@ export class ProductFormComponent implements OnInit {
     this.router.navigate(['/products']);
   }
 
+  updateArticleNumberPreview(): void {
+    const col = this.form.collection;
+    const yr = this.form.year;
+    const cat = this.form.category;
+
+    if (!col || !yr || !cat) {
+      this.articleNumberPreview.set('Pending required fields...');
+      return;
+    }
+
+    const yearStr = String(yr).slice(-2);
+    let catCode = 'OTH';
+    if (cat === 'football') catCode = 'FB';
+    else if (cat === 'handball') catCode = 'HB';
+    else if (cat === 'lifestyle') catCode = 'APP';
+
+    this.api.getProductNextCounter(col, yr, cat).subscribe({
+      next: (res) => {
+        const counterStr = String(res.counter).padStart(4, '0');
+        this.articleNumberPreview.set(`${col}${yearStr}${counterStr}${catCode}`);
+      },
+      error: () => {
+        this.articleNumberPreview.set(`${col}${yearStr}??${catCode}`);
+      }
+    });
+  }
+
   onTechPackUploaded(file: { path: string; name: string }): void {
     this.form.techPackPath = file.path;
     this.form.techPackName = file.name;
@@ -348,5 +624,15 @@ export class ProductFormComponent implements OnInit {
   onTechPackRemoved(): void {
     this.form.techPackPath = '';
     this.form.techPackName = '';
+  }
+
+  onProductPhotoUploaded(file: { path: string; name: string }): void {
+    this.form.imagePath = file.path;
+    this.form.imageName = file.name;
+  }
+
+  onProductPhotoRemoved(): void {
+    this.form.imagePath = '';
+    this.form.imageName = '';
   }
 }

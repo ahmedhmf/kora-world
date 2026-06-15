@@ -3,7 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { Supplier, CreateSupplierDto } from '../models/supplier.model';
 import { Product, CreateProductDto } from '../models/product.model';
-import { Prototype, CreatePrototypeDto } from '../models/prototype.model';
+import { Sample, CreateSampleDto } from '../models/sample.model';
 import { PurchaseOrder, CreatePurchaseOrderDto } from '../models/purchase-order.model';
 import { User, CreateUserDto } from '../models/user.model';
 
@@ -62,25 +62,29 @@ export class ApiService {
     return this.http.delete<void>(`${this.base}/products/${id}`);
   }
 
-  // Prototypes
-  getPrototypes(): Observable<Prototype[]> {
-    return this.http.get<Prototype[]>(`${this.base}/prototypes`);
+  // Samples
+  getSamples(): Observable<Sample[]> {
+    return this.http.get<Sample[]>(`${this.base}/samples`);
   }
 
-  getPrototype(id: number): Observable<Prototype> {
-    return this.http.get<Prototype>(`${this.base}/prototypes/${id}`);
+  getSample(id: number): Observable<Sample> {
+    return this.http.get<Sample>(`${this.base}/samples/${id}`);
   }
 
-  createPrototype(dto: CreatePrototypeDto): Observable<Prototype> {
-    return this.http.post<Prototype>(`${this.base}/prototypes`, dto);
+  createSample(dto: CreateSampleDto): Observable<Sample> {
+    return this.http.post<Sample>(`${this.base}/samples`, dto);
   }
 
-  updatePrototype(id: number, dto: Partial<CreatePrototypeDto>): Observable<Prototype> {
-    return this.http.put<Prototype>(`${this.base}/prototypes/${id}`, dto);
+  updateSample(id: number, dto: Partial<CreateSampleDto>): Observable<Sample> {
+    return this.http.put<Sample>(`${this.base}/samples/${id}`, dto);
   }
 
-  deletePrototype(id: number): Observable<void> {
-    return this.http.delete<void>(`${this.base}/prototypes/${id}`);
+  deleteSample(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.base}/samples/${id}`);
+  }
+
+  getSampleRounds(id: number): Observable<Sample[]> {
+    return this.http.get<Sample[]>(`${this.base}/samples/${id}/rounds`);
   }
 
   // Purchase Orders
@@ -136,5 +140,17 @@ export class ApiService {
     return this.http.get(`${this.base}/attachments/download/${path}`, {
       responseType: 'blob',
     });
+  }
+
+  getPublicImageUrl(path: string): string {
+    return `${this.base}/attachments/public/${path}`;
+  }
+
+  getProductNextCounter(collection: string, year: number, category: string): Observable<{ counter: number }> {
+    return this.http.get<{ counter: number }>(`${this.base}/products/next-counter?collection=${collection}&year=${year}&category=${category}`);
+  }
+
+  getSampleNextCounter(collection: string, year: number, category: string): Observable<{ counter: number }> {
+    return this.http.get<{ counter: number }>(`${this.base}/samples/next-counter?collection=${collection}&year=${year}&category=${category}`);
   }
 }

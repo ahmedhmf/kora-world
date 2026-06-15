@@ -42,10 +42,38 @@ export class ProductsService {
     });
   }
 
+  async getNextCounter(collection: string, year: number, category: string): Promise<number> {
+    const maxProduct = await this.productRepo
+      .createQueryBuilder('product')
+      .where('product.collection = :collection', { collection })
+      .andWhere('product.year = :year', { year })
+      .andWhere('product.category = :category', { category })
+      .orderBy('product.articleCounter', 'DESC')
+      .getOne();
+
+    return maxProduct ? (maxProduct.articleCounter || 0) + 1 : 1;
+  }
+
   async create(dto: CreateProductDto): Promise<Product> {
     // Validate supplier exists
     await this.suppliersService.findOne(dto.supplierId);
     const product = this.productRepo.create(dto);
+
+    // Auto-generate article number if collection, year, and category are specified
+    if (dto.collection && dto.year && dto.category) {
+      const counter = await this.getNextCounter(dto.collection, dto.year, dto.category);
+      product.articleCounter = counter;
+
+      const yearStr = String(dto.year).slice(-2);
+      let catCode = 'OTH';
+      if (dto.category === 'football') catCode = 'FB';
+      else if (dto.category === 'handball') catCode = 'HB';
+      else if (dto.category === 'lifestyle') catCode = 'APP';
+
+      const counterStr = String(counter).padStart(4, '0');
+      product.articleNumber = `${dto.collection}${yearStr}${counterStr}${catCode}`;
+    }
+
     return this.productRepo.save(product);
   }
 

@@ -1,4 +1,43 @@
-import { IsString, IsNotEmpty, IsOptional, IsInt, IsEmail, Min, IsIn, IsNumber } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsInt,
+  IsEmail,
+  Min,
+  IsIn,
+  IsNumber,
+  IsArray,
+  ValidateNested,
+  IsBoolean,
+} from 'class-validator';
+import { Type } from 'class-transformer';
+
+export class SupplierContactDto {
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @IsEmail()
+  @IsNotEmpty()
+  email: string;
+
+  @IsString()
+  @IsOptional()
+  phone?: string;
+
+  @IsString()
+  @IsOptional()
+  role?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  sendInfo?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  sendPo?: boolean;
+}
 
 export class CreateSupplierDto {
   @IsString()
@@ -9,17 +48,10 @@ export class CreateSupplierDto {
   @IsNotEmpty()
   country: string;
 
-  @IsString()
-  @IsNotEmpty()
-  contactName: string;
-
-  @IsEmail()
-  @IsNotEmpty()
-  contactEmail: string;
-
-  @IsString()
-  @IsNotEmpty()
-  contactPhone: string;
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => SupplierContactDto)
+  contacts: SupplierContactDto[];
 
   @IsString()
   @IsOptional()

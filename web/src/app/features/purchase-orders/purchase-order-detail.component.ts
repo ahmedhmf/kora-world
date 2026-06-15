@@ -109,9 +109,9 @@ import { POStatus } from '../../core/models/purchase-order.model';
                 <p class="text-zinc-400 text-xs print:text-zinc-700">{{ po.supplier?.country }}</p>
               </div>
               <div class="text-xs text-zinc-400 space-y-1 print:text-zinc-700">
-                <p><span class="text-zinc-500 print:text-zinc-500">Contact:</span> {{ po.supplier?.contactName || '—' }}</p>
-                <p><span class="text-zinc-500 print:text-zinc-500">Email:</span> {{ po.supplier?.contactEmail || '—' }}</p>
-                <p><span class="text-zinc-500 print:text-zinc-500">Phone:</span> {{ po.supplier?.contactPhone || '—' }}</p>
+                <p><span class="text-zinc-500 print:text-zinc-500">Contact:</span> {{ getPoContact(po.supplier)?.name || '—' }}</p>
+                <p><span class="text-zinc-500 print:text-zinc-500">Email:</span> {{ getPoContact(po.supplier)?.email || '—' }}</p>
+                <p><span class="text-zinc-500 print:text-zinc-500">Phone:</span> {{ getPoContact(po.supplier)?.phone || '—' }}</p>
               </div>
             </div>
 
@@ -226,6 +226,11 @@ export class PurchaseOrderDetailComponent implements OnInit {
     if (id) {
       this.store.loadPurchaseOrder(+id);
     }
+  }
+
+  getPoContact(supplier: any): any {
+    if (!supplier || !supplier.contacts || supplier.contacts.length === 0) return null;
+    return supplier.contacts.find((c: any) => c.sendPo) || supplier.contacts[0];
   }
 
   totalQty(po: any): number {

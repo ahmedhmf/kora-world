@@ -28,6 +28,10 @@ export const SuppliersStore = signalStore(
     totalSuppliers: computed(() => store.suppliers().length),
   })),
   withMethods((store, api = inject(ApiService)) => ({
+    setSuppliers(suppliers: Supplier[]): void {
+      patchState(store, { suppliers });
+    },
+
     loadSuppliers: rxMethod<void>(
       pipe(
         tap(() => patchState(store, { loading: true, error: null })),

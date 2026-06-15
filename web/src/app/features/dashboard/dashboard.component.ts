@@ -3,7 +3,7 @@ import { RouterLink } from '@angular/router';
 import { SuppliersStore } from '../../store/suppliers.store';
 import { ProductsStore } from '../../store/products.store';
 import { PurchaseOrdersStore } from '../../store/purchase-orders.store';
-import { PrototypesStore } from '../../store/prototypes.store';
+import { SamplesStore } from '../../store/samples.store';
 
 @Component({
   selector: 'app-dashboard',
@@ -31,11 +31,11 @@ import { PrototypesStore } from '../../store/prototypes.store';
           <a routerLink="/products" class="text-zinc-500 text-xs hover:text-zinc-300 mt-2 inline-block">View all →</a>
         </div>
 
-        <!-- Prototypes -->
+        <!-- Samples -->
         <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-          <p class="text-zinc-400 text-sm mb-1">Prototypes</p>
-          <p class="text-3xl font-bold text-white">{{ prototypesStore.totalPrototypes() }}</p>
-          <a routerLink="/prototypes" class="text-zinc-500 text-xs hover:text-zinc-300 mt-2 inline-block">View all →</a>
+          <p class="text-zinc-400 text-sm mb-1">Samples</p>
+          <p class="text-3xl font-bold text-white">{{ samplesStore.totalSamples() }}</p>
+          <a routerLink="/samples" class="text-zinc-500 text-xs hover:text-zinc-300 mt-2 inline-block">View all →</a>
         </div>
 
         <!-- Purchase Orders -->
@@ -84,7 +84,7 @@ import { PrototypesStore } from '../../store/prototypes.store';
                       } @else {
                         <span class="px-2 py-1 bg-blue-950/50 text-blue-400 border border-blue-900/30 rounded text-xs font-medium inline-flex items-center space-x-1">
                           <span>🧪</span>
-                          <span>Prototype</span>
+                          <span>Sample</span>
                         </span>
                       }
                     </td>
@@ -130,7 +130,7 @@ import { PrototypesStore } from '../../store/prototypes.store';
                         >View Details</a>
                       } @else {
                         <a
-                          [routerLink]="['/prototypes', item.id, 'edit']"
+                          [routerLink]="['/samples', item.id, 'edit']"
                           class="text-zinc-400 hover:text-white text-xs underline"
                         >Edit Details</a>
                       }
@@ -148,13 +148,13 @@ import { PrototypesStore } from '../../store/prototypes.store';
 export class DashboardComponent implements OnInit {
   readonly suppliersStore = inject(SuppliersStore);
   readonly productsStore = inject(ProductsStore);
-  readonly prototypesStore = inject(PrototypesStore);
+  readonly samplesStore = inject(SamplesStore);
   readonly purchaseOrdersStore = inject(PurchaseOrdersStore);
 
   ngOnInit(): void {
     this.suppliersStore.loadSuppliers();
     this.productsStore.loadProducts({});
-    this.prototypesStore.loadPrototypes();
+    this.samplesStore.loadSamples();
     this.purchaseOrdersStore.loadPurchaseOrders();
   }
 
@@ -171,11 +171,11 @@ export class DashboardComponent implements OnInit {
         expectedDelivery: o.expectedDelivery ? new Date(o.expectedDelivery).toLocaleDateString() : '',
       }));
 
-    const shippedPrototypes = this.prototypesStore.prototypes()
+    const shippedSamples = this.samplesStore.samples()
       .filter((p) => p.status === 'shipped')
       .map((p) => ({
         id: p.id,
-        type: 'prototype',
+        type: 'sample',
         name: p.name,
         supplierName: p.supplier?.name || '',
         carrier: p.carrier,
@@ -183,6 +183,6 @@ export class DashboardComponent implements OnInit {
         expectedDelivery: '',
       }));
 
-    return [...shippedOrders, ...shippedPrototypes];
+    return [...shippedOrders, ...shippedSamples];
   }
 }

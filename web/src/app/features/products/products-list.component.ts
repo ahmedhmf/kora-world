@@ -96,27 +96,43 @@ import { ApiService } from '../../core/services/api.service';
                 <tr class="border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors">
                   <td class="px-6 py-4 text-zinc-400 font-mono text-xs">{{ product.articleNumber }}</td>
                   <td class="px-6 py-4 font-medium text-white">
-                    <div>{{ product.name }}</div>
-                    @if (product.construction && Object.keys(product.construction).length > 0) {
-                      <div class="flex flex-wrap gap-1.5 mt-1.5">
-                        @for (entry of Object.entries(product.construction); track entry[0]) {
-                          <span class="text-[10px] bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded border border-zinc-700/50">
-                            {{ entry[0] }}: {{ entry[1] }}
-                          </span>
+                    <div class="flex items-center space-x-3">
+                      <!-- Thumbnail -->
+                      @if (product.imagePath) {
+                        <img [src]="getPublicUrl(product.imagePath)" class="h-10 w-10 object-cover rounded-full border border-zinc-700 flex-shrink-0" alt="Product" />
+                      } @else {
+                        <div class="h-10 w-10 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-lg flex-shrink-0 select-none">
+                          {{ getCategoryPlaceholder(product.category) }}
+                        </div>
+                      }
+                      
+                      <!-- Name & details -->
+                      <div>
+                        <div>
+                          <a [routerLink]="['/products', product.id]" class="text-white hover:underline">{{ product.name }}</a>
+                        </div>
+                        @if (product.construction && Object.keys(product.construction).length > 0) {
+                          <div class="flex flex-wrap gap-1.5 mt-1.5">
+                            @for (entry of Object.entries(product.construction); track entry[0]) {
+                              <span class="text-[10px] bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded border border-zinc-700/50">
+                                {{ entry[0] }}: {{ entry[1] }}
+                              </span>
+                            }
+                          </div>
+                        }
+                        @if (product.techPackPath) {
+                          <div
+                            (click)="downloadTechPack(product.techPackPath, product.techPackName || '')"
+                            class="mt-2 flex items-center space-x-1.5 text-xs text-zinc-400 hover:text-white cursor-pointer select-none"
+                          >
+                            <svg class="h-3.5 w-3.5 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                            <span class="underline truncate max-w-[180px]">{{ product.techPackName || 'Download Tech Pack' }}</span>
+                          </div>
                         }
                       </div>
-                    }
-                    @if (product.techPackPath) {
-                      <div
-                        (click)="downloadTechPack(product.techPackPath, product.techPackName || '')"
-                        class="mt-2 flex items-center space-x-1.5 text-xs text-zinc-400 hover:text-white cursor-pointer select-none"
-                      >
-                        <svg class="h-3.5 w-3.5 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                        </svg>
-                        <span class="underline truncate max-w-[180px]">{{ product.techPackName || 'Download Tech Pack' }}</span>
-                      </div>
-                    }
+                    </div>
                   </td>
                   <td class="px-6 py-4">
                     <span class="px-2 py-1 rounded-md text-xs font-medium"
@@ -130,6 +146,10 @@ import { ApiService } from '../../core/services/api.service';
                   </td>
                   <td class="px-6 py-4 text-zinc-400">{{ product.moq ?? '—' }}</td>
                   <td class="px-6 py-4 text-right">
+                    <a
+                      [routerLink]="['/products', product.id]"
+                      class="text-zinc-400 hover:text-white text-xs underline mr-4"
+                    >View</a>
                     <a
                       [routerLink]="['/products', product.id, 'edit']"
                       class="text-zinc-400 hover:text-white text-xs underline mr-4"
@@ -200,5 +220,18 @@ export class ProductsListComponent implements OnInit {
       case 'lifestyle': return 'bg-purple-900/40 text-purple-400';
       default: return 'bg-zinc-800 text-zinc-400';
     }
+  }
+
+  getCategoryPlaceholder(category?: string): string {
+    switch (category) {
+      case 'football': return '⚽';
+      case 'handball': return '🤾';
+      case 'lifestyle': return '👟';
+      default: return '📦';
+    }
+  }
+
+  getPublicUrl(path: string): string {
+    return this.api.getPublicImageUrl(path);
   }
 }

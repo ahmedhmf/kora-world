@@ -37,7 +37,10 @@ export class PurchaseOrdersController {
   }
 
   @Put(':id')
-  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdatePurchaseOrderDto) {
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdatePurchaseOrderDto,
+  ) {
     return this.purchaseOrdersService.update(id, dto);
   }
 

@@ -59,7 +59,13 @@ export class PurchaseOrder {
   @Column({ length: 10, nullable: true })
   currency: string;
 
-  @Column({ name: 'shipping_cost', type: 'numeric', precision: 12, scale: 2, default: 0 })
+  @Column({
+    name: 'shipping_cost',
+    type: 'numeric',
+    precision: 12,
+    scale: 2,
+    default: 0,
+  })
   shippingCost: number;
 
   @Column({ length: 100, nullable: true })

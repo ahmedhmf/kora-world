@@ -1,7 +1,8 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectorRef, Component, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { DecimalPipe } from '@angular/common';
+import { forkJoin } from 'rxjs';
 import { PurchaseOrdersStore } from '../../store/purchase-orders.store';
 import { SuppliersStore } from '../../store/suppliers.store';
 import { ProductsStore } from '../../store/products.store';
@@ -331,6 +332,7 @@ export class PurchaseOrderFormComponent implements OnInit {
   private readonly api = inject(ApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly cdr = inject(ChangeDetectorRef);
 
   readonly isEdit = signal(false);
   private editId = signal<number | null>(null);
@@ -354,29 +356,63 @@ export class PurchaseOrderFormComponent implements OnInit {
   };
 
   ngOnInit(): void {
-    this.suppliersStore.loadSuppliers();
-
-    const id = this.route.snapshot.paramMap.get('id');
-    if (id) {
-      this.isEdit.set(true);
-      this.editId.set(+id);
-      this.api.getPurchaseOrder(+id).subscribe((po) => {
+    this.route.paramMap.subscribe((params) => {
+      const id = params.get('id');
+      if (id) {
+        this.isEdit.set(true);
+        this.editId.set(+id);
+        forkJoin({
+          suppliers: this.api.getSuppliers(),
+          po: this.api.getPurchaseOrder(+id)
+        }).subscribe({
+          next: ({ suppliers, po }) => {
+            this.suppliersStore.setSuppliers(suppliers);
+            this.form = {
+              supplierId: po.supplierId,
+              orderDate: po.orderDate ? new Date(po.orderDate).toISOString().slice(0, 10) : '',
+              expectedDelivery: po.expectedDelivery ? new Date(po.expectedDelivery).toISOString().slice(0, 10) : '',
+              status: po.status,
+              notes: po.notes || '',
+              currency: po.currency || 'USD',
+              carrier: po.carrier || '',
+              trackingNumber: po.trackingNumber || '',
+            };
+            this.supplierName = po.supplier?.name || '';
+            this.readOnlyLineItems = po.lineItems || [];
+            this.poTotalValue = po.totalValue || 0;
+            this.poShippingCost = po.shippingCost || 0;
+            this.cdr.detectChanges();
+          },
+          error: (err) => console.error('PurchaseOrderForm: error loading data:', err)
+        });
+      } else {
+        this.isEdit.set(false);
+        this.editId.set(null);
         this.form = {
-          supplierId: po.supplierId,
-          orderDate: po.orderDate ? new Date(po.orderDate).toISOString().slice(0, 10) : '',
-          expectedDelivery: po.expectedDelivery ? new Date(po.expectedDelivery).toISOString().slice(0, 10) : '',
-          status: po.status,
-          notes: po.notes || '',
-          currency: po.currency || 'USD',
-          carrier: po.carrier || '',
-          trackingNumber: po.trackingNumber || '',
+          supplierId: 0,
+          orderDate: new Date().toISOString().slice(0, 10),
+          expectedDelivery: '',
+          status: 'draft',
+          notes: '',
+          currency: 'USD',
+          carrier: '',
+          trackingNumber: '',
         };
-        this.supplierName = po.supplier?.name || '';
-        this.readOnlyLineItems = po.lineItems || [];
-        this.poTotalValue = po.totalValue || 0;
-        this.poShippingCost = po.shippingCost || 0;
-      });
-    }
+        this.supplierName = '';
+        this.readOnlyLineItems = [];
+        this.lineItems = [];
+        this.poTotalValue = 0;
+        this.poShippingCost = 0;
+
+        this.api.getSuppliers().subscribe({
+          next: (suppliers) => {
+            this.suppliersStore.setSuppliers(suppliers);
+            this.cdr.detectChanges();
+          },
+          error: (err) => console.error('PurchaseOrderForm: error loading suppliers:', err)
+        });
+      }
+    });
   }
 
   onSupplierChange(): void {
