@@ -97,6 +97,10 @@ export class LayoutComponent {
     { label: 'Products', route: '/products', icon: '⚽' },
     { label: 'Samples', route: '/samples', icon: '🧪' },
     { label: 'Purchase Orders', route: '/purchase-orders', icon: '📋' },
+    { label: 'Calendar', route: '/calendar', icon: '📅' },
+    { label: 'Accounts', route: '/accounts', icon: '💼' },
+    { label: 'Receipts', route: '/receipts', icon: '🧾' },
+    { label: 'Contacts', route: '/contacts', icon: '📇' },
     { label: 'Employees', route: '/users', icon: '👥', roles: ['admin'] },
   ];
 

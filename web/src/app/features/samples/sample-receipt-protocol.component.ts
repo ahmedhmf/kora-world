@@ -583,7 +583,7 @@ import { SupplierContact } from '../../core/models/supplier.model';
                   <th class="p-3 font-semibold w-1/4">Category</th>
                   <th class="p-3 font-semibold w-5/12">Description</th>
                   <th class="p-3 font-semibold w-1/4">Severity</th>
-                  <th class="p-3 font-semibold w-24 text-center">Photo Ref.</th>
+                  <th class="p-3 font-semibold w-32 text-center">Photo / Ref.</th>
                   <th class="p-3 font-semibold w-16 text-center print:hidden">Actions</th>
                 </tr>
               </thead>
@@ -611,8 +611,71 @@ import { SupplierContact } from '../../core/models/supplier.model';
                       </div>
                     </td>
                     <td class="p-2">
-                      <input type="text" [(ngModel)]="item.photoRef" class="w-full bg-zinc-900 border border-zinc-800 text-white rounded px-2 py-1 print:hidden text-center" placeholder="e.g. IMG_01" />
-                      <span class="hidden print:block text-black font-mono text-center">{{ item.photoRef || '' }}</span>
+                      <!-- Online view: Text ref input + Upload/Preview controls -->
+                      <div class="flex flex-col items-center space-y-1.5 print:hidden">
+                        <input 
+                          type="text" [(ngModel)]="item.photoRef" 
+                          class="w-full bg-zinc-900 border border-zinc-800 text-white rounded px-1.5 py-0.5 text-center text-[11px]" 
+                          placeholder="Ref (e.g. IMG_01)" 
+                        />
+                        
+                        @if (item.photoPath) {
+                          <div class="relative group">
+                            <img 
+                              [src]="getPublicUrl(item.photoPath)" 
+                              (click)="openImagePreview(item.photoPath)"
+                              class="h-10 w-10 object-cover rounded border border-zinc-700 cursor-pointer hover:border-zinc-500 transition-colors" 
+                              alt="Defect" 
+                            />
+                            <button 
+                              type="button" 
+                              (click)="removeDefectPhoto(i)" 
+                              class="absolute -top-1.5 -right-1.5 bg-red-600 hover:bg-red-700 text-white rounded-full p-0.5 shadow transition-colors"
+                              title="Remove photo"
+                            >
+                              <svg class="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                        } @else {
+                          <button
+                            type="button"
+                            (click)="defectFileInput.click()"
+                            [disabled]="uploadingIndex() === i"
+                            class="px-2 py-1 bg-zinc-800 hover:bg-zinc-750 text-zinc-300 text-[10px] font-semibold rounded border border-zinc-700 transition-colors flex items-center gap-1"
+                          >
+                            @if (uploadingIndex() === i) {
+                              <span class="animate-spin inline-block w-2.5 h-2.5 border border-t-transparent border-white rounded-full"></span>
+                            } @else {
+                              <svg class="h-3 w-3 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                              </svg>
+                            }
+                            <span>Upload</span>
+                          </button>
+                          <input
+                            type="file"
+                            #defectFileInput
+                            (change)="uploadDefectPhoto($event, i)"
+                            class="hidden"
+                            accept="image/*"
+                          />
+                        }
+                      </div>
+                      
+                      <!-- Print view: Render photo inline if available -->
+                      <div class="hidden print:flex flex-col items-center space-y-1">
+                        @if (item.photoRef) {
+                          <span class="text-black font-semibold text-[10px]">{{ item.photoRef }}</span>
+                        }
+                        @if (item.photoPath) {
+                          <img [src]="getPublicUrl(item.photoPath)" class="h-16 w-16 object-contain rounded border border-black" alt="Defect" />
+                        } @else {
+                          <span class="text-zinc-400">—</span>
+                        }
+                      </div>
                     </td>
                     <td class="p-2 text-center print:hidden">
                       <button 
@@ -778,6 +841,34 @@ import { SupplierContact } from '../../core/models/supplier.model';
         </button>
       </div>
 
+      <!-- Fullscreen Image Preview Modal -->
+      @if (previewImageUrl()) {
+        <div 
+          class="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-zoom-out print:hidden"
+          (click)="closeImagePreview()"
+          (window:keydown.escape)="closeImagePreview()"
+        >
+          <div class="relative max-w-4xl max-h-[90vh] flex flex-col items-center">
+            <img 
+              [src]="previewImageUrl()" 
+              class="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl border border-zinc-800" 
+              alt="Fullscreen Preview" 
+              (click)="$event.stopPropagation()"
+            />
+            <button 
+              type="button" 
+              (click)="closeImagePreview()"
+              class="absolute -top-12 right-0 md:-right-12 text-zinc-400 hover:text-white bg-zinc-900/60 hover:bg-zinc-850 p-2 rounded-full border border-zinc-800 transition-colors cursor-pointer"
+              title="Close preview"
+            >
+              <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      }
+
     </div>
   `,
   styles: [`
@@ -812,6 +903,8 @@ export class SampleReceiptProtocolComponent implements OnInit {
   sample = signal<Sample | null>(null);
   saving = signal<boolean>(false);
   supplierContacts = signal<SupplierContact[]>([]);
+  readonly uploadingIndex = signal<number | null>(null);
+  readonly previewImageUrl = signal<string | null>(null);
 
   readonly qualityCriteria = [
     { key: 'coverMaterialFeel', label: 'Cover material feel' },
@@ -885,7 +978,7 @@ export class SampleReceiptProtocolComponent implements OnInit {
       pantoneColor: { expected: '', received: '', status: '', notes: '' }
     },
     defectLog: [
-      { category: '', description: '', severity: '', photoRef: '' }
+      { category: '', description: '', severity: '', photoRef: '', photoPath: '', photoName: '' }
     ],
     overallVerdict: '',
     remarks: '',
@@ -940,13 +1033,59 @@ export class SampleReceiptProtocolComponent implements OnInit {
     if (!this.protocol.defectLog) {
       this.protocol.defectLog = [];
     }
-    this.protocol.defectLog.push({ category: '', description: '', severity: '', photoRef: '' });
+    this.protocol.defectLog.push({ category: '', description: '', severity: '', photoRef: '', photoPath: '', photoName: '' });
   }
 
   removeDefectRow(index: number): void {
     if (this.protocol.defectLog && this.protocol.defectLog.length > 0) {
       this.protocol.defectLog.splice(index, 1);
     }
+  }
+
+  uploadDefectPhoto(event: Event, index: number): void {
+    const input = event.target as HTMLInputElement;
+    if (!input.files || input.files.length === 0) return;
+    const file = input.files[0];
+
+    this.uploadingIndex.set(index);
+    this.api.uploadFile(file).subscribe({
+      next: (res) => {
+        const item = this.protocol.defectLog[index];
+        item.photoPath = res.path;
+        item.photoName = res.name;
+        if (!item.photoRef || !item.photoRef.trim()) {
+          item.photoRef = `IMG_${index + 1}`;
+        }
+        this.uploadingIndex.set(null);
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        console.error('Error uploading defect photo:', err);
+        alert('Failed to upload image. Please try again.');
+        this.uploadingIndex.set(null);
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  removeDefectPhoto(index: number): void {
+    const item = this.protocol.defectLog[index];
+    item.photoPath = '';
+    item.photoName = '';
+    this.cdr.detectChanges();
+  }
+
+  getPublicUrl(path: string): string {
+    return this.api.getPublicImageUrl(path);
+  }
+
+  openImagePreview(path: string): void {
+    if (!path) return;
+    this.previewImageUrl.set(this.getPublicUrl(path));
+  }
+
+  closeImagePreview(): void {
+    this.previewImageUrl.set(null);
   }
 
   private loadSampleData(id: number): void {
@@ -1019,7 +1158,7 @@ export class SampleReceiptProtocolComponent implements OnInit {
           }
           if (!this.protocol.defectLog || this.protocol.defectLog.length === 0) {
             this.protocol.defectLog = [
-              { category: '', description: '', severity: '', photoRef: '' }
+              { category: '', description: '', severity: '', photoRef: '', photoPath: '', photoName: '' }
             ];
           }
         } else {
@@ -1101,7 +1240,8 @@ export class SampleReceiptProtocolComponent implements OnInit {
         item.category?.trim() || 
         item.description?.trim() || 
         item.severity?.trim() || 
-        item.photoRef?.trim()
+        item.photoRef?.trim() ||
+        item.photoPath?.trim()
       );
     }
 

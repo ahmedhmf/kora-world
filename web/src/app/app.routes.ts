@@ -118,6 +118,71 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/purchase-orders/purchase-order-form.component').then((m) => m.PurchaseOrderFormComponent),
       },
+      {
+        path: 'calendar',
+        loadComponent: () =>
+          import('./features/events/calendar.component').then((m) => m.CalendarComponent),
+      },
+      {
+        path: 'accounts',
+        loadComponent: () =>
+          import('./features/accounts/accounts-list.component').then((m) => m.AccountsListComponent),
+      },
+      {
+        path: 'accounts/new',
+        loadComponent: () =>
+          import('./features/accounts/account-form.component').then((m) => m.AccountFormComponent),
+      },
+      {
+        path: 'accounts/:id',
+        loadComponent: () =>
+          import('./features/accounts/account-detail.component').then((m) => m.AccountDetailComponent),
+      },
+      {
+        path: 'accounts/:id/edit',
+        loadComponent: () =>
+          import('./features/accounts/account-form.component').then((m) => m.AccountFormComponent),
+      },
+      {
+        path: 'receipts',
+        loadComponent: () =>
+          import('./features/receipts/receipts-list.component').then((m) => m.ReceiptsListComponent),
+      },
+      {
+        path: 'receipts/new',
+        loadComponent: () =>
+          import('./features/receipts/receipt-form.component').then((m) => m.ReceiptFormComponent),
+      },
+      {
+        path: 'receipts/:id',
+        loadComponent: () =>
+          import('./features/receipts/receipt-detail.component').then((m) => m.ReceiptDetailComponent),
+      },
+      {
+        path: 'receipts/:id/edit',
+        loadComponent: () =>
+          import('./features/receipts/receipt-form.component').then((m) => m.ReceiptFormComponent),
+      },
+      {
+        path: 'contacts',
+        loadComponent: () =>
+          import('./features/contacts/contacts-list.component').then((m) => m.ContactsListComponent),
+      },
+      {
+        path: 'contacts/new',
+        loadComponent: () =>
+          import('./features/contacts/contact-form.component').then((m) => m.ContactFormComponent),
+      },
+      {
+        path: 'contacts/:id',
+        loadComponent: () =>
+          import('./features/contacts/contact-detail.component').then((m) => m.ContactDetailComponent),
+      },
+      {
+        path: 'contacts/:id/edit',
+        loadComponent: () =>
+          import('./features/contacts/contact-form.component').then((m) => m.ContactFormComponent),
+      },
     ],
   },
 ];

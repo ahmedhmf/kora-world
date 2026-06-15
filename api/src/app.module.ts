@@ -10,6 +10,11 @@ import { PurchaseOrder } from './purchase-orders/entities/purchase-order.entity'
 import { PurchaseOrderLineItem } from './purchase-orders/entities/purchase-order-line-item.entity';
 import { Sample } from './samples/entities/sample.entity';
 import { User } from './users/entities/user.entity';
+import { Event } from './events/entities/event.entity';
+import { Account } from './accounts/entities/account.entity';
+import { Receipt } from './receipts/entities/receipt.entity';
+import { ReceiptLineItem } from './receipts/entities/receipt-line-item.entity';
+import { Contact } from './contacts/entities/contact.entity';
 import { SuppliersModule } from './suppliers/suppliers.module';
 import { ProductsModule } from './products/products.module';
 import { SamplesModule } from './samples/samples.module';
@@ -17,6 +22,10 @@ import { PurchaseOrdersModule } from './purchase-orders/purchase-orders.module';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { AttachmentsModule } from './attachments/attachments.module';
+import { EventsModule } from './events/events.module';
+import { AccountsModule } from './accounts/accounts.module';
+import { ReceiptsModule } from './receipts/receipts.module';
+import { ContactsModule } from './contacts/contacts.module';
 
 @Module({
   imports: [
@@ -38,6 +47,11 @@ import { AttachmentsModule } from './attachments/attachments.module';
           PurchaseOrderLineItem,
           Sample,
           User,
+          Event,
+          Account,
+          Receipt,
+          ReceiptLineItem,
+          Contact,
         ],
         migrations: [__dirname + '/migrations/*{.ts,.js}'],
         migrationsRun: true,
@@ -53,8 +67,14 @@ import { AttachmentsModule } from './attachments/attachments.module';
     UsersModule,
     AuthModule,
     AttachmentsModule,
+    EventsModule,
+    AccountsModule,
+    ReceiptsModule,
+    ContactsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
 export class AppModule {}
+
+

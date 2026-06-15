@@ -6,6 +6,10 @@ import { Product, CreateProductDto } from '../models/product.model';
 import { Sample, CreateSampleDto } from '../models/sample.model';
 import { PurchaseOrder, CreatePurchaseOrderDto } from '../models/purchase-order.model';
 import { User, CreateUserDto } from '../models/user.model';
+import { CalendarEvent, CreateEventDto } from '../models/event.model';
+import { B2BAccount, CreateAccountDto } from '../models/account.model';
+import { Receipt, CreateReceiptDto, UpdateReceiptDto } from '../models/receipt.model';
+import { Contact, CreateContactDto, UpdateContactDto } from '../models/contact.model';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
@@ -152,5 +156,93 @@ export class ApiService {
 
   getSampleNextCounter(collection: string, year: number, category: string): Observable<{ counter: number }> {
     return this.http.get<{ counter: number }>(`${this.base}/samples/next-counter?collection=${collection}&year=${year}&category=${category}`);
+  }
+
+  // Events
+  getEvents(): Observable<CalendarEvent[]> {
+    return this.http.get<CalendarEvent[]>(`${this.base}/events`);
+  }
+
+  getEvent(id: number): Observable<CalendarEvent> {
+    return this.http.get<CalendarEvent>(`${this.base}/events/${id}`);
+  }
+
+  createEvent(dto: CreateEventDto): Observable<CalendarEvent> {
+    return this.http.post<CalendarEvent>(`${this.base}/events`, dto);
+  }
+
+  updateEvent(id: number, dto: Partial<CreateEventDto>): Observable<CalendarEvent> {
+    return this.http.put<CalendarEvent>(`${this.base}/events/${id}`, dto);
+  }
+
+  deleteEvent(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.base}/events/${id}`);
+  }
+
+  // Accounts
+  getAccounts(): Observable<B2BAccount[]> {
+    return this.http.get<B2BAccount[]>(`${this.base}/accounts`);
+  }
+
+  getAccount(id: number): Observable<B2BAccount> {
+    return this.http.get<B2BAccount>(`${this.base}/accounts/${id}`);
+  }
+
+  createAccount(dto: CreateAccountDto): Observable<B2BAccount> {
+    return this.http.post<B2BAccount>(`${this.base}/accounts`, dto);
+  }
+
+  updateAccount(id: number, dto: Partial<CreateAccountDto>): Observable<B2BAccount> {
+    return this.http.put<B2BAccount>(`${this.base}/accounts/${id}`, dto);
+  }
+
+  deleteAccount(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.base}/accounts/${id}`);
+  }
+
+  // Receipts
+  getReceipts(): Observable<Receipt[]> {
+    return this.http.get<Receipt[]>(`${this.base}/receipts`);
+  }
+
+  getReceipt(id: number): Observable<Receipt> {
+    return this.http.get<Receipt>(`${this.base}/receipts/${id}`);
+  }
+
+  getAccountReceipts(accountId: number): Observable<Receipt[]> {
+    return this.http.get<Receipt[]>(`${this.base}/receipts/account/${accountId}`);
+  }
+
+  createReceipt(dto: CreateReceiptDto): Observable<Receipt> {
+    return this.http.post<Receipt>(`${this.base}/receipts`, dto);
+  }
+
+  updateReceipt(id: number, dto: UpdateReceiptDto): Observable<Receipt> {
+    return this.http.patch<Receipt>(`${this.base}/receipts/${id}`, dto);
+  }
+
+  deleteReceipt(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.base}/receipts/${id}`);
+  }
+
+  // Contacts
+  getContacts(): Observable<Contact[]> {
+    return this.http.get<Contact[]>(`${this.base}/contacts`);
+  }
+
+  getContact(id: number): Observable<Contact> {
+    return this.http.get<Contact>(`${this.base}/contacts/${id}`);
+  }
+
+  createContact(dto: CreateContactDto): Observable<Contact> {
+    return this.http.post<Contact>(`${this.base}/contacts`, dto);
+  }
+
+  updateContact(id: number, dto: UpdateContactDto): Observable<Contact> {
+    return this.http.put<Contact>(`${this.base}/contacts/${id}`, dto);
+  }
+
+  deleteContact(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.base}/contacts/${id}`);
   }
 }
