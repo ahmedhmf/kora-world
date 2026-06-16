@@ -10,6 +10,7 @@ import { CalendarEvent, CreateEventDto } from '../models/event.model';
 import { B2BAccount, CreateAccountDto } from '../models/account.model';
 import { Receipt, CreateReceiptDto, UpdateReceiptDto } from '../models/receipt.model';
 import { Contact, CreateContactDto, UpdateContactDto } from '../models/contact.model';
+import { B2cRequest, CreateB2cRequestDto, UpdateB2cRequestDto } from '../models/b2c-request.model';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
@@ -244,5 +245,31 @@ export class ApiService {
 
   deleteContact(id: number): Observable<void> {
     return this.http.delete<void>(`${this.base}/contacts/${id}`);
+  }
+
+  // B2C Requests
+  getB2cRequests(): Observable<B2cRequest[]> {
+    return this.http.get<B2cRequest[]>(`${this.base}/b2c-requests`);
+  }
+
+  getB2cRequest(id: number): Observable<B2cRequest> {
+    return this.http.get<B2cRequest>(`${this.base}/b2c-requests/${id}`);
+  }
+
+  createB2cRequest(dto: CreateB2cRequestDto): Observable<B2cRequest> {
+    return this.http.post<B2cRequest>(`${this.base}/b2c-requests`, dto);
+  }
+
+  updateB2cRequest(id: number, dto: UpdateB2cRequestDto): Observable<B2cRequest> {
+    return this.http.put<B2cRequest>(`${this.base}/b2c-requests/${id}`, dto);
+  }
+
+  deleteB2cRequest(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.base}/b2c-requests/${id}`);
+  }
+
+  // DHL Tracking
+  getDhlTracking(trackingNumber: string): Observable<any> {
+    return this.http.get<any>(`${this.base}/dhl-tracking?trackingNumber=${trackingNumber}`);
   }
 }

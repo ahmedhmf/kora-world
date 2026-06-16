@@ -5,6 +5,7 @@ import { ApiService } from '../../core/services/api.service';
 import { AccountsStore } from '../../store/accounts.store';
 import { B2BAccount, AccountStatus } from '../../core/models/account.model';
 import { Receipt, ReceiptStatus } from '../../core/models/receipt.model';
+import { DialogService } from '../../core/services/dialog.service';
 
 @Component({
   selector: 'app-account-detail',
@@ -365,6 +366,7 @@ export class AccountDetailComponent implements OnInit {
   private readonly store = inject(AccountsStore);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly dialogService = inject(DialogService);
 
   account = signal<B2BAccount | null>(null);
   loading = signal(false);
@@ -411,8 +413,9 @@ export class AccountDetailComponent implements OnInit {
     });
   }
 
-  confirmDelete(id: number): void {
-    if (confirm('Are you sure you want to delete this account? This action cannot be undone.')) {
+  async confirmDelete(id: number): Promise<void> {
+    const ok = await this.dialogService.confirm('Delete Account', 'Are you sure you want to delete this account? This action cannot be undone.');
+    if (ok) {
       this.store.deleteAccount(id);
       this.router.navigate(['/accounts']);
     }

@@ -193,6 +193,33 @@ import { FileUploadComponent } from '../../shared/components/file-upload.compone
           </div>
 
           <div>
+            <label class="block text-sm font-medium text-zinc-400 mb-1.5">Landing Price</label>
+            <input
+              [(ngModel)]="form.landingPrice" name="landingPrice" type="number" min="0" step="0.01"
+              class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
+              placeholder="0.00"
+            />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-zinc-400 mb-1.5">1 PC Price</label>
+            <input
+              [(ngModel)]="form.onePcPrice" name="onePcPrice" type="number" min="0" step="0.01"
+              class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
+              placeholder="0.00"
+            />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-zinc-400 mb-1.5">Bulk Price</label>
+            <input
+              [(ngModel)]="form.bulkPrice" name="bulkPrice" type="number" min="0" step="0.01"
+              class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
+              placeholder="0.00"
+            />
+          </div>
+
+          <div>
             <label class="block text-sm font-medium text-zinc-400 mb-1.5">MOQ</label>
             <input
               [(ngModel)]="form.moq" name="moq" type="number" min="1"
@@ -386,6 +413,9 @@ export class ProductFormComponent implements OnInit {
     category: undefined as ProductCategory | undefined,
     description: '',
     unitPrice: 0,
+    landingPrice: undefined as number | undefined,
+    onePcPrice: undefined as number | undefined,
+    bulkPrice: undefined as number | undefined,
     currency: '',
     moq: undefined as number | undefined,
     weightKg: undefined as number | undefined,
@@ -460,6 +490,9 @@ export class ProductFormComponent implements OnInit {
               category: product.category,
               description: product.description || '',
               unitPrice: product.unitPrice,
+              landingPrice: product.landingPrice,
+              onePcPrice: product.onePcPrice,
+              bulkPrice: product.bulkPrice,
               currency: product.currency || '',
               moq: product.moq,
               weightKg: product.weightKg,
@@ -487,6 +520,9 @@ export class ProductFormComponent implements OnInit {
           category: undefined,
           description: '',
           unitPrice: 0,
+          landingPrice: undefined,
+          onePcPrice: undefined,
+          bulkPrice: undefined,
           currency: '',
           moq: undefined,
           weightKg: undefined,
@@ -557,6 +593,18 @@ export class ProductFormComponent implements OnInit {
 
     // supplierId must always be included
     dto.supplierId = this.form.supplierId;
+
+    // Explicitly map numeric prices to bypass the "v !== 0" filter
+    dto.unitPrice = this.form.unitPrice;
+    if (this.form.landingPrice !== undefined && this.form.landingPrice !== null) {
+      dto.landingPrice = this.form.landingPrice;
+    }
+    if (this.form.onePcPrice !== undefined && this.form.onePcPrice !== null) {
+      dto.onePcPrice = this.form.onePcPrice;
+    }
+    if (this.form.bulkPrice !== undefined && this.form.bulkPrice !== null) {
+      dto.bulkPrice = this.form.bulkPrice;
+    }
 
     // Explicitly allow empty/null values for paths and names to allow removing them
     dto.techPackPath = this.form.techPackPath || null as any;

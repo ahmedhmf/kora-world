@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { AccountsStore } from '../../store/accounts.store';
 import { ApiService } from '../../core/services/api.service';
 import { CreateAccountDto, AccountStatus, CustomerType } from '../../core/models/account.model';
+import { DialogService } from '../../core/services/dialog.service';
 
 @Component({
   selector: 'app-account-form',
@@ -350,6 +351,7 @@ export class AccountFormComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly cdr = inject(ChangeDetectorRef);
+  private readonly dialogService = inject(DialogService);
 
   readonly isEdit = signal(false);
   private editId = signal<number | null>(null);
@@ -503,8 +505,9 @@ export class AccountFormComponent implements OnInit {
     this.router.navigate(['/accounts']);
   }
 
-  confirmDelete(): void {
-    if (confirm('Are you sure you want to delete this account? This action cannot be undone.')) {
+  async confirmDelete(): Promise<void> {
+    const ok = await this.dialogService.confirm('Delete Account', 'Are you sure you want to delete this account? This action cannot be undone.');
+    if (ok) {
       this.store.deleteAccount(this.editId()!);
       this.router.navigate(['/accounts']);
     }

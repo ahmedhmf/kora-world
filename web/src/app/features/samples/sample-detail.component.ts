@@ -4,6 +4,8 @@ import { DatePipe } from '@angular/common';
 import { forkJoin } from 'rxjs';
 import { ApiService } from '../../core/services/api.service';
 import { Sample } from '../../core/models/sample.model';
+import { DialogService } from '../../core/services/dialog.service';
+import { AuthService } from '../../core/services/auth.service';
 
 @Component({
   selector: 'app-sample-detail',
@@ -38,29 +40,31 @@ import { Sample } from '../../core/models/sample.model';
 
         @if (sample(); as s) {
           <div class="flex flex-wrap gap-3">
-            @if (s.status === 'rejected' && isLatestRound()) {
-              <a
-                [routerLink]="['/samples/new']"
-                [queryParams]="{ fromParentSampleId: s.id }"
-                class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-zinc-950 text-sm font-semibold rounded-lg transition-colors flex items-center gap-1.5"
-              >
-                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 6.5" />
-                </svg>
-                Request Next Round
-              </a>
-            }
-            @if (s.status === 'approved') {
-              <a
-                [routerLink]="['/products/new']"
-                [queryParams]="{ fromSampleId: s.id }"
-                class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg transition-colors flex items-center gap-1.5"
-              >
-                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 11l3-3m0 0l3 3m-3-3v8m0-13a9 9 0 110 18 9 9 0 010-18z" />
-                </svg>
-                Promote to Product
-              </a>
+            @if (authService.currentUser()?.role !== 'supplier') {
+              @if (s.status === 'rejected' && isLatestRound()) {
+                <a
+                  [routerLink]="['/samples/new']"
+                  [queryParams]="{ fromParentSampleId: s.id }"
+                  class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-zinc-950 text-sm font-semibold rounded-lg transition-colors flex items-center gap-1.5"
+                >
+                  <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 6.5" />
+                  </svg>
+                  Request Next Round
+                </a>
+              }
+              @if (s.status === 'approved') {
+                <a
+                  [routerLink]="['/products/new']"
+                  [queryParams]="{ fromSampleId: s.id }"
+                  class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg transition-colors flex items-center gap-1.5"
+                >
+                  <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 11l3-3m0 0l3 3m-3-3v8m0-13a9 9 0 110 18 9 9 0 010-18z" />
+                  </svg>
+                  Promote to Product
+                </a>
+              }
             }
             <a
               [routerLink]="['/samples', s.id, 'receipt-protocol']"
@@ -74,12 +78,14 @@ import { Sample } from '../../core/models/sample.model';
                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-500" title="Protocol filled"></span>
               }
             </a>
-            <a
-              [routerLink]="['/samples', s.id, 'edit']"
-              class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-semibold rounded-lg border border-zinc-700 transition-colors"
-            >
-              Edit Sample
-            </a>
+            @if (authService.currentUser()?.role !== 'supplier') {
+              <a
+                [routerLink]="['/samples', s.id, 'edit']"
+                class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-semibold rounded-lg border border-zinc-700 transition-colors"
+              >
+                Edit Sample
+              </a>
+            }
           </div>
         }
       </div>
@@ -265,10 +271,12 @@ import { Sample } from '../../core/models/sample.model';
   `,
 })
 export class SampleDetailComponent implements OnInit {
+  readonly authService = inject(AuthService);
   private readonly api = inject(ApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly cdr = inject(ChangeDetectorRef);
+  private readonly dialogService = inject(DialogService);
 
   sample = signal<Sample | null>(null);
   rounds = signal<Sample[]>([]);
@@ -331,7 +339,7 @@ export class SampleDetailComponent implements OnInit {
         window.URL.revokeObjectURL(url);
       },
       error: (err) => {
-        alert('Could not download file. You may not have access permission.');
+        this.dialogService.alert('Download Failed', 'Could not download file. You may not have access permission.');
         console.error('Download error:', err);
       }
     });

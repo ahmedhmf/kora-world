@@ -2,6 +2,7 @@ import { ChangeDetectorRef, Component, inject, OnInit, signal } from '@angular/c
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { UsersStore } from '../../store/users.store';
+import { SuppliersStore } from '../../store/suppliers.store';
 import { ApiService } from '../../core/services/api.service';
 import { CreateUserDto } from '../../core/models/user.model';
 
@@ -74,11 +75,33 @@ import { CreateUserDto } from '../../core/models/user.model';
               <option value="" disabled>Select a role</option>
               <option value="admin">Admin (Full Access)</option>
               <option value="employee">Employee (Standard Access)</option>
+              <option value="supplier">Supplier (View Only)</option>
             </select>
             @if (roleInput.invalid && (roleInput.dirty || roleInput.touched)) {
               <p class="text-red-500 text-xs mt-1.5">Role is required</p>
             }
           </div>
+
+          <!-- Supplier Select (conditional on Role == supplier) -->
+          @if (form.role === 'supplier') {
+            <div class="col-span-2">
+              <label class="block text-sm font-medium text-zinc-400 mb-1.5">Attach to Supplier *</label>
+              <select
+                [(ngModel)]="form.supplierId" name="supplierId" required #supplierInput="ngModel"
+                class="w-full bg-zinc-900 border rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-zinc-500"
+                [class.border-zinc-700]="!supplierInput.invalid || (!supplierInput.dirty && !supplierInput.touched)"
+                [class.border-red-500]="supplierInput.invalid && (supplierInput.dirty || supplierInput.touched)"
+              >
+                <option value="" disabled>Select a supplier</option>
+                @for (supplier of suppliersStore.suppliers(); track supplier.id) {
+                  <option [value]="supplier.id">{{ supplier.name }}</option>
+                }
+              </select>
+              @if (supplierInput.invalid && (supplierInput.dirty || supplierInput.touched)) {
+                <p class="text-red-500 text-xs mt-1.5">Supplier attachment is required for supplier accounts</p>
+              }
+            </div>
+          }
 
           <!-- Password -->
           <div class="col-span-2">
@@ -123,6 +146,7 @@ import { CreateUserDto } from '../../core/models/user.model';
 })
 export class UserFormComponent implements OnInit {
   readonly store = inject(UsersStore);
+  readonly suppliersStore = inject(SuppliersStore);
   private readonly api = inject(ApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -135,10 +159,12 @@ export class UserFormComponent implements OnInit {
     name: '',
     email: '',
     role: '',
+    supplierId: undefined,
     password: '',
   };
 
   ngOnInit(): void {
+    this.suppliersStore.loadSuppliers();
     this.route.paramMap.subscribe((params) => {
       const id = params.get('id');
       if (id) {
@@ -149,6 +175,7 @@ export class UserFormComponent implements OnInit {
             name: user.name,
             email: user.email,
             role: user.role,
+            supplierId: user.supplierId,
             password: '',
           };
           this.cdr.detectChanges();
@@ -160,6 +187,7 @@ export class UserFormComponent implements OnInit {
           name: '',
           email: '',
           role: '',
+          supplierId: undefined,
           password: '',
         };
         this.cdr.detectChanges();
@@ -172,6 +200,12 @@ export class UserFormComponent implements OnInit {
 
     if (this.isEdit() && (!dto.password || dto.password.trim() === '')) {
       delete dto.password;
+    }
+
+    if (dto.role !== 'supplier') {
+      delete dto.supplierId;
+    } else if (dto.supplierId) {
+      dto.supplierId = +dto.supplierId;
     }
 
     if (this.isEdit() && this.editId()) {

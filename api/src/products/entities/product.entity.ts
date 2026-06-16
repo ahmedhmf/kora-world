@@ -83,6 +83,15 @@ export class Product {
   @Column({ name: 'pricepoint', length: 50, nullable: true })
   pricepoint?: string;
 
+  @Column({ name: 'landing_price', type: 'numeric', precision: 10, scale: 2, nullable: true })
+  landingPrice?: number;
+
+  @Column({ name: 'one_pc_price', type: 'numeric', precision: 10, scale: 2, nullable: true })
+  onePcPrice?: number;
+
+  @Column({ name: 'bulk_price', type: 'numeric', precision: 10, scale: 2, nullable: true })
+  bulkPrice?: number;
+
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
 

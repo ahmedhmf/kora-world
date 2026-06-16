@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { EventsStore } from '../../store/events.store';
 import { CalendarEvent, EventCategory } from '../../core/models/event.model';
 import { AuthService } from '../../core/services/auth.service';
+import { DialogService } from '../../core/services/dialog.service';
 
 @Component({
   selector: 'app-calendar',
@@ -303,6 +304,7 @@ import { AuthService } from '../../core/services/auth.service';
 export class CalendarComponent implements OnInit {
   readonly store = inject(EventsStore);
   readonly authService = inject(AuthService);
+  private readonly dialogService = inject(DialogService);
 
   // Month navigation
   currentMonth = signal<Date>(new Date());
@@ -557,9 +559,10 @@ export class CalendarComponent implements OnInit {
     this.closeDrawer();
   }
 
-  deleteEvent(): void {
+  async deleteEvent(): Promise<void> {
     if (this.eventId === null) return;
-    if (confirm('Are you sure you want to delete this event?')) {
+    const ok = await this.dialogService.confirm('Delete Event', 'Are you sure you want to delete this event?');
+    if (ok) {
       this.store.deleteEvent(this.eventId);
       this.closeDrawer();
     }

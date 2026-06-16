@@ -14,8 +14,13 @@ export class SamplesService {
     private readonly suppliersService: SuppliersService,
   ) {}
 
-  async findAll(): Promise<Sample[]> {
+  async findAll(supplierId?: number): Promise<Sample[]> {
+    const where: any = {};
+    if (supplierId) {
+      where.supplierId = supplierId;
+    }
     return this.sampleRepo.find({
+      where,
       relations: { supplier: true, parentSample: true },
       order: { createdAt: 'DESC' },
     });

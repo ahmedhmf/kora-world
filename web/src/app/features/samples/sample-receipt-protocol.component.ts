@@ -6,6 +6,7 @@ import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { Sample } from '../../core/models/sample.model';
 import { SupplierContact } from '../../core/models/supplier.model';
+import { DialogService } from '../../core/services/dialog.service';
 
 @Component({
   selector: 'app-sample-receipt-protocol',
@@ -30,18 +31,21 @@ import { SupplierContact } from '../../core/models/supplier.model';
             </svg>
             Export PDF / Print
           </button>
-          <button
-            (click)="saveProtocol()"
-            [disabled]="saving()"
-            class="px-5 py-2 bg-white text-zinc-900 hover:bg-zinc-100 text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
-          >
-            {{ saving() ? 'Saving...' : 'Save Protocol' }}
-          </button>
+          @if (authService.currentUser()?.role !== 'supplier') {
+            <button
+              (click)="saveProtocol()"
+              [disabled]="saving()"
+              class="px-5 py-2 bg-white text-zinc-900 hover:bg-zinc-100 text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
+            >
+              {{ saving() ? 'Saving...' : 'Save Protocol' }}
+            </button>
+          }
         </div>
       </div>
 
       <!-- Main Protocol Sheet -->
       <div class="bg-zinc-950 border border-zinc-800 text-white rounded-xl p-8 print:bg-white print:text-black print:border-none print:p-0 print:m-0">
+        <fieldset [disabled]="authService.currentUser()?.role === 'supplier'" class="border-0 p-0 m-0">
         
         <!-- Document Header (Logo & Title) -->
         <div class="flex items-center justify-between border-b-2 border-zinc-800 pb-5 mb-6 print:border-black">
@@ -825,20 +829,23 @@ import { SupplierContact } from '../../core/models/supplier.model';
           <span>Keep on file for quality records</span>
         </div>
 
+        </fieldset>
       </div>
 
       <!-- Bottom Actions for Online View -->
       <div class="flex justify-end gap-3 mt-6 print:hidden">
         <a [routerLink]="['/samples', sampleId()]" class="px-6 py-2.5 bg-zinc-850 hover:bg-zinc-750 text-zinc-300 text-sm font-semibold rounded-lg border border-zinc-700 transition-colors">
-          Cancel
+          {{ authService.currentUser()?.role === 'supplier' ? 'Back' : 'Cancel' }}
         </a>
-        <button
-          (click)="saveProtocol()"
-          [disabled]="saving()"
-          class="px-6 py-2.5 bg-white text-zinc-900 hover:bg-zinc-100 text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
-        >
-          {{ saving() ? 'Saving...' : 'Save Protocol' }}
-        </button>
+        @if (authService.currentUser()?.role !== 'supplier') {
+          <button
+            (click)="saveProtocol()"
+            [disabled]="saving()"
+            class="px-6 py-2.5 bg-white text-zinc-900 hover:bg-zinc-100 text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
+          >
+            {{ saving() ? 'Saving...' : 'Save Protocol' }}
+          </button>
+        }
       </div>
 
       <!-- Fullscreen Image Preview Modal -->
@@ -894,10 +901,11 @@ import { SupplierContact } from '../../core/models/supplier.model';
 })
 export class SampleReceiptProtocolComponent implements OnInit {
   private readonly api = inject(ApiService);
-  private readonly authService = inject(AuthService);
+  readonly authService = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly cdr = inject(ChangeDetectorRef);
+  private readonly dialogService = inject(DialogService);
 
   sampleId = signal<number>(0);
   sample = signal<Sample | null>(null);
@@ -1061,7 +1069,7 @@ export class SampleReceiptProtocolComponent implements OnInit {
       },
       error: (err) => {
         console.error('Error uploading defect photo:', err);
-        alert('Failed to upload image. Please try again.');
+        this.dialogService.alert('Upload Failed', 'Failed to upload image. Please try again.');
         this.uploadingIndex.set(null);
         this.cdr.detectChanges();
       }
@@ -1248,16 +1256,16 @@ export class SampleReceiptProtocolComponent implements OnInit {
     this.api.updateSample(this.sampleId(), {
       receiptProtocol: cleanedProtocol
     } as any).subscribe({
-      next: (updated) => {
+      next: async (updated) => {
         this.saving.set(false);
         this.sample.set(updated);
-        alert('Sample receipt protocol saved successfully!');
+        await this.dialogService.alert('Success', 'Sample receipt protocol saved successfully!');
         this.router.navigate(['/samples', this.sampleId()]);
       },
-      error: (err) => {
+      error: async (err) => {
         this.saving.set(false);
         console.error('Error saving receipt protocol:', err);
-        alert('Could not save the protocol. Please try again.');
+        await this.dialogService.alert('Save Failed', 'Could not save the protocol. Please try again.');
       }
     });
   }

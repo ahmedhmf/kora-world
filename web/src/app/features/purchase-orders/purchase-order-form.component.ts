@@ -8,6 +8,7 @@ import { SuppliersStore } from '../../store/suppliers.store';
 import { ProductsStore } from '../../store/products.store';
 import { ApiService } from '../../core/services/api.service';
 import { CreatePurchaseOrderDto, POStatus } from '../../core/models/purchase-order.model';
+import { DialogService } from '../../core/services/dialog.service';
 
 @Component({
   selector: 'app-purchase-order-form',
@@ -333,6 +334,7 @@ export class PurchaseOrderFormComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly cdr = inject(ChangeDetectorRef);
+  private readonly dialogService = inject(DialogService);
 
   readonly isEdit = signal(false);
   private editId = signal<number | null>(null);
@@ -415,9 +417,10 @@ export class PurchaseOrderFormComponent implements OnInit {
     });
   }
 
-  onSupplierChange(): void {
+  async onSupplierChange(): Promise<void> {
     if (this.lineItems.length > 0) {
-      if (confirm('Changing the supplier will clear your current line items. Proceed?')) {
+      const ok = await this.dialogService.confirm('Clear Line Items', 'Changing the supplier will clear your current line items. Proceed?');
+      if (ok) {
         this.lineItems = [];
       } else {
         this.form.supplierId = this.previousSupplierId;

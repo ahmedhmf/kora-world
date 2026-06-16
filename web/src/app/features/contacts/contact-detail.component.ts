@@ -4,6 +4,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ApiService } from '../../core/services/api.service';
 import { ContactsStore } from '../../store/contacts.store';
 import { Contact, ContactType } from '../../core/models/contact.model';
+import { DialogService } from '../../core/services/dialog.service';
 
 @Component({
   selector: 'app-contact-detail',
@@ -233,6 +234,7 @@ export class ContactDetailComponent implements OnInit {
   private readonly store = inject(ContactsStore);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly dialogService = inject(DialogService);
 
   contact = signal<Contact | null>(null);
   loading = signal(false);
@@ -258,8 +260,9 @@ export class ContactDetailComponent implements OnInit {
     });
   }
 
-  confirmDelete(id: number): void {
-    if (confirm('Are you sure you want to delete this contact?')) {
+  async confirmDelete(id: number): Promise<void> {
+    const ok = await this.dialogService.confirm('Delete Contact', 'Are you sure you want to delete this contact?');
+    if (ok) {
       this.store.deleteContact(id);
       this.router.navigate(['/contacts']);
     }

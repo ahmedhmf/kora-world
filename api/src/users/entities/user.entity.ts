@@ -4,7 +4,10 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
+import { Supplier } from '../../suppliers/entities/supplier.entity';
 
 @Entity('users')
 export class User {
@@ -22,6 +25,13 @@ export class User {
 
   @Column({ default: 'employee' })
   role: string;
+
+  @Column({ name: 'supplier_id', type: 'integer', nullable: true })
+  supplierId?: number | null;
+
+  @ManyToOne(() => Supplier, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'supplier_id' })
+  supplier?: Supplier | null;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;

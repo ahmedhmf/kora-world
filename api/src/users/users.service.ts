@@ -29,6 +29,7 @@ export class UsersService {
         email: true,
         name: true,
         role: true,
+        supplierId: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -44,6 +45,7 @@ export class UsersService {
         email: true,
         name: true,
         role: true,
+        supplierId: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -72,6 +74,7 @@ export class UsersService {
       email,
       name: dto.name,
       role: dto.role || 'employee',
+      supplierId: dto.supplierId || null,
       password: hashedPassword,
     });
 
@@ -105,6 +108,13 @@ export class UsersService {
 
     if (dto.role) {
       user.role = dto.role;
+      if (dto.role === 'supplier') {
+        user.supplierId = dto.supplierId || null;
+      } else {
+        user.supplierId = null;
+      }
+    } else if (dto.supplierId !== undefined) {
+      user.supplierId = dto.supplierId;
     }
 
     if (dto.password && dto.password.trim() !== '') {

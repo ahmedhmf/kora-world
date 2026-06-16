@@ -32,6 +32,7 @@ export class AuthService {
       email: user.email,
       name: user.name,
       role: user.role,
+      supplierId: user.supplierId,
     };
     // Token valid for 24 hours (86400 seconds)
     const token = signJwt(payload, this.jwtSecret, 86400);
@@ -43,6 +44,7 @@ export class AuthService {
         email: user.email,
         name: user.name,
         role: user.role,
+        supplierId: user.supplierId,
       },
     };
   }

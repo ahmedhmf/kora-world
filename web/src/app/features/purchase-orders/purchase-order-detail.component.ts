@@ -3,6 +3,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { PurchaseOrdersStore } from '../../store/purchase-orders.store';
 import { POStatus } from '../../core/models/purchase-order.model';
+import { AuthService } from '../../core/services/auth.service';
 
 @Component({
   selector: 'app-purchase-order-detail',
@@ -32,12 +33,14 @@ import { POStatus } from '../../core/models/purchase-order.model';
             >
               Export PDF
             </button>
-            <a
-              [routerLink]="['/purchase-orders', po.id, 'edit']"
-              class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-semibold rounded-lg transition-colors border border-zinc-700/50"
-            >
-              Edit Details
-            </a>
+            @if (authService.currentUser()?.role !== 'supplier') {
+              <a
+                [routerLink]="['/purchase-orders', po.id, 'edit']"
+                class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-semibold rounded-lg transition-colors border border-zinc-700/50"
+              >
+                Edit Details
+              </a>
+            }
           }
         </div>
       </div>
@@ -134,21 +137,23 @@ import { POStatus } from '../../core/models/purchase-order.model';
               </div>
 
               <!-- Quick Status Selector -->
-              <div class="flex items-center gap-2 pt-3 border-t border-zinc-800/50 mt-3 print:hidden">
-                <span class="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">Update Status:</span>
-                <select
-                  [value]="po.status"
-                  (change)="updateStatus($event)"
-                  class="bg-zinc-900 border border-zinc-700 text-zinc-300 text-xs rounded-lg px-2 py-1 focus:outline-none focus:border-zinc-500"
-                >
-                  <option value="draft">Draft</option>
-                  <option value="sent">Sent</option>
-                  <option value="confirmed">Confirmed</option>
-                  <option value="shipped">Shipped</option>
-                  <option value="received">Received</option>
-                  <option value="cancelled">Cancelled</option>
-                </select>
-              </div>
+              @if (authService.currentUser()?.role !== 'supplier') {
+                <div class="flex items-center gap-2 pt-3 border-t border-zinc-800/50 mt-3 print:hidden">
+                  <span class="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">Update Status:</span>
+                  <select
+                    [value]="po.status"
+                    (change)="updateStatus($event)"
+                    class="bg-zinc-900 border border-zinc-700 text-zinc-300 text-xs rounded-lg px-2 py-1 focus:outline-none focus:border-zinc-500"
+                  >
+                    <option value="draft">Draft</option>
+                    <option value="sent">Sent</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="shipped">Shipped</option>
+                    <option value="received">Received</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </div>
+              }
             </div>
           </div>
 
@@ -219,6 +224,7 @@ import { POStatus } from '../../core/models/purchase-order.model';
 })
 export class PurchaseOrderDetailComponent implements OnInit {
   readonly store = inject(PurchaseOrdersStore);
+  readonly authService = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
 
   ngOnInit(): void {

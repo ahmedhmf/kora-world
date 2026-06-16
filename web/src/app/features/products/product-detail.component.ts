@@ -4,6 +4,8 @@ import { DatePipe, DecimalPipe } from '@angular/common';
 import { ApiService } from '../../core/services/api.service';
 import { Product } from '../../core/models/product.model';
 import { ProductsStore } from '../../store/products.store';
+import { DialogService } from '../../core/services/dialog.service';
+import { AuthService } from '../../core/services/auth.service';
 
 @Component({
   selector: 'app-product-detail',
@@ -27,20 +29,22 @@ import { ProductsStore } from '../../store/products.store';
         </div>
 
         @if (product(); as p) {
-          <div class="flex flex-wrap gap-3">
-            <a
-              [routerLink]="['/products', p.id, 'edit']"
-              class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-semibold rounded-lg border border-zinc-700 transition-colors"
-            >
-              Edit Product
-            </a>
-            <button
-              (click)="deleteProduct(p.id)"
-              class="px-4 py-2 bg-red-950/40 hover:bg-red-900/60 text-red-200 hover:text-red-100 text-sm font-semibold rounded-lg border border-red-900/50 transition-colors"
-            >
-              Delete Product
-            </button>
-          </div>
+          @if (authService.currentUser()?.role !== 'supplier') {
+            <div class="flex flex-wrap gap-3">
+              <a
+                [routerLink]="['/products', p.id, 'edit']"
+                class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-semibold rounded-lg border border-zinc-700 transition-colors"
+              >
+                Edit Product
+              </a>
+              <button
+                (click)="deleteProduct(p.id)"
+                class="px-4 py-2 bg-red-950/40 hover:bg-red-900/60 text-red-200 hover:text-red-100 text-sm font-semibold rounded-lg border border-red-900/50 transition-colors"
+              >
+                Delete Product
+              </button>
+            </div>
+          }
         }
       </div>
 
@@ -80,11 +84,13 @@ import { ProductsStore } from '../../store/products.store';
                     </span>
                   </div>
                 </div>
-                @if (p.pricepoint) {
-                  <div>
-                    <span class="block text-zinc-500 font-medium mb-1">Pricepoint</span>
-                    <span class="text-white font-semibold">{{ p.pricepoint }}</span>
-                  </div>
+                @if (authService.currentUser()?.role !== 'supplier') {
+                  @if (p.pricepoint) {
+                    <div>
+                      <span class="block text-zinc-500 font-medium mb-1">Pricepoint</span>
+                      <span class="text-white font-semibold">{{ p.pricepoint }}</span>
+                    </div>
+                  }
                 }
                 <div>
                   <span class="block text-zinc-500 font-medium mb-1">Unit Price</span>
@@ -92,6 +98,26 @@ import { ProductsStore } from '../../store/products.store';
                     {{ p.unitPrice | number:'1.2-2' }} {{ p.currency || 'USD' }}
                   </span>
                 </div>
+                @if (authService.currentUser()?.role !== 'supplier') {
+                  <div>
+                    <span class="block text-zinc-500 font-medium mb-1">Landing Price</span>
+                    <span class="text-white font-semibold text-base">
+                      {{ p.landingPrice ? (p.landingPrice | number:'1.2-2') + ' ' + (p.currency || 'USD') : '—' }}
+                    </span>
+                  </div>
+                  <div>
+                    <span class="block text-zinc-500 font-medium mb-1">1 PC Price</span>
+                    <span class="text-white font-semibold text-base">
+                      {{ p.onePcPrice ? (p.onePcPrice | number:'1.2-2') + ' ' + (p.currency || 'USD') : '—' }}
+                    </span>
+                  </div>
+                  <div>
+                    <span class="block text-zinc-500 font-medium mb-1">Bulk Price</span>
+                    <span class="text-white font-semibold text-base">
+                      {{ p.bulkPrice ? (p.bulkPrice | number:'1.2-2') + ' ' + (p.currency || 'USD') : '—' }}
+                    </span>
+                  </div>
+                }
                 <div>
                   <span class="block text-zinc-500 font-medium mb-1">Minimum Order Quantity (MOQ)</span>
                   <span class="text-white font-semibold">{{ p.moq ? (p.moq | number) : '—' }}</span>
@@ -194,11 +220,13 @@ import { ProductsStore } from '../../store/products.store';
   `,
 })
 export class ProductDetailComponent implements OnInit {
+  readonly authService = inject(AuthService);
   private readonly api = inject(ApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly productsStore = inject(ProductsStore);
   private readonly cdr = inject(ChangeDetectorRef);
+  private readonly dialogService = inject(DialogService);
 
   product = signal<Product | null>(null);
   loading = signal(true);
@@ -237,8 +265,9 @@ export class ProductDetailComponent implements OnInit {
     });
   }
 
-  deleteProduct(id: number): void {
-    if (confirm('Delete this product permanently?')) {
+  async deleteProduct(id: number): Promise<void> {
+    const ok = await this.dialogService.confirm('Delete Product', 'Delete this product permanently?');
+    if (ok) {
       this.productsStore.deleteProduct(id);
       this.router.navigate(['/products']);
     }
@@ -255,7 +284,7 @@ export class ProductDetailComponent implements OnInit {
         window.URL.revokeObjectURL(url);
       },
       error: (err) => {
-        alert('Could not download file. You may not have access permission.');
+        this.dialogService.alert('Download Failed', 'Could not download file. You may not have access permission.');
         console.error('Download error:', err);
       }
     });

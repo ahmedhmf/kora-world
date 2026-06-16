@@ -15,6 +15,7 @@ import { Account } from './accounts/entities/account.entity';
 import { Receipt } from './receipts/entities/receipt.entity';
 import { ReceiptLineItem } from './receipts/entities/receipt-line-item.entity';
 import { Contact } from './contacts/entities/contact.entity';
+import { B2cRequest } from './b2c-requests/entities/b2c-request.entity.js';
 import { SuppliersModule } from './suppliers/suppliers.module';
 import { ProductsModule } from './products/products.module';
 import { SamplesModule } from './samples/samples.module';
@@ -26,6 +27,7 @@ import { EventsModule } from './events/events.module';
 import { AccountsModule } from './accounts/accounts.module';
 import { ReceiptsModule } from './receipts/receipts.module';
 import { ContactsModule } from './contacts/contacts.module';
+import { B2cRequestsModule } from './b2c-requests/b2c-requests.module.js';
 
 @Module({
   imports: [
@@ -52,6 +54,7 @@ import { ContactsModule } from './contacts/contacts.module';
           Receipt,
           ReceiptLineItem,
           Contact,
+          B2cRequest,
         ],
         migrations: [__dirname + '/migrations/*{.ts,.js}'],
         migrationsRun: true,
@@ -71,6 +74,7 @@ import { ContactsModule } from './contacts/contacts.module';
     AccountsModule,
     ReceiptsModule,
     ContactsModule,
+    B2cRequestsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

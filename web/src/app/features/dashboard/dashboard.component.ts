@@ -1,14 +1,35 @@
-import { Component, inject, OnInit } from '@angular/core';
+import { Component, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { SuppliersStore } from '../../store/suppliers.store';
 import { ProductsStore } from '../../store/products.store';
 import { PurchaseOrdersStore } from '../../store/purchase-orders.store';
 import { SamplesStore } from '../../store/samples.store';
+import { ApiService } from '../../core/services/api.service';
+import { AuthService } from '../../core/services/auth.service';
+import { forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
+
+interface TrackingTimeline {
+  id: number;
+  trackingNumber: string;
+  referenceName: string;
+  type: string;
+  status: string;
+  estimatedDelivery?: string;
+  checkpoints: {
+    timestamp: string;
+    location: string;
+    description: string;
+    code: string;
+  }[];
+}
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [RouterLink],
+  imports: [CommonModule, RouterLink, FormsModule],
   template: `
     <div class="p-8">
       <div class="mb-8">
@@ -16,13 +37,20 @@ import { SamplesStore } from '../../store/samples.store';
         <p class="text-zinc-400 text-sm mt-1">Welcome to Kora World</p>
       </div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+      <!-- Stats Grid -->
+      <div 
+        class="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-8"
+        [class.lg:grid-cols-3]="authService.currentUser()?.role === 'supplier'"
+        [class.lg:grid-cols-4]="authService.currentUser()?.role !== 'supplier'"
+      >
         <!-- Suppliers -->
-        <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-          <p class="text-zinc-400 text-sm mb-1">Suppliers</p>
-          <p class="text-3xl font-bold text-white">{{ suppliersStore.totalSuppliers() }}</p>
-          <a routerLink="/suppliers" class="text-zinc-500 text-xs hover:text-zinc-300 mt-2 inline-block">View all →</a>
-        </div>
+        @if (authService.currentUser()?.role !== 'supplier') {
+          <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+            <p class="text-zinc-400 text-sm mb-1">Suppliers</p>
+            <p class="text-3xl font-bold text-white">{{ suppliersStore.totalSuppliers() }}</p>
+            <a routerLink="/suppliers" class="text-zinc-500 text-xs hover:text-zinc-300 mt-2 inline-block">View all →</a>
+          </div>
+        }
 
         <!-- Products -->
         <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
@@ -46,102 +74,95 @@ import { SamplesStore } from '../../store/samples.store';
         </div>
       </div>
 
-      <!-- Incoming Shipments Section -->
-      <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-        <h2 class="text-lg font-bold text-white mb-4 flex items-center space-x-2">
-          <span>🚢</span>
-          <span>Incoming Shipments (On the Way)</span>
+      <!-- DHL Timelines Section -->
+      <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6 mb-8">
+        <h2 class="text-lg font-bold text-white mb-6 flex items-center space-x-2">
+          <span>✈️</span>
+          <span>Active DHL Shipments Timeline</span>
         </h2>
 
-        @if (getShippedItems().length === 0) {
+        @if (loadingTimelines()) {
+          <div class="text-zinc-500 text-sm py-8 text-center font-mono">Quiring DHL live tracking data...</div>
+        } @else if (timelines().length === 0) {
           <div class="text-center py-10 bg-zinc-950/20 border border-dashed border-zinc-800 rounded-lg">
             <p class="text-2xl mb-2">📦</p>
-            <p class="text-zinc-500 text-sm">No active shipments currently on the way.</p>
+            <p class="text-zinc-500 text-sm">No active DHL shipments currently in transit.</p>
           </div>
         } @else {
-          <div class="border border-zinc-800 rounded-lg overflow-hidden">
-            <table class="w-full text-sm text-left">
-              <thead>
-                <tr class="bg-zinc-950/40 border-b border-zinc-800 text-zinc-400 text-xs font-semibold uppercase">
-                  <th class="px-6 py-3.5">Type</th>
-                  <th class="px-6 py-3.5">Reference</th>
-                  <th class="px-6 py-3.5">Supplier</th>
-                  <th class="px-6 py-3.5">Shipping Details</th>
-                  <th class="px-6 py-3.5">Expected Delivery</th>
-                  <th class="px-6 py-3.5"></th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (item of getShippedItems(); track item.id + '-' + item.type) {
-                  <tr class="border-b border-zinc-800/50 hover:bg-zinc-805/20 text-zinc-300 transition-colors">
-                    <!-- Type Badge -->
-                    <td class="px-6 py-4">
-                      @if (item.type === 'order') {
-                        <span class="px-2 py-1 bg-emerald-950/50 text-emerald-400 border border-emerald-900/30 rounded text-xs font-medium inline-flex items-center space-x-1">
-                          <span>📦</span>
-                          <span>Order</span>
-                        </span>
-                      } @else {
-                        <span class="px-2 py-1 bg-blue-950/50 text-blue-400 border border-blue-900/30 rounded text-xs font-medium inline-flex items-center space-x-1">
-                          <span>🧪</span>
-                          <span>Sample</span>
-                        </span>
-                      }
-                    </td>
-                    <!-- Reference -->
-                    <td class="px-6 py-4 font-semibold text-white">
-                      {{ item.name }}
-                    </td>
-                    <!-- Supplier -->
-                    <td class="px-6 py-4 text-zinc-400">
-                      {{ item.supplierName || '—' }}
-                    </td>
-                    <!-- Shipping Details -->
-                    <td class="px-6 py-4">
-                      @if (item.carrier || item.trackingNumber) {
-                        <div>
-                          <span class="text-xs text-zinc-500">Carrier:</span>
-                          <span class="ml-1 text-white font-medium">{{ item.carrier || '—' }}</span>
+          <div class="space-y-8">
+            @for (t of timelines(); track t.trackingNumber) {
+              <div class="bg-zinc-950/50 border border-zinc-800/80 rounded-xl p-5 space-y-4">
+                <!-- Timeline Header Info -->
+                <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-zinc-800/60 pb-3">
+                  <div>
+                    <span class="px-2 py-0.5 bg-yellow-950/50 text-yellow-400 border border-yellow-800/30 rounded text-[10px] font-bold tracking-wider mr-2 uppercase">DHL Express</span>
+                    
+                    @if (t.type === 'Purchase Order') {
+                      <a [routerLink]="['/purchase-orders', t.id]" class="text-white hover:text-yellow-400 font-semibold text-sm hover:underline transition-colors">
+                        {{ t.referenceName }}
+                      </a>
+                    } @else {
+                      <a [routerLink]="['/samples', t.id]" class="text-white hover:text-yellow-400 font-semibold text-sm hover:underline transition-colors">
+                        {{ t.referenceName }}
+                      </a>
+                    }
+                    
+                    <span class="text-zinc-500 text-xs ml-2">({{ t.type }})</span>
+                    <span class="ml-2 px-2 py-0.5 rounded text-[10px] font-bold tracking-wider capitalize border"
+                      [class.bg-emerald-950/50]="t.status === 'DELIVERED'"
+                      [class.text-emerald-400]="t.status === 'DELIVERED'"
+                      [class.border-emerald-900/30]="t.status === 'DELIVERED'"
+                      [class.bg-blue-950/50]="t.status !== 'DELIVERED'"
+                      [class.text-blue-400]="t.status !== 'DELIVERED'"
+                      [class.border-blue-900/30]="t.status !== 'DELIVERED'"
+                    >
+                      Status: {{ t.status }}
+                    </span>
+                  </div>
+                  <div class="text-xs sm:text-right">
+                    <span class="text-zinc-500">Tracking:</span>
+                    <span class="font-mono text-zinc-300 font-bold ml-1">{{ t.trackingNumber }}</span>
+                  </div>
+                </div>
+
+                <!-- Horizontal Process Flow -->
+                <div class="py-4">
+                  <!-- Stepper line container -->
+                  <div class="grid grid-cols-1 md:grid-cols-4 gap-4 relative">
+                    <!-- Connector line behind items -->
+                    <div class="hidden md:block absolute top-4 left-6 right-6 h-0.5 bg-zinc-800 z-0"></div>
+
+                    @for (step of getTimelineSteps(t); track step.code; let i = $index) {
+                      <div class="flex items-start md:flex-col md:items-center text-left md:text-center relative z-10 gap-3 md:gap-0">
+                        <!-- Step Bubble Icon -->
+                        <div 
+                          [class]="step.active ? 'bg-emerald-500 text-zinc-950 font-bold shadow-lg ring-4 ring-emerald-950/60' : 'bg-zinc-850 text-zinc-500 border border-zinc-700'" 
+                          class="w-8 h-8 rounded-full flex items-center justify-center text-xs flex-shrink-0 md:mb-3"
+                        >
+                          {{ step.icon }}
                         </div>
-                        @if (item.trackingNumber) {
-                          <div class="mt-0.5 text-xs">
-                            <span class="text-zinc-500">Tracking:</span>
-                            <span class="ml-1 font-mono text-zinc-300 font-semibold">{{ item.trackingNumber }}</span>
-                          </div>
-                        }
-                      } @else {
-                        <span class="text-zinc-500 italic text-xs">No tracking details provided</span>
-                      }
-                    </td>
-                    <!-- Expected Delivery -->
-                    <td class="px-6 py-4">
-                      @if (item.type === 'order' && item.expectedDelivery) {
-                        <span class="text-zinc-300 font-medium">{{ item.expectedDelivery }}</span>
-                      } @else {
-                        <span class="text-zinc-500 italic text-xs">N/A</span>
-                      }
-                    </td>
-                    <!-- Action Link -->
-                    <td class="px-6 py-4 text-right">
-                      @if (item.type === 'order') {
-                        <a
-                          [routerLink]="['/purchase-orders', item.id]"
-                          class="text-zinc-400 hover:text-white text-xs underline"
-                        >View Details</a>
-                      } @else {
-                        <a
-                          [routerLink]="['/samples', item.id, 'edit']"
-                          class="text-zinc-400 hover:text-white text-xs underline"
-                        >Edit Details</a>
-                      }
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
+                        <!-- Step Description -->
+                        <div class="min-w-0">
+                          <p [class.text-white]="step.active" [class.text-zinc-500]="!step.active" class="font-semibold text-xs transition-colors">
+                            {{ step.title }}
+                          </p>
+                          <p class="text-[10px] text-zinc-500 mt-1 max-w-[150px] mx-auto md:line-clamp-2" [title]="step.desc || ''">
+                            {{ step.desc || 'Waiting...' }}
+                          </p>
+                          @if (step.timestamp) {
+                            <p class="text-[9px] text-zinc-600 font-mono mt-0.5">{{ step.timestamp | date:'dd MMM, hh:mm a' }}</p>
+                          }
+                        </div>
+                      </div>
+                    }
+                  </div>
+                </div>
+              </div>
+            }
           </div>
         }
       </div>
+
     </div>
   `,
 })
@@ -150,39 +171,150 @@ export class DashboardComponent implements OnInit {
   readonly productsStore = inject(ProductsStore);
   readonly samplesStore = inject(SamplesStore);
   readonly purchaseOrdersStore = inject(PurchaseOrdersStore);
+  readonly authService = inject(AuthService);
+  private readonly api = inject(ApiService);
+
+  timelines = signal<TrackingTimeline[]>([]);
+  loadingTimelines = signal(false);
 
   ngOnInit(): void {
     this.suppliersStore.loadSuppliers();
     this.productsStore.loadProducts({});
+    
+    // Load samples and POs, then fetch live tracking details for DHL items
     this.samplesStore.loadSamples();
     this.purchaseOrdersStore.loadPurchaseOrders();
+
+    // Trigger load of live tracking details
+    this.loadDhlTrackingTimelines();
   }
 
-  getShippedItems(): any[] {
-    const shippedOrders = this.purchaseOrdersStore.purchaseOrders()
-      .filter((o: any) => o.status === 'shipped')
+  loadDhlTrackingTimelines(): void {
+    this.loadingTimelines.set(true);
+    setTimeout(() => {
+      const items = this.getDhlActiveShipments();
+      if (items.length === 0) {
+        this.loadingTimelines.set(false);
+        return;
+      }
+
+      const requests = items.map(item => 
+        this.api.getDhlTracking(item.trackingNumber).pipe(
+          catchError(() => of(null))
+        )
+      );
+
+      forkJoin(requests).subscribe({
+        next: (results) => {
+          const validTimelines: TrackingTimeline[] = [];
+          results.forEach((res, index) => {
+            if (res) {
+              if (res.status === 'DELIVERED') {
+                // Find delivered checkpoint timestamp to check if it's within 24 hours
+                const deliveredCp = res.checkpoints.find((c: any) => c.code === 'DELIVERED');
+                const deliveryTime = deliveredCp ? new Date(deliveredCp.timestamp).getTime() : new Date(res.lastUpdate).getTime();
+                const hoursSinceDelivery = (Date.now() - deliveryTime) / (1000 * 60 * 60);
+                
+                if (hoursSinceDelivery <= 24) {
+                  validTimelines.push({
+                    id: items[index].id,
+                    trackingNumber: res.trackingNumber,
+                    referenceName: items[index].name,
+                    type: items[index].type,
+                    status: res.status,
+                    estimatedDelivery: res.estimatedDelivery,
+                    checkpoints: res.checkpoints,
+                  });
+                }
+              } else {
+                validTimelines.push({
+                  id: items[index].id,
+                  trackingNumber: res.trackingNumber,
+                  referenceName: items[index].name,
+                  type: items[index].type,
+                  status: res.status,
+                  estimatedDelivery: res.estimatedDelivery,
+                  checkpoints: res.checkpoints,
+                });
+              }
+            }
+          });
+          this.timelines.set(validTimelines);
+          this.loadingTimelines.set(false);
+        },
+        error: (err) => {
+          this.loadingTimelines.set(false);
+          console.error('Failed to load tracking timelines:', err);
+        }
+      });
+    }, 800);
+  }
+
+  getDhlActiveShipments(): any[] {
+    const orders = this.purchaseOrdersStore.purchaseOrders()
+      .filter((o: any) => o.carrier?.toLowerCase() === 'dhl' && o.trackingNumber && o.trackingNumber.trim().length > 0)
       .map((o: any) => ({
         id: o.id,
-        type: 'order',
+        type: 'Purchase Order',
         name: o.poNumber,
-        supplierName: o.supplier?.name || '',
-        carrier: o.carrier,
         trackingNumber: o.trackingNumber,
-        expectedDelivery: o.expectedDelivery ? new Date(o.expectedDelivery).toLocaleDateString() : '',
       }));
 
-    const shippedSamples = this.samplesStore.samples()
-      .filter((p) => p.status === 'shipped')
-      .map((p) => ({
+    const samples = this.samplesStore.samples()
+      .filter((p: any) => p.carrier?.toLowerCase() === 'dhl' && p.trackingNumber && p.trackingNumber.trim().length > 0)
+      .map((p: any) => ({
         id: p.id,
-        type: 'sample',
+        type: 'Sample',
         name: p.name,
-        supplierName: p.supplier?.name || '',
-        carrier: p.carrier,
         trackingNumber: p.trackingNumber,
-        expectedDelivery: '',
       }));
 
-    return [...shippedOrders, ...shippedSamples];
+    return [...orders, ...samples];
+  }
+
+  getTimelineSteps(t: TrackingTimeline): any[] {
+    const findCp = (code: string) => t.checkpoints.find(c => c.code === code);
+    
+    const pickedUp = findCp('PICKED_UP');
+    const inTransit = findCp('IN_TRANSIT');
+    const outForDelivery = findCp('OUT_FOR_DELIVERY');
+    const delivered = findCp('DELIVERED');
+
+    const steps = [
+      {
+        code: 'PICKED_UP',
+        title: 'Picked Up',
+        icon: '📤',
+        active: !!pickedUp,
+        timestamp: pickedUp?.timestamp || '',
+        desc: pickedUp?.description || 'Package picked up by DHL',
+      },
+      {
+        code: 'IN_TRANSIT',
+        title: 'In Transit',
+        icon: '✈️',
+        active: !!inTransit,
+        timestamp: inTransit?.timestamp || '',
+        desc: inTransit?.description || 'In transit to destination',
+      },
+      {
+        code: 'OUT_FOR_DELIVERY',
+        title: 'Out for Delivery',
+        icon: '🚚',
+        active: !!outForDelivery,
+        timestamp: outForDelivery?.timestamp || '',
+        desc: outForDelivery?.description || 'Out for final delivery',
+      },
+      {
+        code: 'DELIVERED',
+        title: 'Delivered',
+        icon: '✅',
+        active: !!delivered,
+        timestamp: delivered?.timestamp || '',
+        desc: delivered?.description || 'Delivered & signed',
+      }
+    ];
+
+    return steps;
   }
 }

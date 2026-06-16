@@ -89,4 +89,19 @@ export class CreateProductDto {
   @IsString()
   @IsOptional()
   pricepoint?: string;
+
+  @IsNumber()
+  @IsOptional()
+  @Type(() => Number)
+  landingPrice?: number;
+
+  @IsNumber()
+  @IsOptional()
+  @Type(() => Number)
+  onePcPrice?: number;
+
+  @IsNumber()
+  @IsOptional()
+  @Type(() => Number)
+  bulkPrice?: number;
 }

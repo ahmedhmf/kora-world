@@ -2,6 +2,8 @@ import { Component, inject, OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { PurchaseOrdersStore } from '../../store/purchase-orders.store';
+import { DialogService } from '../../core/services/dialog.service';
+import { AuthService } from '../../core/services/auth.service';
 
 @Component({
   selector: 'app-purchase-orders-list',
@@ -16,12 +18,14 @@ import { PurchaseOrdersStore } from '../../store/purchase-orders.store';
           <h1 class="text-2xl font-bold text-white">Purchase Orders</h1>
           <p class="text-zinc-400 text-sm mt-1">{{ store.totalOrders() }} orders recorded</p>
         </div>
-        <a
-          routerLink="/purchase-orders/new"
-          class="px-4 py-2 bg-white text-zinc-900 text-sm font-semibold rounded-lg hover:bg-zinc-100 transition-colors"
-        >
-          + Add Purchase Order
-        </a>
+        @if (authService.currentUser()?.role !== 'supplier') {
+          <a
+            routerLink="/purchase-orders/new"
+            class="px-4 py-2 bg-white text-zinc-900 text-sm font-semibold rounded-lg hover:bg-zinc-100 transition-colors"
+          >
+            + Add Purchase Order
+          </a>
+        }
       </div>
 
       <!-- Loading -->
@@ -43,7 +47,9 @@ import { PurchaseOrdersStore } from '../../store/purchase-orders.store';
         <div class="text-center py-20">
           <p class="text-4xl mb-4">📋</p>
           <p class="text-zinc-400 text-sm">No purchase orders found.</p>
-          <a routerLink="/purchase-orders/new" class="text-white text-sm underline mt-2 inline-block">Create your first purchase order</a>
+          @if (authService.currentUser()?.role !== 'supplier') {
+            <a routerLink="/purchase-orders/new" class="text-white text-sm underline mt-2 inline-block">Create your first purchase order</a>
+          }
         </div>
       }
 
@@ -85,14 +91,16 @@ import { PurchaseOrdersStore } from '../../store/purchase-orders.store';
                       [routerLink]="['/purchase-orders', po.id]"
                       class="text-zinc-400 hover:text-white text-xs underline mr-4"
                     >View</a>
-                    <a
-                      [routerLink]="['/purchase-orders', po.id, 'edit']"
-                      class="text-zinc-400 hover:text-white text-xs underline mr-4"
-                    >Edit</a>
-                    <button
-                      (click)="delete(po.id)"
-                      class="text-red-400 hover:text-red-300 text-xs font-medium"
-                    >Delete</button>
+                    @if (authService.currentUser()?.role !== 'supplier') {
+                      <a
+                        [routerLink]="['/purchase-orders', po.id, 'edit']"
+                        class="text-zinc-400 hover:text-white text-xs underline mr-4"
+                      >Edit</a>
+                      <button
+                        (click)="delete(po.id)"
+                        class="text-red-400 hover:text-red-300 text-xs font-medium"
+                      >Delete</button>
+                    }
                   </td>
                 </tr>
               }
@@ -105,13 +113,16 @@ import { PurchaseOrdersStore } from '../../store/purchase-orders.store';
 })
 export class PurchaseOrdersListComponent implements OnInit {
   readonly store = inject(PurchaseOrdersStore);
+  readonly authService = inject(AuthService);
+  private readonly dialogService = inject(DialogService);
 
   ngOnInit(): void {
     this.store.loadPurchaseOrders();
   }
 
-  delete(id: number): void {
-    if (confirm('Delete this purchase order? This action cannot be undone.')) {
+  async delete(id: number): Promise<void> {
+    const ok = await this.dialogService.confirm('Delete Purchase Order', 'Delete this purchase order? This action cannot be undone.');
+    if (ok) {
       this.store.deletePurchaseOrder(id);
     }
   }

@@ -4,6 +4,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ApiService } from '../../core/services/api.service';
 import { ReceiptsStore } from '../../store/receipts.store';
 import { Receipt, ReceiptStatus, UpdateReceiptDto } from '../../core/models/receipt.model';
+import { DialogService } from '../../core/services/dialog.service';
 
 @Component({
   selector: 'app-receipt-detail',
@@ -227,6 +228,7 @@ export class ReceiptDetailComponent implements OnInit {
   private readonly store = inject(ReceiptsStore);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly dialogService = inject(DialogService);
 
   receipt = signal<Receipt | null>(null);
   loading = signal(false);
@@ -254,12 +256,13 @@ export class ReceiptDetailComponent implements OnInit {
         this.receipt.set({ ...r, ...updated });
         this.store.updateReceipt({ id: r.id, dto });
       },
-      error: () => alert('Failed to update status.'),
+      error: () => this.dialogService.alert('Error', 'Failed to update status.'),
     });
   }
 
-  confirmDelete(): void {
-    if (!confirm('Are you sure you want to delete this receipt? This cannot be undone.')) return;
+  async confirmDelete(): Promise<void> {
+    const ok = await this.dialogService.confirm('Delete Receipt', 'Are you sure you want to delete this receipt? This cannot be undone.');
+    if (!ok) return;
     const r = this.receipt();
     if (!r) return;
     this.store.deleteReceipt(r.id);

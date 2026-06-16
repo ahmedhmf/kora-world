@@ -10,6 +10,9 @@ export interface Product {
   category?: ProductCategory;
   description?: string;
   unitPrice: number;
+  landingPrice?: number;
+  onePcPrice?: number;
+  bulkPrice?: number;
   currency?: string;
   moq?: number;
   weightKg?: number;
@@ -34,6 +37,9 @@ export interface CreateProductDto {
   category?: ProductCategory;
   description?: string;
   unitPrice: number;
+  landingPrice?: number;
+  onePcPrice?: number;
+  bulkPrice?: number;
   currency?: string;
   moq?: number;
   weightKg?: number;

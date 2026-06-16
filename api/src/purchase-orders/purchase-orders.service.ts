@@ -23,8 +23,13 @@ export class PurchaseOrdersService {
     private readonly productsService: ProductsService,
   ) {}
 
-  async findAll(): Promise<PurchaseOrder[]> {
+  async findAll(supplierId?: number): Promise<PurchaseOrder[]> {
+    const where: any = {};
+    if (supplierId) {
+      where.supplierId = supplierId;
+    }
     return this.poRepo.find({
+      where,
       relations: { supplier: true },
       order: { orderDate: 'DESC', createdAt: 'DESC' },
     });

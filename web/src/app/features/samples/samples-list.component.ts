@@ -2,6 +2,8 @@ import { Component, inject, OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { SamplesStore } from '../../store/samples.store';
 import { ApiService } from '../../core/services/api.service';
+import { DialogService } from '../../core/services/dialog.service';
+import { AuthService } from '../../core/services/auth.service';
 
 @Component({
   selector: 'app-samples-list',
@@ -16,12 +18,14 @@ import { ApiService } from '../../core/services/api.service';
           <h1 class="text-2xl font-bold text-white">Supplier Samples</h1>
           <p class="text-zinc-400 text-sm mt-1">{{ store.totalSamples() }} samples requested or received</p>
         </div>
-        <a
-          routerLink="/samples/new"
-          class="px-4 py-2 bg-white text-zinc-900 text-sm font-semibold rounded-lg hover:bg-zinc-100 transition-colors"
-        >
-          + Add Sample
-        </a>
+        @if (authService.currentUser()?.role !== 'supplier') {
+          <a
+            routerLink="/samples/new"
+            class="px-4 py-2 bg-white text-zinc-900 text-sm font-semibold rounded-lg hover:bg-zinc-100 transition-colors"
+          >
+            + Add Sample
+          </a>
+        }
       </div>
 
       <!-- Loading -->
@@ -43,7 +47,9 @@ import { ApiService } from '../../core/services/api.service';
         <div class="text-center py-20">
           <p class="text-4xl mb-4">🧪</p>
           <p class="text-zinc-400 text-sm">No samples tracked yet.</p>
-          <a routerLink="/samples/new" class="text-white text-sm underline mt-2 inline-block">Track your first sample</a>
+          @if (authService.currentUser()?.role !== 'supplier') {
+            <a routerLink="/samples/new" class="text-white text-sm underline mt-2 inline-block">Track your first sample</a>
+          }
         </div>
       }
 
@@ -118,44 +124,48 @@ import { ApiService } from '../../core/services/api.service';
                     {{ sample.comments || '—' }}
                   </td>
                   <td class="px-6 py-4 text-right">
-                    @if (sample.status === 'rejected') {
-                      <a
-                        [routerLink]="['/samples/new']"
-                        [queryParams]="{ fromParentSampleId: sample.id }"
-                        class="text-amber-400 hover:text-amber-300 text-xs font-semibold mr-4 inline-flex items-center"
-                        title="Request next round of sample"
-                      >
-                        <svg class="h-3.5 w-3.5 mr-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 6.5" />
-                        </svg>
-                        <span>Next Round</span>
-                      </a>
-                    }
-                    @if (sample.status === 'approved') {
-                      <a
-                        [routerLink]="['/products/new']"
-                        [queryParams]="{ fromSampleId: sample.id }"
-                        class="text-emerald-400 hover:text-emerald-300 text-xs font-semibold mr-4 inline-flex items-center"
-                        title="Promote approved sample to Product"
-                      >
-                        <svg class="h-3.5 w-3.5 mr-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 11l3-3m0 0l3 3m-3-3v8m0-13a9 9 0 110 18 9 9 0 010-18z" />
-                        </svg>
-                        <span>Promote</span>
-                      </a>
+                    @if (authService.currentUser()?.role !== 'supplier') {
+                      @if (sample.status === 'rejected') {
+                        <a
+                          [routerLink]="['/samples/new']"
+                          [queryParams]="{ fromParentSampleId: sample.id }"
+                          class="text-amber-400 hover:text-amber-300 text-xs font-semibold mr-4 inline-flex items-center"
+                          title="Request next round of sample"
+                        >
+                          <svg class="h-3.5 w-3.5 mr-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 6.5" />
+                          </svg>
+                          <span>Next Round</span>
+                        </a>
+                      }
+                      @if (sample.status === 'approved') {
+                        <a
+                          [routerLink]="['/products/new']"
+                          [queryParams]="{ fromSampleId: sample.id }"
+                          class="text-emerald-400 hover:text-emerald-300 text-xs font-semibold mr-4 inline-flex items-center"
+                          title="Promote approved sample to Product"
+                        >
+                          <svg class="h-3.5 w-3.5 mr-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 11l3-3m0 0l3 3m-3-3v8m0-13a9 9 0 110 18 9 9 0 010-18z" />
+                          </svg>
+                          <span>Promote</span>
+                        </a>
+                      }
                     }
                     <a
                       [routerLink]="['/samples', sample.id]"
                       class="text-zinc-400 hover:text-white text-xs underline mr-4"
                     >View</a>
-                    <a
-                      [routerLink]="['/samples', sample.id, 'edit']"
-                      class="text-zinc-400 hover:text-white text-xs underline mr-4"
-                    >Edit</a>
-                    <button
-                      (click)="delete(sample.id)"
-                      class="text-red-400 hover:text-red-300 text-xs font-medium"
-                    >Delete</button>
+                    @if (authService.currentUser()?.role !== 'supplier') {
+                      <a
+                        [routerLink]="['/samples', sample.id, 'edit']"
+                        class="text-zinc-400 hover:text-white text-xs underline mr-4"
+                      >Edit</a>
+                      <button
+                        (click)="delete(sample.id)"
+                        class="text-red-400 hover:text-red-300 text-xs font-medium"
+                      >Delete</button>
+                    }
                   </td>
                 </tr>
               }
@@ -168,15 +178,18 @@ import { ApiService } from '../../core/services/api.service';
 })
 export class SamplesListComponent implements OnInit {
   readonly store = inject(SamplesStore);
+  readonly authService = inject(AuthService);
   private readonly api = inject(ApiService);
+  private readonly dialogService = inject(DialogService);
   readonly Object = Object;
 
   ngOnInit(): void {
     this.store.loadSamples();
   }
 
-  delete(id: number): void {
-    if (confirm('Delete this sample record?')) {
+  async delete(id: number): Promise<void> {
+    const ok = await this.dialogService.confirm('Delete Sample', 'Are you sure you want to delete this sample record?');
+    if (ok) {
       this.store.deleteSample(id);
     }
   }
@@ -192,7 +205,7 @@ export class SamplesListComponent implements OnInit {
         window.URL.revokeObjectURL(url);
       },
       error: (err) => {
-        alert('Could not download file. You may not have access permission.');
+        this.dialogService.alert('Download Failed', 'Could not download file. You may not have access permission.');
         console.error('Download error:', err);
       }
     });

@@ -183,6 +183,21 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/contacts/contact-form.component').then((m) => m.ContactFormComponent),
       },
+      {
+        path: 'b2c-requests',
+        loadComponent: () =>
+          import('./features/b2c-requests/b2c-requests-list.component').then((m) => m.B2cRequestsListComponent),
+      },
+      {
+        path: 'b2c-requests/new',
+        loadComponent: () =>
+          import('./features/b2c-requests/b2c-request-form.component').then((m) => m.B2cRequestFormComponent),
+      },
+      {
+        path: 'b2c-requests/:id/edit',
+        loadComponent: () =>
+          import('./features/b2c-requests/b2c-request-form.component').then((m) => m.B2cRequestFormComponent),
+      },
     ],
   },
 ];

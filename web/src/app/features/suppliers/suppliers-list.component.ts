@@ -1,6 +1,7 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { SuppliersStore } from '../../store/suppliers.store';
+import { DialogService } from '../../core/services/dialog.service';
 
 @Component({
   selector: 'app-suppliers-list',
@@ -91,13 +92,15 @@ import { SuppliersStore } from '../../store/suppliers.store';
 })
 export class SuppliersListComponent implements OnInit {
   readonly store = inject(SuppliersStore);
+  private readonly dialogService = inject(DialogService);
 
   ngOnInit(): void {
     this.store.loadSuppliers();
   }
 
-  delete(id: number): void {
-    if (confirm('Delete this supplier?')) {
+  async delete(id: number): Promise<void> {
+    const ok = await this.dialogService.confirm('Delete Supplier', 'Are you sure you want to delete this supplier?');
+    if (ok) {
       this.store.deleteSupplier(id);
     }
   }
