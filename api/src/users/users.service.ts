@@ -6,7 +6,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
-import { hashPassword } from '../auth/crypto-auth.helper';
+import { hashPassword, verifyPassword } from '../auth/crypto-auth.helper';
 
 @Injectable()
 export class UsersService {
@@ -135,5 +135,30 @@ export class UsersService {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
     await this.usersRepository.remove(user);
+  }
+
+  async updatePassword(id: number, currentPass: string, newPass: string): Promise<void> {
+    const user = await this.usersRepository.findOne({
+      where: { id },
+      select: {
+        id: true,
+        password: true,
+      },
+    });
+    if (!user) {
+      throw new NotFoundException(`User with ID ${id} not found`);
+    }
+
+    if (!user.password) {
+      throw new BadRequestException('Current password is not set');
+    }
+
+    const isValid = verifyPassword(currentPass, user.password);
+    if (!isValid) {
+      throw new BadRequestException('Incorrect current password');
+    }
+
+    user.password = hashPassword(newPass);
+    await this.usersRepository.save(user);
   }
 }

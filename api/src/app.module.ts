@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { Supplier } from './suppliers/entities/supplier.entity';
@@ -75,9 +77,19 @@ import { B2cRequestsModule } from './b2c-requests/b2c-requests.module.js';
     ReceiptsModule,
     ContactsModule,
     B2cRequestsModule,
+    ThrottlerModule.forRoot([{
+      ttl: 60000,
+      limit: 120,
+    }]),
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
 export class AppModule {}
 

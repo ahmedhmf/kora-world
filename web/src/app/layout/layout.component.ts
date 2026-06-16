@@ -1,6 +1,8 @@
 import { Component, inject, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService } from '../core/services/auth.service';
+import { FormsModule } from '@angular/forms';
+import { Observable } from 'rxjs';
 
 interface NavItem {
   label: string;
@@ -12,7 +14,7 @@ interface NavItem {
 @Component({
   selector: 'app-layout',
   standalone: true,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, FormsModule],
   template: `
     <div class="flex h-screen bg-zinc-950 text-white overflow-hidden print:bg-white print:text-black print:h-auto print:overflow-visible">
 
@@ -75,18 +77,48 @@ interface NavItem {
         </nav>
 
         <!-- Footer -->
-        <div class="px-6 py-4 border-t border-zinc-800 space-y-3">
+        <div class="px-6 py-4 border-t border-zinc-800 relative">
           @if (authService.currentUser(); as user) {
-            <div>
-              <p class="text-sm font-semibold text-white truncate">{{ user.name }}</p>
-              <p class="text-xs text-zinc-500 truncate">{{ user.email }}</p>
+            <div class="flex items-center justify-between">
+              <div class="truncate mr-2">
+                <p class="text-sm font-semibold text-white truncate">{{ user.name }}</p>
+                <p class="text-xs text-zinc-500 truncate">{{ user.email }}</p>
+              </div>
+              
+              <!-- More menu trigger button -->
+              <button 
+                (click)="isUserMenuOpen.set(!isUserMenuOpen())"
+                class="text-zinc-400 hover:text-white p-1.5 rounded hover:bg-zinc-800 cursor-pointer focus:outline-none transition-colors shrink-0"
+                title="Account Options"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="1"></circle>
+                  <circle cx="12" cy="5" r="1"></circle>
+                  <circle cx="12" cy="19" r="1"></circle>
+                </svg>
+              </button>
             </div>
-            <button
-              (click)="authService.logout(); isMobileOpen.set(false)"
-              class="w-full py-1.5 bg-zinc-800 hover:bg-zinc-700 text-red-400 text-xs font-medium rounded-md transition-colors cursor-pointer"
-            >
-              Sign Out
-            </button>
+
+            <!-- Context Dropdown Menu (Opens upwards) -->
+            @if (isUserMenuOpen()) {
+              <!-- Invisible backdrop to close the menu on click outside -->
+              <div (click)="isUserMenuOpen.set(false)" class="fixed inset-0 z-10"></div>
+              
+              <div class="absolute bottom-16 right-6 left-6 bg-black border border-zinc-800 rounded-lg shadow-xl p-1.5 z-20 space-y-0.5 animate-fade-in">
+                <button
+                  (click)="openChangePasswordModal(); isUserMenuOpen.set(false); isMobileOpen.set(false)"
+                  class="w-full text-left px-3 py-2 text-zinc-300 hover:text-white hover:bg-zinc-900 text-xs font-medium rounded-md transition-colors cursor-pointer flex items-center gap-2"
+                >
+                  <span>🔑</span> Change Password
+                </button>
+                <button
+                  (click)="authService.logout(); isUserMenuOpen.set(false); isMobileOpen.set(false)"
+                  class="w-full text-left px-3 py-2 text-red-400 hover:text-red-300 hover:bg-red-950/40 text-xs font-medium rounded-md transition-colors cursor-pointer flex items-center gap-2 border-t border-zinc-850"
+                >
+                  <span>🚪</span> Sign Out
+                </button>
+              </div>
+            }
           } @else {
             <p class="text-xs text-zinc-600">korafc.com</p>
           }
@@ -133,6 +165,85 @@ interface NavItem {
         </main>
       </div>
 
+      <!-- Change Password Modal -->
+      @if (isChangePasswordOpen()) {
+        <div class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div class="bg-black border border-zinc-800 rounded-xl max-w-md w-full overflow-hidden shadow-2xl animate-fade-in">
+            <!-- Modal Header -->
+            <div class="px-6 py-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-950">
+              <h3 class="font-bold text-white text-base">🔑 Change Password</h3>
+              <button (click)="isChangePasswordOpen.set(false)" class="text-zinc-500 hover:text-white text-lg font-bold transition-colors cursor-pointer focus:outline-none">&times;</button>
+            </div>
+            
+            <!-- Modal Body -->
+            <div class="p-6 space-y-4">
+              @if (errorMessage) {
+                <div class="p-3 bg-red-950/80 border border-red-800/60 rounded text-red-300 text-xs">
+                  {{ errorMessage }}
+                </div>
+              }
+              @if (successMessage) {
+                <div class="p-3 bg-emerald-950/80 border border-emerald-800/60 rounded text-emerald-300 text-xs">
+                  {{ successMessage }}
+                </div>
+              }
+              
+              <div class="space-y-1.5">
+                <label class="block text-xs font-medium text-zinc-400">Current Password</label>
+                <input 
+                  type="password" 
+                  [(ngModel)]="currentPassword" 
+                  class="w-full bg-zinc-950 border border-zinc-850 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-700 transition-colors"
+                  placeholder="••••••••"
+                />
+              </div>
+
+              <div class="space-y-1.5">
+                <label class="block text-xs font-medium text-zinc-400">New Password</label>
+                <input 
+                  type="password" 
+                  [(ngModel)]="newPassword" 
+                  class="w-full bg-zinc-950 border border-zinc-850 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-700 transition-colors"
+                  placeholder="••••••••"
+                />
+              </div>
+
+              <div class="space-y-1.5">
+                <label class="block text-xs font-medium text-zinc-400">Confirm New Password</label>
+                <input 
+                  type="password" 
+                  [(ngModel)]="confirmPassword" 
+                  class="w-full bg-zinc-950 border border-zinc-850 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-700 transition-colors"
+                  placeholder="••••••••"
+                />
+              </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="px-6 py-4 border-t border-zinc-800 bg-zinc-950 flex justify-end gap-3">
+              <button 
+                [disabled]="isSubmitting"
+                (click)="isChangePasswordOpen.set(false)" 
+                class="px-4 py-2 border border-zinc-800 text-zinc-400 hover:text-white rounded text-xs transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button 
+                [disabled]="isSubmitting"
+                (click)="submitChangePassword()" 
+                class="px-4 py-2 bg-zinc-100 hover:bg-white text-zinc-900 rounded font-semibold text-xs transition-colors cursor-pointer flex items-center gap-1.5"
+              >
+                @if (isSubmitting) {
+                  <span>Saving...</span>
+                } @else {
+                  <span>Update Password</span>
+                }
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
     </div>
   `,
 })
@@ -153,6 +264,62 @@ export class LayoutComponent {
     { label: 'B2C Requests', route: '/b2c-requests', icon: '📱' },
     { label: 'Employees', route: '/users', icon: '👥', roles: ['admin'] },
   ];
+
+  // User Options Menu and Change Password state
+  isUserMenuOpen = signal(false);
+  isChangePasswordOpen = signal(false);
+  currentPassword = '';
+  newPassword = '';
+  confirmPassword = '';
+  errorMessage = '';
+  successMessage = '';
+  isSubmitting = false;
+
+  openChangePasswordModal() {
+    this.currentPassword = '';
+    this.newPassword = '';
+    this.confirmPassword = '';
+    this.errorMessage = '';
+    this.successMessage = '';
+    this.isChangePasswordOpen.set(true);
+  }
+
+  submitChangePassword() {
+    this.errorMessage = '';
+    this.successMessage = '';
+
+    if (!this.currentPassword || !this.newPassword || !this.confirmPassword) {
+      this.errorMessage = 'All fields are required.';
+      return;
+    }
+
+    if (this.newPassword !== this.confirmPassword) {
+      this.errorMessage = 'New password and confirmation do not match.';
+      return;
+    }
+
+    // Complexity validation
+    const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
+    if (!regex.test(this.newPassword)) {
+      this.errorMessage = 'Password must be at least 8 characters long, and contain at least one uppercase letter, one lowercase letter, one number, and one special character.';
+      return;
+    }
+
+    this.isSubmitting = true;
+    this.authService.changePassword(this.currentPassword, this.newPassword).subscribe({
+      next: () => {
+        this.successMessage = 'Password changed successfully!';
+        this.isSubmitting = false;
+        setTimeout(() => {
+          this.isChangePasswordOpen.set(false);
+        }, 1500);
+      },
+      error: (err) => {
+        this.errorMessage = err.error?.message || 'Failed to change password. Please verify current password.';
+        this.isSubmitting = false;
+      }
+    });
+  }
 
   get filteredNavItems(): NavItem[] {
     const role = this.authService.currentUser()?.role;

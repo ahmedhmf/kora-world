@@ -11,9 +11,17 @@ export class AuthService {
     private usersService: UsersService,
     private configService: ConfigService,
   ) {
-    this.jwtSecret =
-      this.configService.get<string>('JWT_SECRET') ||
-      'kora_super_secret_jwt_key_2026';
+    const secret = this.configService.get<string>('JWT_SECRET');
+    const isProd = this.configService.get<string>('NODE_ENV') === 'production';
+    const defaultSecret = 'kora_super_secret_jwt_key_2026';
+
+    if (isProd && (!secret || secret === defaultSecret)) {
+      throw new Error(
+        'PRODUCTION SECURITY VIOLATION: JWT_SECRET must be set to a secure custom value in production environments.',
+      );
+    }
+
+    this.jwtSecret = secret || defaultSecret;
   }
 
   async login(email: string, pass: string) {
@@ -47,5 +55,9 @@ export class AuthService {
         supplierId: user.supplierId,
       },
     };
+  }
+
+  async changePassword(userId: number, currentPass: string, newPass: string): Promise<void> {
+    await this.usersService.updatePassword(userId, currentPass, newPass);
   }
 }

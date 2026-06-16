@@ -15,7 +15,7 @@ export class AuthService {
   readonly isAuthenticated = computed(() => !!this.currentUser());
 
   constructor() {
-    this.loadUserFromToken();
+    this.loadUserFromServer();
   }
 
   private get base(): string {
@@ -26,8 +26,8 @@ export class AuthService {
   login(credentials: { email: string; password: string }): Observable<any> {
     return this.http.post<any>(`${this.base}/auth/login`, credentials).pipe(
       tap((res) => {
-        if (res && res.token) {
-          localStorage.setItem('kora_token', res.token);
+        if (res && res.user) {
+          localStorage.setItem('kora_user', JSON.stringify(res.user));
           this.currentUser.set(res.user);
         }
       })
@@ -35,42 +35,57 @@ export class AuthService {
   }
 
   logout(): void {
-    localStorage.removeItem('kora_token');
+    this.http.post(`${this.base}/auth/logout`, {}).subscribe({
+      next: () => {
+        localStorage.removeItem('kora_user');
+        this.currentUser.set(null);
+        this.router.navigate(['/login']);
+      },
+      error: () => {
+        localStorage.removeItem('kora_user');
+        this.currentUser.set(null);
+        this.router.navigate(['/login']);
+      }
+    });
+  }
+
+  private loadUserFromServer(): void {
+    // Load synchronous profile hint from localStorage to keep routing guards happy
+    const savedUser = localStorage.getItem('kora_user');
+    if (savedUser) {
+      try {
+        this.currentUser.set(JSON.parse(savedUser));
+      } catch {
+        localStorage.removeItem('kora_user');
+      }
+    }
+
+    // Verify session state asynchronously with the server
+    this.http.get<any>(`${this.base}/auth/me`).subscribe({
+      next: (res) => {
+        if (res && res.user) {
+          localStorage.setItem('kora_user', JSON.stringify(res.user));
+          this.currentUser.set(res.user);
+        } else {
+          this.clearSession();
+        }
+      },
+      error: () => {
+        this.clearSession();
+      }
+    });
+  }
+
+  private clearSession(): void {
+    localStorage.removeItem('kora_user');
     this.currentUser.set(null);
     this.router.navigate(['/login']);
   }
 
-  private loadUserFromToken(): void {
-    const token = localStorage.getItem('kora_token');
-    if (!token) return;
-
-    try {
-      const parts = token.split('.');
-      if (parts.length !== 3) {
-        this.clearSession();
-        return;
-      }
-
-      const payload = JSON.parse(atob(parts[1]));
-      const now = Math.floor(Date.now() / 1000);
-
-      if (payload.exp && payload.exp > now) {
-        this.currentUser.set({
-          id: payload.sub,
-          email: payload.email,
-          name: payload.name,
-          role: payload.role,
-        });
-      } else {
-        this.clearSession();
-      }
-    } catch {
-      this.clearSession();
-    }
-  }
-
-  private clearSession(): void {
-    localStorage.removeItem('kora_token');
-    this.currentUser.set(null);
+  changePassword(currentPassword: string, newPassword: string): Observable<any> {
+    return this.http.post<any>(`${this.base}/auth/change-password`, {
+      currentPassword,
+      newPassword,
+    });
   }
 }
