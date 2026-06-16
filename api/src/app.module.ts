@@ -31,6 +31,19 @@ import { ReceiptsModule } from './receipts/receipts.module';
 import { ContactsModule } from './contacts/contacts.module';
 import { B2cRequestsModule } from './b2c-requests/b2c-requests.module.js';
 
+// Accounting, Invoices, Payments Imports
+import { AccountingAccount } from './accounting/entities/accounting-account.entity';
+import { ExchangeRate } from './accounting/entities/exchange-rate.entity';
+import { JournalEntry } from './accounting/entities/journal-entry.entity';
+import { JournalLine } from './accounting/entities/journal-line.entity';
+import { Invoice } from './invoices/entities/invoice.entity';
+import { InvoiceLine } from './invoices/entities/invoice-line.entity';
+import { Payment } from './payments/entities/payment.entity';
+
+import { AccountingModule } from './accounting/accounting.module';
+import { InvoicesModule } from './invoices/invoices.module';
+import { PaymentsModule } from './payments/payments.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -57,6 +70,13 @@ import { B2cRequestsModule } from './b2c-requests/b2c-requests.module.js';
           ReceiptLineItem,
           Contact,
           B2cRequest,
+          AccountingAccount,
+          ExchangeRate,
+          JournalEntry,
+          JournalLine,
+          Invoice,
+          InvoiceLine,
+          Payment,
         ],
         migrations: [__dirname + '/migrations/*{.ts,.js}'],
         migrationsRun: true,
@@ -77,6 +97,9 @@ import { B2cRequestsModule } from './b2c-requests/b2c-requests.module.js';
     ReceiptsModule,
     ContactsModule,
     B2cRequestsModule,
+    AccountingModule,
+    InvoicesModule,
+    PaymentsModule,
     ThrottlerModule.forRoot([{
       ttl: 60000,
       limit: 120,

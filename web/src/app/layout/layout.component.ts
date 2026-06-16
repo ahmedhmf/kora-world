@@ -9,6 +9,7 @@ interface NavItem {
   route: string;
   icon: string;
   roles?: string[];
+  subItems?: { label: string; route: string; icon: string }[];
 }
 
 @Component({
@@ -61,18 +62,51 @@ interface NavItem {
         </div>
 
         <!-- Nav -->
-        <nav class="flex-1 px-3 py-4 space-y-1">
-          @for (item of filteredNavItems; track item.route) {
-            <a
-              [routerLink]="item.route"
-              (click)="isMobileOpen.set(false)"
-              routerLinkActive="bg-zinc-800 text-white"
-              [routerLinkActiveOptions]="{ exact: false }"
-              class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors text-sm font-medium"
-            >
-              <span class="text-base">{{ item.icon }}</span>
-              {{ item.label }}
-            </a>
+        <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+          @for (item of filteredNavItems; track item.label) {
+            <div>
+              @if (item.subItems) {
+                <button
+                  (click)="toggleSubmenu(item.label)"
+                  class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors text-sm font-medium cursor-pointer text-left"
+                >
+                  <div class="flex items-center gap-3">
+                    <span class="text-base">{{ item.icon }}</span>
+                    {{ item.label }}
+                  </div>
+                  <span class="text-[9px] transition-transform duration-200" [class.rotate-90]="isSubmenuOpen(item.label)">
+                    ▶
+                  </span>
+                </button>
+                @if (isSubmenuOpen(item.label)) {
+                  <div class="pl-4 pr-1 py-1 space-y-1 bg-zinc-950/20 border-l border-zinc-800 ml-5 mt-1 rounded-r-lg">
+                    @for (sub of item.subItems; track sub.route) {
+                      <a
+                        [routerLink]="sub.route"
+                        (click)="isMobileOpen.set(false)"
+                        routerLinkActive="bg-zinc-850 text-white"
+                        [routerLinkActiveOptions]="{ exact: true }"
+                        class="flex items-center gap-2.5 px-3 py-2 rounded text-zinc-450 hover:text-white transition-colors text-xs font-medium"
+                      >
+                        <span class="text-xs">{{ sub.icon }}</span>
+                        {{ sub.label }}
+                      </a>
+                    }
+                  </div>
+                }
+              } @else {
+                <a
+                  [routerLink]="item.route"
+                  (click)="isMobileOpen.set(false)"
+                  routerLinkActive="bg-zinc-800 text-white"
+                  [routerLinkActiveOptions]="{ exact: false }"
+                  class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors text-sm font-medium"
+                >
+                  <span class="text-base">{{ item.icon }}</span>
+                  {{ item.label }}
+                </a>
+              }
+            </div>
           }
         </nav>
 
@@ -262,8 +296,36 @@ export class LayoutComponent {
     { label: 'Receipts', route: '/receipts', icon: '🧾' },
     { label: 'Contacts', route: '/contacts', icon: '📇' },
     { label: 'B2C Requests', route: '/b2c-requests', icon: '📱' },
+    {
+      label: 'Accounting',
+      route: '/accounting',
+      icon: '🏛️',
+      subItems: [
+        { label: 'Chart of Accounts', route: '/accounting/chart-of-accounts', icon: '📊' },
+        { label: 'Journal Entries', route: '/accounting/journal', icon: '📝' },
+        { label: 'Invoices', route: '/accounting/invoices', icon: '🧾' },
+        { label: 'Payments', route: '/accounting/payments', icon: '💳' },
+        { label: 'Financial Reports', route: '/accounting/reports', icon: '📈' },
+      ],
+    },
     { label: 'Employees', route: '/users', icon: '👥', roles: ['admin'] },
   ];
+
+  // Collapsible submenus state
+  openSubmenus = signal<Record<string, boolean>>({
+    'Accounting': true,
+  });
+
+  toggleSubmenu(label: string) {
+    this.openSubmenus.update(m => ({
+      ...m,
+      [label]: !m[label],
+    }));
+  }
+
+  isSubmenuOpen(label: string): boolean {
+    return !!this.openSubmenus()[label];
+  }
 
   // User Options Menu and Change Password state
   isUserMenuOpen = signal(false);

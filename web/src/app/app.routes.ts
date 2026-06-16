@@ -198,6 +198,32 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/b2c-requests/b2c-request-form.component').then((m) => m.B2cRequestFormComponent),
       },
+      // Accounting Routes
+      {
+        path: 'accounting/chart-of-accounts',
+        loadComponent: () =>
+          import('./features/accounting/chart-of-accounts.component').then((m) => m.ChartOfAccountsComponent),
+      },
+      {
+        path: 'accounting/journal',
+        loadComponent: () =>
+          import('./features/accounting/journal.component').then((m) => m.JournalComponent),
+      },
+      {
+        path: 'accounting/invoices',
+        loadComponent: () =>
+          import('./features/accounting/invoices.component').then((m) => m.InvoicesComponent),
+      },
+      {
+        path: 'accounting/payments',
+        loadComponent: () =>
+          import('./features/accounting/payments.component').then((m) => m.PaymentsComponent),
+      },
+      {
+        path: 'accounting/reports',
+        loadComponent: () =>
+          import('./features/accounting/reports.component').then((m) => m.ReportsComponent),
+      },
     ],
   },
 ];
