@@ -17,4 +17,7 @@ export class ExchangeRate {
 
   @Column({ type: 'date' })
   date: Date | string;
+
+  @Column({ name: 'notes', length: 255, nullable: true })
+  notes?: string;
 }

@@ -1,4 +1,5 @@
 import { inject } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import { signalStore, withState, withMethods, patchState } from '@ngrx/signals';
 import { rxMethod } from '@ngrx/signals/rxjs-interop';
 import { pipe, switchMap, tap } from 'rxjs';
@@ -10,6 +11,18 @@ import {
   Payment,
 } from '../core/services/accounting-api.service';
 import { tapResponse } from '@ngrx/operators';
+
+const parseErrorMessage = (error: any): string => {
+  if (error instanceof HttpErrorResponse) {
+    if (error.error && error.error.message) {
+      if (Array.isArray(error.error.message)) {
+        return error.error.message.join(', ');
+      }
+      return error.error.message;
+    }
+  }
+  return error.message || 'Unknown error occurred';
+};
 
 interface AccountingState {
   accounts: AccountingAccount[];
@@ -168,7 +181,7 @@ export const AccountingStore = signalStore(
                 });
                 if (onSuccess) onSuccess();
               },
-              error: (error: Error) => patchState(store, { error: error.message, loading: false }),
+              error: (error: any) => patchState(store, { error: parseErrorMessage(error), loading: false }),
             })
           )
         )
@@ -188,7 +201,7 @@ export const AccountingStore = signalStore(
                 });
                 if (onSuccess) onSuccess();
               },
-              error: (error: Error) => patchState(store, { error: error.message, loading: false }),
+              error: (error: any) => patchState(store, { error: parseErrorMessage(error), loading: false }),
             })
           )
         )
@@ -248,7 +261,7 @@ export const AccountingStore = signalStore(
                 const startDate = `${year}-01-01`;
                 const endDate = `${year}-12-31`;
                 if (store.profitLoss()) {
-                  (store as any).loadProfitAndLoss({ startDate, endDate, currency: store.profitLoss().currency ?? 'EUR' });
+                  (store as any).loadProfitAndLoss({ startDate, endDate, currency: store.profitLoss().currency ?? 'EGP' });
                 }
                 if (store.balanceSheet()) {
                   (store as any).loadBalanceSheet({ asOfDate: endDate });
@@ -283,7 +296,7 @@ export const AccountingStore = signalStore(
                 const startDate = `${year}-01-01`;
                 const endDate = `${year}-12-31`;
                 if (store.profitLoss()) {
-                  (store as any).loadProfitAndLoss({ startDate, endDate, currency: store.profitLoss().currency ?? 'EUR' });
+                  (store as any).loadProfitAndLoss({ startDate, endDate, currency: store.profitLoss().currency ?? 'EGP' });
                 }
                 if (store.balanceSheet()) {
                   (store as any).loadBalanceSheet({ asOfDate: endDate });

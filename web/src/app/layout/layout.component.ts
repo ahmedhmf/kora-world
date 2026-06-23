@@ -293,7 +293,6 @@ export class LayoutComponent {
     { label: 'Purchase Orders', route: '/purchase-orders', icon: '📋' },
     { label: 'Calendar', route: '/calendar', icon: '📅' },
     { label: 'Accounts', route: '/accounts', icon: '💼' },
-    { label: 'Receipts', route: '/receipts', icon: '🧾' },
     { label: 'Contacts', route: '/contacts', icon: '📇' },
     { label: 'B2C Requests', route: '/b2c-requests', icon: '📱' },
     {

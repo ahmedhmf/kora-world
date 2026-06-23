@@ -272,7 +272,7 @@ export class ReportsComponent implements OnInit {
   activeTab = signal<string>('pl');
   startDate = '2026-01-01';
   endDate = '2026-12-31';
-  currency = 'EUR';
+  currency = 'EGP';
   asOfDate = '2026-12-31';
 
   readonly tabs = [

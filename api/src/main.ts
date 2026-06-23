@@ -8,7 +8,12 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   
   // Use Helmet to secure HTTP headers
-  app.use(helmet());
+  // crossOriginResourcePolicy must be 'cross-origin' so the Angular frontend
+  // (on a different port/origin) can load images served by the API.
+  app.use(helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    contentSecurityPolicy: false, // managed by the Angular app / nginx
+  }));
 
   // Use Cookie Parser for reading HttpOnly JWT cookies
   app.use(cookieParser());

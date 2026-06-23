@@ -37,7 +37,7 @@ export class ReportsService {
   }> {
     const formattedStartDate = new Date(startDate).toISOString().split('T')[0];
     const formattedEndDate = new Date(endDate).toISOString().split('T')[0];
-    const targetCurrency = currency ? currency.toUpperCase() : 'EUR';
+    const targetCurrency = currency ? currency.toUpperCase() : 'EGP';
 
     const lines = await this.lineRepo.createQueryBuilder('line')
       .innerJoinAndSelect('line.journalEntry', 'entry')
@@ -47,44 +47,44 @@ export class ReportsService {
       .andWhere('account.type IN (:...types)', { types: [AccountType.REVENUE, AccountType.EXPENSE] })
       .getMany();
 
-    const revenueMap = new Map<string, { name: string; amountEur: number }>();
-    const expenseMap = new Map<string, { name: string; amountEur: number }>();
+    const revenueMap = new Map<string, { name: string; amountBase: number }>();
+    const expenseMap = new Map<string, { name: string; amountBase: number }>();
 
     // Load all accounts to include them with 0 if needed, or just aggregate from transactions
     for (const line of lines) {
       const acc = line.account;
       const code = acc.code;
-      const amountEur = Number(line.amountEur); // amountEur is debit - credit
+      const amountBase = Number(line.amountBase || 0); // amountBase is debit - credit
 
       if (acc.type === AccountType.REVENUE) {
-        const existing = revenueMap.get(code) || { name: acc.name, amountEur: 0 };
-        // Revenue increases with Credit (amountEur is negative for credit), so subtract amountEur to get positive revenue
-        existing.amountEur = Number((existing.amountEur - amountEur).toFixed(2));
+        const existing = revenueMap.get(code) || { name: acc.name, amountBase: 0 };
+        // Revenue increases with Credit (amountBase is negative for credit), so subtract amountBase to get positive revenue
+        existing.amountBase = Number((existing.amountBase - amountBase).toFixed(2));
         revenueMap.set(code, existing);
       } else {
-        const existing = expenseMap.get(code) || { name: acc.name, amountEur: 0 };
-        // Expense increases with Debit (amountEur is positive for debit), so add amountEur
-        existing.amountEur = Number((existing.amountEur + amountEur).toFixed(2));
+        const existing = expenseMap.get(code) || { name: acc.name, amountBase: 0 };
+        // Expense increases with Debit (amountBase is positive for debit), so add amountBase
+        existing.amountBase = Number((existing.amountBase + amountBase).toFixed(2));
         expenseMap.set(code, existing);
       }
     }
 
-    // Convert to target currency if necessary
-    const convert = async (eurAmt: number): Promise<number> => {
-      if (targetCurrency === 'EUR') return eurAmt;
+    // Convert to target currency if necessary (from EGP)
+    const convert = async (egpAmt: number): Promise<number> => {
+      if (targetCurrency === 'EGP') return egpAmt;
       try {
-        const rate = await this.accountingService.getExchangeRate('EUR', targetCurrency, endDate);
-        return Number((eurAmt * rate).toFixed(2));
+        const rate = await this.accountingService.getExchangeRate('EGP', targetCurrency, endDate);
+        return Number((egpAmt * rate).toFixed(2));
       } catch (err) {
         // Fallback to 1.0 if exchange rate cannot be resolved
-        return eurAmt;
+        return egpAmt;
       }
     };
 
     const revenueList: any[] = [];
     let totalRevenue = 0;
     for (const [code, val] of revenueMap.entries()) {
-      const amount = await convert(val.amountEur);
+      const amount = await convert(val.amountBase);
       revenueList.push({ code, name: val.name, amount });
       totalRevenue += amount;
     }
@@ -93,7 +93,7 @@ export class ReportsService {
     let totalExpenses = 0;
     let totalCOGS = 0;
     for (const [code, val] of expenseMap.entries()) {
-      const amount = await convert(val.amountEur);
+      const amount = await convert(val.amountBase);
       expenseList.push({ code, name: val.name, amount });
       totalExpenses += amount;
       if (code.startsWith('51')) {
@@ -132,21 +132,18 @@ export class ReportsService {
     // Initialize all account balances to 0
     accounts.forEach(acc => balances.set(acc.id, 0));
 
-    // Get all journal lines up to the date
     const lines = await this.lineRepo.createQueryBuilder('line')
       .innerJoin('line.journalEntry', 'entry')
       .select('line.accountId', 'accountId')
-      .addSelect('SUM(line.debit)', 'totalDebit')
-      .addSelect('SUM(line.credit)', 'totalCredit')
+      .addSelect('SUM(line.amount_base)', 'totalAmountBase')
       .where('entry.date <= :asOfDate', { asOfDate: formattedAsOf })
       .groupBy('line.accountId')
       .getRawMany();
 
     lines.forEach(row => {
       const accId = parseInt(row.accountId);
-      const deb = parseFloat(row.totalDebit) || 0;
-      const cred = parseFloat(row.totalCredit) || 0;
-      balances.set(accId, Number((deb - cred).toFixed(2))); // raw balance (debit - credit)
+      const amtBase = parseFloat(row.totalAmountBase) || 0;
+      balances.set(accId, Number(amtBase.toFixed(2))); // balance in base currency (EGP)
     });
 
     const assetsList: any[] = [];
@@ -277,7 +274,7 @@ export class ReportsService {
       inv => inv.type === InvoiceType.INCOMING && inv.status !== InvoiceStatus.PAID && inv.status !== InvoiceStatus.CANCELLED
     );
 
-    const supplierMap = new Map<number, { name: string; invoices: any[]; totalOutstandingEur: number }>();
+    const supplierMap = new Map<number, { name: string; invoices: any[]; totalOutstandingEgp: number }>();
 
     for (const inv of incoming) {
       const supplierId = inv.supplierId || 0;
@@ -300,11 +297,11 @@ export class ReportsService {
 
       if (outstanding <= 0) continue;
 
-      const existing = supplierMap.get(supplierId) || { name: supplierName, invoices: [], totalOutstandingEur: 0 };
+      const existing = supplierMap.get(supplierId) || { name: supplierName, invoices: [], totalOutstandingEgp: 0 };
       
-      // Calculate outstanding in EUR for supplier total aggregation
-      const rateToEur = await this.accountingService.getExchangeRate(inv.currency, 'EUR', inv.date);
-      const outstandingEur = Number((outstanding * rateToEur).toFixed(2));
+      // Calculate outstanding in EGP for supplier total aggregation
+      const rateToEgp = await this.accountingService.getExchangeRate(inv.currency, 'EGP', inv.date);
+      const outstandingEgp = Number((outstanding * rateToEgp).toFixed(2));
 
       existing.invoices.push({
         id: inv.id,
@@ -317,7 +314,7 @@ export class ReportsService {
         currency: inv.currency,
       });
 
-      existing.totalOutstandingEur = Number((existing.totalOutstandingEur + outstandingEur).toFixed(2));
+      existing.totalOutstandingEgp = Number((existing.totalOutstandingEgp + outstandingEgp).toFixed(2));
       supplierMap.set(supplierId, existing);
     }
 
@@ -326,7 +323,7 @@ export class ReportsService {
       result.push({
         supplierId,
         supplierName: val.name,
-        totalOutstanding: val.totalOutstandingEur, // in EUR
+        totalOutstanding: val.totalOutstandingEgp, // in EGP
         invoices: val.invoices,
       });
     }
@@ -356,7 +353,7 @@ export class ReportsService {
       inv => inv.type === InvoiceType.OUTGOING && inv.status !== InvoiceStatus.PAID && inv.status !== InvoiceStatus.CANCELLED
     );
 
-    const customerMap = new Map<string, { invoices: any[]; totalOutstandingEur: number }>();
+    const customerMap = new Map<string, { invoices: any[]; totalOutstandingEgp: number }>();
 
     for (const inv of outgoing) {
       const customerName = inv.customerName || 'Unknown Customer';
@@ -377,10 +374,10 @@ export class ReportsService {
 
       if (outstanding <= 0) continue;
 
-      const existing = customerMap.get(customerName) || { invoices: [], totalOutstandingEur: 0 };
+      const existing = customerMap.get(customerName) || { invoices: [], totalOutstandingEgp: 0 };
       
-      const rateToEur = await this.accountingService.getExchangeRate(inv.currency, 'EUR', inv.date);
-      const outstandingEur = Number((outstanding * rateToEur).toFixed(2));
+      const rateToEgp = await this.accountingService.getExchangeRate(inv.currency, 'EGP', inv.date);
+      const outstandingEgp = Number((outstanding * rateToEgp).toFixed(2));
 
       existing.invoices.push({
         id: inv.id,
@@ -393,7 +390,7 @@ export class ReportsService {
         currency: inv.currency,
       });
 
-      existing.totalOutstandingEur = Number((existing.totalOutstandingEur + outstandingEur).toFixed(2));
+      existing.totalOutstandingEgp = Number((existing.totalOutstandingEgp + outstandingEgp).toFixed(2));
       customerMap.set(customerName, existing);
     }
 
@@ -401,7 +398,7 @@ export class ReportsService {
     for (const [customerName, val] of customerMap.entries()) {
       result.push({
         customerName,
-        totalOutstanding: val.totalOutstandingEur, // in EUR
+        totalOutstanding: val.totalOutstandingEgp, // in EGP
         invoices: val.invoices,
       });
     }

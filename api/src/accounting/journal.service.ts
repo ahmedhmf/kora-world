@@ -183,7 +183,8 @@ export class JournalService {
       credit: number;
       currency: string;
       exchangeRate: number;
-      amountEur: number;
+      amountBase: number;
+      amountEgp?: number;
       runningBalance: number;
     }>;
   }> {
@@ -195,28 +196,22 @@ export class JournalService {
     // First fetch lines before the start date to calculate opening balance if startDate is specified
     let openingBalance = 0;
     if (startDate) {
-      const formattedStartDate = new Date(startDate).toISOString().split('T')[0];
-      const openingQuery = this.lineRepo.createQueryBuilder('line')
+      const priorLines = await this.lineRepo.createQueryBuilder('line')
         .innerJoin('line.journalEntry', 'entry')
-        .select('SUM(line.debit)', 'totalDebit')
-        .addSelect('SUM(line.credit)', 'totalCredit')
         .where('line.accountId = :accountId', { accountId })
-        .andWhere('entry.date < :startDate', { startDate: formattedStartDate });
+        .andWhere('entry.date < :startDate', { startDate: new Date(startDate).toISOString().split('T')[0] })
+        .getMany();
 
-      const openingRes = await openingQuery.getRawOne();
-      const opDebit = parseFloat(openingRes?.totalDebit) || 0;
-      const opCredit = parseFloat(openingRes?.totalCredit) || 0;
-      
-      const rawOpBalance = opDebit - opCredit;
-      openingBalance = rawOpBalance;
+      for (const line of priorLines) {
+        openingBalance += Number(line.debit) - Number(line.credit);
+      }
     }
 
-    // Now fetch main ledger lines
+    // Fetch lines in range
     const query = this.lineRepo.createQueryBuilder('line')
       .innerJoinAndSelect('line.journalEntry', 'entry')
       .where('line.accountId = :accountId', { accountId })
-      .orderBy('entry.date', 'ASC')
-      .addOrderBy('entry.createdAt', 'ASC')
+      .addOrderBy('entry.date', 'ASC')
       .addOrderBy('line.id', 'ASC');
 
     if (startDate) {
@@ -243,7 +238,8 @@ export class JournalService {
         credit,
         currency: line.currency,
         exchangeRate: Number(line.exchangeRate),
-        amountEur: Number(line.amountEur),
+        amountBase: Number(line.amountBase),
+        amountEgp: Number(line.amountEgp || 0),
         runningBalance: currentBalance,
       };
     });

@@ -62,10 +62,10 @@ import { ApiService } from '../../core/services/api.service';
                   <td class="p-4 text-zinc-400 font-mono font-semibold">{{ entry.reference || '—' }}</td>
                   <td class="p-4 text-zinc-100 font-semibold">{{ entry.description || 'No description' }}</td>
                   <td class="p-4 text-right font-mono font-bold text-zinc-300">
-                    {{ getEntryTotalDebit(entry) | currency:'EUR':'symbol':'1.2-2' }}
+                    {{ getEntryTotalDebit(entry) | currency:'EGP':'symbol':'1.2-2' }}
                   </td>
                   <td class="p-4 text-right font-mono font-bold text-zinc-300">
-                    {{ getEntryTotalCredit(entry) | currency:'EUR':'symbol':'1.2-2' }}
+                    {{ getEntryTotalCredit(entry) | currency:'EGP':'symbol':'1.2-2' }}
                   </td>
                 </tr>
 
@@ -80,7 +80,7 @@ import { ApiService } from '../../core/services/api.service';
                           <div class="col-span-2 text-right">Debit</div>
                           <div class="col-span-2 text-right">Credit</div>
                           <div class="col-span-1 text-center">Currency</div>
-                          <div class="col-span-2 text-right">Amount (EUR)</div>
+                          <div class="col-span-2 text-right">Amount (EGP)</div>
                         </div>
                         @for (line of entry.lines; track line.id) {
                           <div class="grid grid-cols-12 gap-2 py-1.5 px-2 text-xs items-center border-b border-zinc-900/40 last:border-b-0 hover:bg-zinc-900/20 rounded">
@@ -98,7 +98,7 @@ import { ApiService } from '../../core/services/api.service';
                               {{ line.currency }}
                             </div>
                             <div class="col-span-2 text-right font-mono font-bold text-zinc-300">
-                              {{ line.amountEur | currency:'EUR':'symbol':'1.2-2' }}
+                              {{ line.amountBase | currency:'EGP':'symbol':'1.2-2' }}
                             </div>
                           </div>
                         }
@@ -391,8 +391,8 @@ export class JournalComponent implements OnInit {
       type: 'manual',
       attachment: undefined,
       lines: [
-        { accountId: 0, debit: undefined, credit: undefined, currency: 'EUR', exchangeRate: 1 },
-        { accountId: 0, debit: undefined, credit: undefined, currency: 'EUR', exchangeRate: 1 }
+        { accountId: 0, debit: undefined, credit: undefined, currency: 'EGP', exchangeRate: 1 },
+        { accountId: 0, debit: undefined, credit: undefined, currency: 'EGP', exchangeRate: 1 }
       ]
     };
     this.isCreateModalOpen.set(true);
@@ -421,7 +421,7 @@ export class JournalComponent implements OnInit {
       accountId: 0,
       debit: undefined,
       credit: undefined,
-      currency: 'EUR',
+      currency: 'EGP',
       exchangeRate: 1
     });
   }

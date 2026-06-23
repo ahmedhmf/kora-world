@@ -12,6 +12,5 @@ export class CreateInvoiceLineDto {
 
   @IsNumber()
   @IsNotEmpty()
-  @Min(0)
   unitPrice: number;
 }

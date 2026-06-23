@@ -40,7 +40,7 @@ import { ApiService } from '../../core/services/api.service';
                 <th class="p-4">Category</th>
                 <th class="p-4">Reference</th>
                 <th class="p-4 text-right">Amount</th>
-                <th class="p-4 text-right">Amount (EUR)</th>
+                <th class="p-4 text-right">Amount (EGP)</th>
                 <th class="p-4 text-center w-20">Actions</th>
               </tr>
             </thead>
@@ -56,7 +56,7 @@ import { ApiService } from '../../core/services/api.service';
                     {{ p.amount | currency: p.currency:'symbol':'1.2-2' }}
                   </td>
                   <td class="p-4 text-right font-mono font-bold text-zinc-300 whitespace-nowrap">
-                    {{ p.amountEur | currency:'EUR':'symbol':'1.2-2' }}
+                    {{ p.amountBase | currency:'EGP':'symbol':'1.2-2' }}
                   </td>
                   <td class="p-4 text-center">
                     <button
@@ -135,7 +135,7 @@ import { ApiService } from '../../core/services/api.service';
                   <input
                     type="number"
                     [(ngModel)]="newPayment.amount"
-                    (input)="calcAmountEur()"
+                    (input)="calcAmountEgp()"
                     class="w-full bg-zinc-950 border border-zinc-800 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-600 text-right font-mono"
                     placeholder="0.00"
                     min="0.01"
@@ -146,7 +146,7 @@ import { ApiService } from '../../core/services/api.service';
                   <label class="block text-xs font-medium text-zinc-400">Currency <span class="text-red-500">*</span></label>
                   <select
                     [(ngModel)]="newPayment.currency"
-                    (change)="calcAmountEur()"
+                    (change)="calcAmountEgp()"
                     class="w-full bg-zinc-950 border border-zinc-800 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-600 font-bold"
                   >
                     <option value="EUR">EUR</option>
@@ -156,14 +156,14 @@ import { ApiService } from '../../core/services/api.service';
                 </div>
               </div>
 
-              <!-- Exchange Rate + Amount in EUR row -->
+              <!-- Exchange Rate + Amount in EGP row -->
               <div class="grid grid-cols-2 gap-3">
                 <div class="space-y-1.5">
-                  <label class="block text-xs font-medium text-zinc-400">Exchange Rate (to EUR)</label>
+                  <label class="block text-xs font-medium text-zinc-400">Exchange Rate (to EGP)</label>
                   <input
                     type="number"
                     [(ngModel)]="newPayment.exchangeRate"
-                    (input)="calcAmountEur()"
+                    (input)="calcAmountEgp()"
                     class="w-full bg-zinc-950 border border-zinc-800 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-600 text-right font-mono"
                     placeholder="auto"
                     min="0.000001"
@@ -171,9 +171,9 @@ import { ApiService } from '../../core/services/api.service';
                   />
                 </div>
                 <div class="space-y-1.5">
-                  <label class="block text-xs font-medium text-zinc-400">Amount in EUR</label>
+                  <label class="block text-xs font-medium text-zinc-400">Amount in EGP</label>
                   <div class="w-full bg-zinc-900 border border-zinc-800 rounded px-3 py-2 text-sm text-zinc-300 text-right font-mono font-bold">
-                    {{ amountEurDisplay() | number:'1.2-2' }}
+                    {{ amountEgpDisplay() | number:'1.2-2' }}
                   </div>
                 </div>
               </div>
@@ -308,7 +308,7 @@ export class PaymentsComponent implements OnInit {
 
   newPayment = this.emptyPayment();
 
-  amountEurDisplay() {
+  amountEgpDisplay() {
     const rate = this.newPayment.exchangeRate || 1;
     const amount = Number(this.newPayment.amount) || 0;
     return Number((amount * rate).toFixed(2));
@@ -329,7 +329,7 @@ export class PaymentsComponent implements OnInit {
       date: new Date().toISOString().split('T')[0],
       paidFromAccountId: 0,
       amount: 0,
-      currency: 'EUR',
+      currency: 'EGP',
       exchangeRate: 1 as number | undefined,
       categoryAccountId: 0,
       reference: '',
@@ -354,7 +354,7 @@ export class PaymentsComponent implements OnInit {
     this.isCreateModalOpen.set(true);
   }
 
-  calcAmountEur() {
+  calcAmountEgp() {
     // triggers re-render via normal change detection
   }
 

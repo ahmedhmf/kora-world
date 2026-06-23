@@ -19,10 +19,46 @@ export class InvoicesService {
     private readonly accountingService: AccountingService,
   ) {}
 
+  async generateNextNumber(): Promise<{ number: string }> {
+    const year = new Date().getFullYear();
+    const prefix = `INV-${year}-`;
+
+    // Find the highest existing number for this year
+    const invoices = await this.invoiceRepo
+      .createQueryBuilder('inv')
+      .select('inv.number', 'number')
+      .where('inv.number LIKE :prefix', { prefix: `${prefix}%` })
+      .orderBy('inv.number', 'DESC')
+      .limit(1)
+      .getRawOne();
+
+    let nextSeq = 1;
+    if (invoices?.number) {
+      const seq = parseInt(invoices.number.replace(prefix, ''), 10);
+      if (!isNaN(seq)) nextSeq = seq + 1;
+    }
+
+    let padded = String(nextSeq).padStart(4, '0');
+    let number = `${prefix}${padded}`;
+    while (await this.invoiceRepo.findOne({ where: { number } })) {
+      nextSeq++;
+      padded = String(nextSeq).padStart(4, '0');
+      number = `${prefix}${padded}`;
+    }
+
+    return { number };
+  }
+
   async create(dto: CreateInvoiceDto): Promise<Invoice> {
-    const existing = await this.invoiceRepo.findOne({ where: { number: dto.number } });
-    if (existing) {
-      throw new BadRequestException(`Invoice with number ${dto.number} already exists`);
+    let invoiceNumber = dto.number;
+    if (!invoiceNumber) {
+      const generated = await this.generateNextNumber();
+      invoiceNumber = generated.number;
+    } else {
+      const existing = await this.invoiceRepo.findOne({ where: { number: invoiceNumber } });
+      if (existing) {
+        throw new BadRequestException(`Invoice with number ${invoiceNumber} already exists`);
+      }
     }
 
     let subtotal = 0;
@@ -41,7 +77,7 @@ export class InvoicesService {
     const total = Number((subtotal + tax).toFixed(2));
 
     const invoice = this.invoiceRepo.create({
-      number: dto.number,
+      number: invoiceNumber,
       type: dto.type,
       supplierId: dto.supplierId,
       customerName: dto.customerName,
@@ -120,10 +156,7 @@ export class InvoicesService {
     const savedInvoice = await this.invoiceRepo.save(invoice);
 
     // If status changed to SENT or PAID, check and generate journal entry
-    if (
-      (savedInvoice.status === InvoiceStatus.SENT || savedInvoice.status === InvoiceStatus.PAID) &&
-      previousStatus === InvoiceStatus.DRAFT
-    ) {
+    if (savedInvoice.status === InvoiceStatus.SENT || savedInvoice.status === InvoiceStatus.PAID) {
       await this.generateJournalEntry(savedInvoice);
     }
 
@@ -152,90 +185,156 @@ export class InvoicesService {
 
   // --- Double-Entry Posting ---
   private async generateJournalEntry(invoice: Invoice): Promise<void> {
-    // Check if journal entry already exists for this invoice
+    console.log(`[generateJournalEntry] Processing invoice ID: ${invoice.id}, Number: ${invoice.number}, Status: ${invoice.status}`);
     const allEntries = await this.accountingService.findAllJournalEntries();
-    const existing = allEntries.find(
+
+    // 1. Ensure Step 1 (Invoice Booking: AR vs Revenue) is created
+    const existingInvoiceEntry = allEntries.find(
       entry => entry.invoiceId === invoice.id && entry.type === JournalEntryType.INVOICE
     );
-    if (existing) {
-      return; // Already generated
-    }
+    console.log(`[generateJournalEntry] Step 1 existing: ${!!existingInvoiceEntry}`);
 
-    // Resolve accounts:
-    const accounts = await this.accountingService.findAllAccounts();
-    const findAccountByCode = (code: string) => {
-      const acc = accounts.find(a => a.code === code);
-      if (!acc) throw new NotFoundException(`Account with code ${code} not found. Please run seeding.`);
-      return acc.id;
-    };
+    if (!existingInvoiceEntry && (invoice.status === InvoiceStatus.SENT || invoice.status === InvoiceStatus.PAID)) {
+      console.log(`[generateJournalEntry] Creating Step 1 entry...`);
+      // Resolve accounts:
+      const accounts = await this.accountingService.findAllAccounts();
+      const findAccountByCode = (code: string) => {
+        const acc = accounts.find(a => a.code === code);
+        if (!acc) throw new NotFoundException(`Account with code ${code} not found. Please run seeding.`);
+        return acc.id;
+      };
 
-    const linesDto: any[] = [];
-    const dateStr = new Date(invoice.date).toISOString().split('T')[0];
+      const linesDto: any[] = [];
+      const dateStr = new Date(invoice.date).toISOString().split('T')[0];
 
-    if (invoice.type === InvoiceType.INCOMING) {
-      // Supplier Invoice
-      // Debit COGS (Expense) for subtotal
-      const cogsAccountId = findAccountByCode('5100');
-      linesDto.push({
-        accountId: cogsAccountId,
-        debit: invoice.subtotal,
-        currency: invoice.currency,
-      });
-
-      // Debit VAT Payable (Asset/Liability offset) for tax
-      if (invoice.tax > 0) {
-        const vatAccountId = findAccountByCode('2200');
+      if (invoice.type === InvoiceType.INCOMING) {
+        // Supplier Invoice
+        const cogsAccountId = findAccountByCode('5100');
         linesDto.push({
-          accountId: vatAccountId,
-          debit: invoice.tax,
+          accountId: cogsAccountId,
+          debit: invoice.subtotal,
           currency: invoice.currency,
         });
-      }
 
-      // Credit Accounts Payable for total
-      const apAccountId = findAccountByCode('2100');
-      linesDto.push({
-        accountId: apAccountId,
-        credit: invoice.total,
-        currency: invoice.currency,
-      });
-    } else {
-      // Customer Invoice
-      // Debit Accounts Receivable for total
-      const arAccountId = findAccountByCode('1200');
-      linesDto.push({
-        accountId: arAccountId,
-        debit: invoice.total,
-        currency: invoice.currency,
-      });
+        if (invoice.tax > 0) {
+          const vatAccountId = findAccountByCode('2200');
+          linesDto.push({
+            accountId: vatAccountId,
+            debit: invoice.tax,
+            currency: invoice.currency,
+          });
+        }
 
-      // Credit Product Sales (Revenue) for subtotal
-      const salesAccountId = findAccountByCode('4100');
-      linesDto.push({
-        accountId: salesAccountId,
-        credit: invoice.subtotal,
-        currency: invoice.currency,
-      });
-
-      // Credit VAT Payable for tax
-      if (invoice.tax > 0) {
-        const vatAccountId = findAccountByCode('2200');
+        const apAccountId = findAccountByCode('2100');
         linesDto.push({
-          accountId: vatAccountId,
-          credit: invoice.tax,
+          accountId: apAccountId,
+          credit: invoice.total,
           currency: invoice.currency,
         });
+      } else {
+        // Customer Invoice
+        const arAccountId = findAccountByCode('1200');
+        linesDto.push({
+          accountId: arAccountId,
+          debit: invoice.total,
+          currency: invoice.currency,
+        });
+
+        const salesAccountId = findAccountByCode('4100');
+        linesDto.push({
+          accountId: salesAccountId,
+          credit: invoice.subtotal,
+          currency: invoice.currency,
+        });
+
+        if (invoice.tax > 0) {
+          const vatAccountId = findAccountByCode('2200');
+          linesDto.push({
+            accountId: vatAccountId,
+            credit: invoice.tax,
+            currency: invoice.currency,
+          });
+        }
       }
+
+      console.log(`[generateJournalEntry] Submitting Step 1 journal entry DTO...`);
+      await this.accountingService.createJournalEntry({
+        date: dateStr,
+        description: `Auto-generated from Invoice #${invoice.number}`,
+        reference: invoice.number,
+        type: JournalEntryType.INVOICE,
+        invoiceId: invoice.id,
+        poId: invoice.poId || undefined,
+        lines: linesDto,
+      });
+      console.log(`[generateJournalEntry] Step 1 journal entry created successfully.`);
     }
 
-    await this.accountingService.createJournalEntry({
-      date: dateStr,
-      description: `Auto-generated from Invoice #${invoice.number}`,
-      reference: invoice.number,
-      type: JournalEntryType.INVOICE,
-      invoiceId: invoice.id,
-      poId: invoice.poId || undefined,
-      lines: linesDto,
-    });
+    // 2. Ensure Step 2 (Payment Booking: Bank vs AR/AP) is created if PAID
+    if (invoice.status === InvoiceStatus.PAID) {
+      const existingPaymentEntry = allEntries.find(
+        entry => entry.invoiceId === invoice.id && entry.reference === `${invoice.number}-PAY`
+      );
+      console.log(`[generateJournalEntry] Step 2 existing check: ${!!existingPaymentEntry}`);
+
+      if (!existingPaymentEntry) {
+        const accounts = await this.accountingService.findAllAccounts();
+        const findAccountByCode = (code: string) => {
+          const acc = accounts.find(a => a.code === code);
+          if (!acc) throw new NotFoundException(`Account with code ${code} not found. Please run seeding.`);
+          return acc.id;
+        };
+
+        const linesDto: any[] = [];
+        const dateStr = new Date().toISOString().split('T')[0];
+
+        // Determine bank account based on invoice currency
+        let bankAccountCode = '1101'; // Default EUR Bank
+        if (invoice.currency === 'EGP') bankAccountCode = '1102';
+        else if (invoice.currency === 'USD') bankAccountCode = '1103';
+
+        const bankAccountId = findAccountByCode(bankAccountCode);
+        const arAccountId = findAccountByCode('1200');
+
+        if (invoice.type === InvoiceType.INCOMING) {
+          // Supplier invoice payment: Credit Bank, Debit Accounts Payable
+          const apAccountId = findAccountByCode('2100');
+          linesDto.push({
+            accountId: apAccountId,
+            debit: invoice.total,
+            currency: invoice.currency,
+          });
+          linesDto.push({
+            accountId: bankAccountId,
+            credit: invoice.total,
+            currency: invoice.currency,
+          });
+        } else {
+          // Customer invoice payment: Debit Bank, Credit Accounts Receivable
+          linesDto.push({
+            accountId: bankAccountId,
+            debit: invoice.total,
+            currency: invoice.currency,
+          });
+          linesDto.push({
+            accountId: arAccountId,
+            credit: invoice.total,
+            currency: invoice.currency,
+          });
+        }
+
+        console.log(`[generateJournalEntry] Submitting Step 2 payment entry DTO...`);
+        await this.accountingService.createJournalEntry({
+          date: dateStr,
+          description: `Auto-generated Payment for Invoice #${invoice.number}`,
+          reference: `${invoice.number}-PAY`,
+          type: JournalEntryType.PAYMENT,
+          invoiceId: invoice.id,
+          poId: invoice.poId || undefined,
+          lines: linesDto,
+        });
+        console.log(`[generateJournalEntry] Step 2 payment entry created successfully.`);
+      }
+    }
   }
 }

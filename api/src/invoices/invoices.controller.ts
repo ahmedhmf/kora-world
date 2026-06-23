@@ -31,6 +31,11 @@ export class InvoicesController {
     return this.invoicesService.findAll();
   }
 
+  @Get('next-number')
+  getNextNumber() {
+    return this.invoicesService.generateNextNumber();
+  }
+
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.invoicesService.findOne(id);

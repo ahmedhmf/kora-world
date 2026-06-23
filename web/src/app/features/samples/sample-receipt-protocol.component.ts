@@ -219,6 +219,11 @@ import { DialogService } from '../../core/services/dialog.service';
                     <span class="text-white print:text-black">FIFA Quality Pro</span>
                   </label>
                   <label class="flex items-center space-x-1.5 cursor-pointer">
+                    <input type="checkbox" [(ngModel)]="protocol.sampleDetails.productionStandard.fifaQuality" class="print:hidden h-3.5 w-3.5 rounded border-zinc-700 bg-zinc-900" />
+                    <span class="hidden print:inline text-sm">{{ protocol.sampleDetails.productionStandard.fifaQuality ? '☑' : '☐' }}</span>
+                    <span class="text-white print:text-black">FIFA Quality</span>
+                  </label>
+                  <label class="flex items-center space-x-1.5 cursor-pointer">
                     <input type="checkbox" [(ngModel)]="protocol.sampleDetails.productionStandard.fifaBasic" class="print:hidden h-3.5 w-3.5 rounded border-zinc-700 bg-zinc-900" />
                     <span class="hidden print:inline text-sm">{{ protocol.sampleDetails.productionStandard.fifaBasic ? '☑' : '☐' }}</span>
                     <span class="text-white print:text-black">FIFA Basic</span>
@@ -592,7 +597,7 @@ import { DialogService } from '../../core/services/dialog.service';
                 </tr>
               </thead>
               <tbody class="divide-y divide-zinc-900 print:divide-black">
-                @for (item of protocol.defectLog; track i; let i = $index) {
+                @for (item of protocol.defectLog; track $index; let i = $index) {
                   <tr>
                     <td class="p-3 text-center font-bold text-zinc-500 print:text-black">{{ i + 1 }}</td>
                     <td class="p-2">
@@ -950,6 +955,7 @@ export class SampleReceiptProtocolComponent implements OnInit {
         en71: false,
         fifa: false,
         fifaQualityPro: false,
+        fifaQuality: false,
         fifaBasic: false,
         ihf: false,
         none: false,
@@ -1020,6 +1026,7 @@ export class SampleReceiptProtocolComponent implements OnInit {
       this.protocol.sampleDetails.productionStandard.ihf = false;
     } else if (type === 'Handball') {
       this.protocol.sampleDetails.productionStandard.fifa = false;
+      this.protocol.sampleDetails.productionStandard.fifaQuality = false;
       this.protocol.sampleDetails.productionStandard.fifaQualityPro = false;
       this.protocol.sampleDetails.productionStandard.fifaBasic = false;
     } else {
@@ -1027,6 +1034,7 @@ export class SampleReceiptProtocolComponent implements OnInit {
       this.protocol.sampleDetails.resinCompatible = '';
       this.protocol.sampleDetails.productionStandard.en71 = false;
       this.protocol.sampleDetails.productionStandard.fifa = false;
+      this.protocol.sampleDetails.productionStandard.fifaQuality = false;
       this.protocol.sampleDetails.productionStandard.fifaQualityPro = false;
       this.protocol.sampleDetails.productionStandard.fifaBasic = false;
       this.protocol.sampleDetails.productionStandard.ihf = false;
@@ -1041,12 +1049,17 @@ export class SampleReceiptProtocolComponent implements OnInit {
     if (!this.protocol.defectLog) {
       this.protocol.defectLog = [];
     }
-    this.protocol.defectLog.push({ category: '', description: '', severity: '', photoRef: '', photoPath: '', photoName: '' });
+    this.protocol.defectLog = [
+      ...this.protocol.defectLog,
+      { category: '', description: '', severity: '', photoRef: '', photoPath: '', photoName: '' }
+    ];
   }
 
   removeDefectRow(index: number): void {
     if (this.protocol.defectLog && this.protocol.defectLog.length > 0) {
-      this.protocol.defectLog.splice(index, 1);
+      const copy = [...this.protocol.defectLog];
+      copy.splice(index, 1);
+      this.protocol.defectLog = copy;
     }
   }
 
@@ -1135,6 +1148,7 @@ export class SampleReceiptProtocolComponent implements OnInit {
                 en71: false,
                 fifa: false,
                 fifaQualityPro: false,
+                fifaQuality: false,
                 fifaBasic: false,
                 ihf: false,
                 none: false,
@@ -1211,6 +1225,7 @@ export class SampleReceiptProtocolComponent implements OnInit {
               en71: false,
               fifa: false,
               fifaQualityPro: false,
+              fifaQuality: false,
               fifaBasic: false,
               ihf: false,
               none: false,

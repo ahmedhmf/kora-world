@@ -143,26 +143,7 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/accounts/account-form.component').then((m) => m.AccountFormComponent),
       },
-      {
-        path: 'receipts',
-        loadComponent: () =>
-          import('./features/receipts/receipts-list.component').then((m) => m.ReceiptsListComponent),
-      },
-      {
-        path: 'receipts/new',
-        loadComponent: () =>
-          import('./features/receipts/receipt-form.component').then((m) => m.ReceiptFormComponent),
-      },
-      {
-        path: 'receipts/:id',
-        loadComponent: () =>
-          import('./features/receipts/receipt-detail.component').then((m) => m.ReceiptDetailComponent),
-      },
-      {
-        path: 'receipts/:id/edit',
-        loadComponent: () =>
-          import('./features/receipts/receipt-form.component').then((m) => m.ReceiptFormComponent),
-      },
+
       {
         path: 'contacts',
         loadComponent: () =>

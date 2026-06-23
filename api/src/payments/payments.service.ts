@@ -32,10 +32,11 @@ export class PaymentsService {
     const currency = dto.currency.toUpperCase();
     let rate = dto.exchangeRate;
     if (!rate) {
-      rate = await this.accountingService.getExchangeRate(currency, 'EUR', dto.date);
+      rate = await this.accountingService.getExchangeRate(currency, 'EGP', dto.date);
     }
 
-    const amountEur = Number((dto.amount * rate).toFixed(2));
+    const amountEgp = Number((dto.amount * rate).toFixed(2));
+    const amountBase = amountEgp;
 
     const payment = this.paymentRepo.create({
       invoiceId: dto.invoiceId || null,
@@ -43,7 +44,8 @@ export class PaymentsService {
       amount: dto.amount,
       currency,
       exchangeRate: rate,
-      amountEur,
+      amountBase,
+      amountEgp,
       method: dto.method,
       reference: dto.reference,
       notes: dto.notes,
@@ -66,10 +68,10 @@ export class PaymentsService {
         if (p.currency.toUpperCase() === invoice.currency.toUpperCase()) {
           totalPaidInInvoiceCurrency += p.amount;
         } else {
-          // Convert payment amount to invoice currency
-          const pToEurRate = p.exchangeRate; // exchange rate from payment currency to EUR
-          const eurToInvRate = await this.accountingService.getExchangeRate('EUR', invoice.currency, p.date);
-          const amtInv = p.amount * pToEurRate * eurToInvRate;
+          // Convert payment amount to invoice currency via EGP
+          const pToEgpRate = p.exchangeRate; // exchange rate from payment currency to EGP
+          const egpToInvRate = await this.accountingService.getExchangeRate('EGP', invoice.currency, p.date);
+          const amtInv = p.amount * pToEgpRate * egpToInvRate;
           totalPaidInInvoiceCurrency += amtInv;
         }
       }
@@ -129,9 +131,9 @@ export class PaymentsService {
           if (p.currency.toUpperCase() === invoice.currency.toUpperCase()) {
             totalPaidInInvoiceCurrency += p.amount;
           } else {
-            const pToEurRate = p.exchangeRate;
-            const eurToInvRate = await this.accountingService.getExchangeRate('EUR', invoice.currency, p.date);
-            totalPaidInInvoiceCurrency += p.amount * pToEurRate * eurToInvRate;
+             const pToEgpRate = p.exchangeRate;
+             const egpToInvRate = await this.accountingService.getExchangeRate('EGP', invoice.currency, p.date);
+             totalPaidInInvoiceCurrency += p.amount * pToEgpRate * egpToInvRate;
           }
         }
         totalPaidInInvoiceCurrency = Number(totalPaidInInvoiceCurrency.toFixed(2));

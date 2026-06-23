@@ -4,7 +4,6 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ApiService } from '../../core/services/api.service';
 import { AccountsStore } from '../../store/accounts.store';
 import { B2BAccount, AccountStatus } from '../../core/models/account.model';
-import { Receipt, ReceiptStatus } from '../../core/models/receipt.model';
 import { DialogService } from '../../core/services/dialog.service';
 
 @Component({
@@ -61,16 +60,6 @@ import { DialogService } from '../../core/services/dialog.service';
 
           <!-- Action Buttons -->
           <div class="flex items-center gap-2 flex-shrink-0">
-            <a
-              [routerLink]="['/receipts/new']"
-              [queryParams]="{ accountId: acct.id }"
-              class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-lg transition-colors flex items-center gap-1.5"
-            >
-              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
-              </svg>
-              New Receipt
-            </a>
             <a
               [routerLink]="['/accounts', acct.id, 'edit']"
               class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5"
@@ -246,117 +235,6 @@ import { DialogService } from '../../core/services/dialog.service';
 
         </div>
 
-        <!-- ── Receipts Section ─────────────────────────────── -->
-        <div class="bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden shadow-2xl">
-
-          <!-- Section header -->
-          <div class="flex items-center justify-between px-6 py-4 border-b border-zinc-800 bg-zinc-900/40">
-            <div class="flex items-center gap-2">
-              <svg class="h-4 w-4 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
-              </svg>
-              <h2 class="text-sm font-semibold text-white">Receipts</h2>
-              @if (receipts().length > 0) {
-                <span class="px-2 py-0.5 bg-zinc-800 text-zinc-400 text-xs rounded-full font-medium">
-                  {{ receipts().length }}
-                </span>
-              }
-            </div>
-            <a
-              routerLink="/receipts/new"
-              class="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
-            >
-              <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
-              </svg>
-              New
-            </a>
-          </div>
-
-          <!-- Receipts loading -->
-          @if (receiptsLoading()) {
-            <div class="p-8 text-center text-zinc-500 text-sm">Loading receipts...</div>
-          }
-
-          <!-- Receipts table -->
-          @if (!receiptsLoading()) {
-            @if (receipts().length > 0) {
-              <table class="w-full text-left text-xs">
-                <thead>
-                  <tr class="text-zinc-600 uppercase tracking-wider text-[10px] border-b border-zinc-900">
-                    <th class="px-5 py-3 font-semibold">Receipt #</th>
-                    <th class="px-5 py-3 font-semibold">Issue Date</th>
-                    <th class="px-5 py-3 font-semibold">Due Date</th>
-                    <th class="px-5 py-3 font-semibold text-right">Total</th>
-                    <th class="px-5 py-3 font-semibold text-center">Status</th>
-                    <th class="px-5 py-3 font-semibold text-center w-16">View</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-zinc-900">
-                  @for (r of receipts(); track r.id) {
-                    <tr class="hover:bg-zinc-900/30 transition-colors">
-                      <td class="px-5 py-3 font-mono font-bold text-zinc-300">{{ r.receiptNumber }}</td>
-                      <td class="px-5 py-3 text-zinc-400">{{ r.issueDate | date:'dd MMM yyyy' }}</td>
-                      <td class="px-5 py-3">
-                        @if (r.dueDate) {
-                          <span [class]="isDue(r) ? 'text-red-400' : 'text-zinc-400'">
-                            {{ r.dueDate | date:'dd MMM yyyy' }}
-                          </span>
-                        } @else {
-                          <span class="text-zinc-700">—</span>
-                        }
-                      </td>
-                      <td class="px-5 py-3 text-right font-mono font-bold text-zinc-100">
-                        {{ r.totalAmount | currency: r.currency:'symbol':'1.2-2' }}
-                      </td>
-                      <td class="px-5 py-3 text-center">
-                        <span [class]="getReceiptStatusClass(r.status)"
-                          class="px-2.5 py-1 rounded-full text-[10px] font-bold border">
-                          {{ getReceiptStatusLabel(r.status) }}
-                        </span>
-                      </td>
-                      <td class="px-5 py-3 text-center">
-                        <a [routerLink]="['/receipts', r.id]"
-                          class="p-1.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white rounded transition-colors inline-flex items-center justify-center"
-                          title="View receipt">
-                          <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                          </svg>
-                        </a>
-                      </td>
-                    </tr>
-                  }
-                </tbody>
-                <!-- Receipts total footer -->
-                <tfoot>
-                  <tr class="border-t border-zinc-800 bg-zinc-900/30">
-                    <td colspan="3" class="px-5 py-3 text-zinc-500 text-xs font-semibold uppercase tracking-wider">
-                      {{ receipts().length }} receipt{{ receipts().length !== 1 ? 's' : '' }}
-                    </td>
-                    <td class="px-5 py-3 text-right font-mono font-bold text-white">
-                      {{ receiptTotal() | currency: acct.defaultCurrency:'symbol':'1.2-2' }}
-                    </td>
-                    <td colspan="2"></td>
-                  </tr>
-                </tfoot>
-              </table>
-            } @else {
-              <div class="p-10 text-center">
-                <p class="text-zinc-600 text-sm mb-3">No receipts yet for this account.</p>
-                <a routerLink="/receipts/new"
-                  class="inline-flex items-center gap-1.5 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold rounded-lg transition-colors">
-                  <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
-                  </svg>
-                  Create first receipt
-                </a>
-              </div>
-            }
-          }
-
-        </div>
-
       }
     </div>
   `,
@@ -371,15 +249,6 @@ export class AccountDetailComponent implements OnInit {
   account = signal<B2BAccount | null>(null);
   loading = signal(false);
   error = signal<string | null>(null);
-
-  receipts = signal<Receipt[]>([]);
-  receiptsLoading = signal(false);
-
-  receiptTotal(): number {
-    return this.receipts()
-      .filter((r) => r.status !== 'cancelled')
-      .reduce((sum, r) => sum + (r.totalAmount || 0), 0);
-  }
 
   ngOnInit(): void {
     this.route.paramMap.subscribe((params) => {
@@ -397,18 +266,6 @@ export class AccountDetailComponent implements OnInit {
             console.error(err);
           }
         });
-
-        // Load receipts for this account
-        this.receiptsLoading.set(true);
-        this.api.getAccountReceipts(+id).subscribe({
-          next: (receipts) => {
-            this.receipts.set(receipts);
-            this.receiptsLoading.set(false);
-          },
-          error: () => {
-            this.receiptsLoading.set(false);
-          }
-        });
       }
     });
   }
@@ -419,11 +276,6 @@ export class AccountDetailComponent implements OnInit {
       this.store.deleteAccount(id);
       this.router.navigate(['/accounts']);
     }
-  }
-
-  isDue(r: Receipt): boolean {
-    if (!r.dueDate || r.status === 'paid' || r.status === 'cancelled') return false;
-    return new Date(r.dueDate) < new Date();
   }
 
   getStatusClass(status: AccountStatus): string {
@@ -440,25 +292,6 @@ export class AccountDetailComponent implements OnInit {
     const labels: Record<AccountStatus, string> = {
       active: 'Active', under_discussion: 'Under Discussion',
       suspended: 'Suspended', inactive: 'Inactive',
-    };
-    return labels[status] ?? status;
-  }
-
-  getReceiptStatusClass(status: ReceiptStatus): string {
-    switch (status) {
-      case 'paid':      return 'bg-emerald-950/40 text-emerald-400 border-emerald-800/60';
-      case 'issued':    return 'bg-blue-950/40 text-blue-400 border-blue-800/60';
-      case 'draft':     return 'bg-zinc-800/50 text-zinc-400 border-zinc-700/60';
-      case 'overdue':   return 'bg-red-950/40 text-red-400 border-red-800/60';
-      case 'cancelled': return 'bg-zinc-900/50 text-zinc-600 border-zinc-800/60';
-      default:          return 'bg-zinc-800/50 text-zinc-400 border-zinc-700/60';
-    }
-  }
-
-  getReceiptStatusLabel(status: ReceiptStatus): string {
-    const labels: Record<ReceiptStatus, string> = {
-      draft: 'Draft', issued: 'Issued', paid: 'Paid',
-      overdue: 'Overdue', cancelled: 'Cancelled',
     };
     return labels[status] ?? status;
   }

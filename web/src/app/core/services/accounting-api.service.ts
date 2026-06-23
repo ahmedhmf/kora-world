@@ -21,7 +21,8 @@ export interface JournalLine {
   credit: number;
   currency: string;
   exchangeRate: number;
-  amountEur: number;
+  amountBase: number;
+  amountEgp?: number;
   account?: AccountingAccount;
 }
 
@@ -71,7 +72,8 @@ export interface Payment {
   amount: number;
   currency: string;
   exchangeRate: number;
-  amountEur: number;
+  amountBase: number;
+  amountEgp?: number;
   method: string;
   reference?: string;
   notes?: string;
@@ -125,7 +127,15 @@ export class AccountingApiService {
     return this.http.post<JournalEntry>(`${this.base}/accounting/journal/manual`, dto);
   }
 
+  getExchangeRate(from: string, to: string, date: string): Observable<number> {
+    return this.http.get<number>(`${this.base}/accounting/exchange-rates/rate?from=${from}&to=${to}&date=${date}`);
+  }
+
   // Invoices
+  getNextInvoiceNumber(): Observable<{ number: string }> {
+    return this.http.get<{ number: string }>(`${this.base}/invoices/next-number`);
+  }
+
   getInvoices(): Observable<Invoice[]> {
     return this.http.get<Invoice[]>(`${this.base}/invoices`);
   }

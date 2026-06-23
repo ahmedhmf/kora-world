@@ -17,9 +17,9 @@ import { CreateInvoiceLineDto } from './create-invoice-line.dto';
 
 export class CreateInvoiceDto {
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   @Length(1, 100)
-  number: string;
+  number?: string;
 
   @IsEnum(InvoiceType)
   @IsNotEmpty()

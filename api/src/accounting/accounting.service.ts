@@ -34,7 +34,7 @@ export class AccountingService {
       code: dto.code,
       name: dto.name,
       type: dto.type,
-      currency: dto.currency || 'EUR',
+      currency: dto.currency || 'EGP',
       parentId: dto.parentId,
       isActive: dto.isActive !== undefined ? dto.isActive : true,
     });
@@ -218,15 +218,15 @@ export class AccountingService {
 
       let rate = lineDto.exchangeRate;
       if (!rate) {
-        // Base currency is EUR. Convert original currency to EUR.
-        rate = await this.getExchangeRate(currency, 'EUR', dto.date);
+        // Base currency is EGP. Convert original currency to EGP.
+        rate = await this.getExchangeRate(currency, 'EGP', dto.date);
       }
 
-      const debitEur = Number((debit * rate).toFixed(2));
-      const creditEur = Number((credit * rate).toFixed(2));
+      const debitBase = Number((debit * rate).toFixed(2));
+      const creditBase = Number((credit * rate).toFixed(2));
 
-      totalDebitEur += debitEur;
-      totalCreditEur += creditEur;
+      totalDebitEur += debitBase;
+      totalCreditEur += creditBase;
 
       const line = this.lineRepo.create({
         accountId: account.id,
@@ -234,17 +234,18 @@ export class AccountingService {
         credit,
         currency,
         exchangeRate: rate,
-        amountEur: Number((debitEur - creditEur).toFixed(2)),
+        amountBase: Number((debitBase - creditBase).toFixed(2)),
+        amountEgp: Number((debitBase - creditBase).toFixed(2)),
       });
 
       lines.push(line);
     }
 
-    // Allow tiny rounding differences (e.g. up to 0.02 EUR)
+    // Allow tiny rounding differences (e.g. up to 0.02 EGP)
     const diff = Math.abs(totalDebitEur - totalCreditEur);
     if (diff > 0.02) {
       throw new BadRequestException(
-        `Journal entry is unbalanced. Total Debit: ${totalDebitEur.toFixed(2)} EUR, Total Credit: ${totalCreditEur.toFixed(2)} EUR. Difference: ${diff.toFixed(2)} EUR.`
+        `Journal entry is unbalanced. Total Debit: ${totalDebitEur.toFixed(2)} EGP, Total Credit: ${totalCreditEur.toFixed(2)} EGP. Difference: ${diff.toFixed(2)} EGP.`
       );
     }
 
@@ -266,8 +267,10 @@ export class AccountingService {
           lastLine.credit = Number((lastLine.credit - diff).toFixed(2));
         }
       }
-      // Re-calculate amountEur
-      lastLine.amountEur = Number(((lastLine.debit - lastLine.credit) * lastLine.exchangeRate).toFixed(2));
+      // Re-calculate amountBase & amountEgp
+      const bal = Number(((lastLine.debit - lastLine.credit) * lastLine.exchangeRate).toFixed(2));
+      lastLine.amountBase = bal;
+      lastLine.amountEgp = bal;
     }
 
     entry.lines = lines;

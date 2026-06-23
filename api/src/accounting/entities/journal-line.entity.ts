@@ -60,7 +60,7 @@ export class JournalLine {
   exchangeRate: number;
 
   @Column({
-    name: 'amount_eur',
+    name: 'amount_base',
     type: 'numeric',
     precision: 12,
     scale: 2,
@@ -70,7 +70,20 @@ export class JournalLine {
       from: (value: string) => parseFloat(value) || 0,
     },
   })
-  amountEur: number;
+  amountBase: number;
+
+  @Column({
+    name: 'amount_egp',
+    type: 'numeric',
+    precision: 12,
+    scale: 2,
+    nullable: true,
+    transformer: {
+      to: (value: number) => value,
+      from: (value: string) => parseFloat(value) || 0,
+    },
+  })
+  amountEgp?: number;
 
   @ManyToOne(() => JournalEntry, (entry) => entry.lines, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'journal_entry_id' })
