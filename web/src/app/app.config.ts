@@ -1,14 +1,86 @@
-import { ApplicationConfig, provideZoneChangeDetection } from '@angular/core';
+import { ApplicationConfig, provideZoneChangeDetection, importProvidersFrom } from '@angular/core';
 import { provideRouter } from '@angular/router';
 
 import { routes } from './app.routes';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { authInterceptor } from './core/interceptors/auth.interceptor';
+import {
+  LucideAngularModule,
+  LayoutDashboard,
+  Package,
+  Factory,
+  Dribbble,
+  FlaskConical,
+  Briefcase,
+  ClipboardList,
+  Building2,
+  Smartphone,
+  Landmark,
+  BarChart3,
+  BookOpen,
+  Receipt,
+  CreditCard,
+  TrendingUp,
+  Calendar,
+  Contact,
+  Users,
+  Key,
+  LogOut,
+  Plane,
+  Upload,
+  Truck,
+  CheckCircle,
+  Search,
+  Pencil,
+  Trash2,
+  Paperclip,
+  AlertTriangle,
+  Lock,
+  HelpCircle,
+  Info,
+} from 'lucide-angular';
 
 export const appConfig: ApplicationConfig = {
   providers: [
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes),
     provideHttpClient(withInterceptors([authInterceptor])),
+    importProvidersFrom(
+      LucideAngularModule.pick({
+        LayoutDashboard,
+        Package,
+        Factory,
+        Dribbble,
+        FlaskConical,
+        Briefcase,
+        ClipboardList,
+        Building2,
+        Smartphone,
+        Landmark,
+        BarChart3,
+        BookOpen,
+        Receipt,
+        CreditCard,
+        TrendingUp,
+        Calendar,
+        Contact,
+        Users,
+        Key,
+        LogOut,
+        Plane,
+        Upload,
+        Truck,
+        CheckCircle,
+        Search,
+        Pencil,
+        Trash2,
+        Paperclip,
+        AlertTriangle,
+        Lock,
+        HelpCircle,
+        Info,
+      })
+    ),
   ]
 };
+

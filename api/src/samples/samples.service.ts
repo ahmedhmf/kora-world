@@ -1,10 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, FindOptionsWhere } from 'typeorm';
 import { Sample } from './entities/sample.entity';
 import { CreateSampleDto } from './dto/create-sample.dto';
 import { UpdateSampleDto } from './dto/update-sample.dto';
 import { SuppliersService } from '../suppliers/suppliers.service';
+import { ProductCategory } from '../products/entities/product.entity';
 
 @Injectable()
 export class SamplesService {
@@ -15,7 +16,7 @@ export class SamplesService {
   ) {}
 
   async findAll(supplierId?: number): Promise<Sample[]> {
-    const where: any = {};
+    const where: FindOptionsWhere<Sample> = {};
     if (supplierId) {
       where.supplierId = supplierId;
     }
@@ -82,7 +83,11 @@ export class SamplesService {
     });
   }
 
-  async getNextCounter(collection: string, year: number, category: string): Promise<number> {
+  async getNextCounter(
+    collection: string,
+    year: number,
+    category: string,
+  ): Promise<number> {
     const maxSample = await this.sampleRepo
       .createQueryBuilder('sample')
       .where('sample.collection = :collection', { collection })
@@ -111,9 +116,9 @@ export class SamplesService {
     sample.articleCounter = counter;
 
     let catCode = 'OTH';
-    if (category === 'football') catCode = 'FB';
-    else if (category === 'handball') catCode = 'HB';
-    else if (category === 'lifestyle') catCode = 'APP';
+    if (category === ProductCategory.FOOTBALL) catCode = 'FB';
+    else if (category === ProductCategory.HANDBALL) catCode = 'HB';
+    else if (category === ProductCategory.LIFESTYLE) catCode = 'APP';
 
     const counterStr = String(counter).padStart(4, '0');
     sample.articleNumber = `SP${collection}${yearStr}${counterStr}${catCode}`;
@@ -124,7 +129,7 @@ export class SamplesService {
       category: sample.category,
       year: sample.year,
       articleCounter: sample.articleCounter,
-      articleNumber: sample.articleNumber
+      articleNumber: sample.articleNumber,
     });
 
     const saved = await this.sampleRepo.save(sample);

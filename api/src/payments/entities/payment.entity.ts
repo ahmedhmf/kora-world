@@ -54,7 +54,7 @@ export class Payment {
     type: 'numeric',
     precision: 12,
     scale: 6,
-    default: 1.000000,
+    default: 1.0,
     transformer: {
       to: (value: number) => value,
       from: (value: string) => parseFloat(value) || 1.0,
@@ -67,7 +67,7 @@ export class Payment {
     type: 'numeric',
     precision: 12,
     scale: 2,
-    default: 0.00,
+    default: 0.0,
     transformer: {
       to: (value: number) => value,
       from: (value: string) => parseFloat(value) || 0,

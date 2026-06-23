@@ -1,4 +1,5 @@
 import * as crypto from 'crypto';
+import { ActiveUser } from './interfaces/authenticated-request.interface';
 
 const NEW_ITERATIONS = 210000;
 const LEGACY_ITERATIONS = 10000;
@@ -14,7 +15,7 @@ export function hashPassword(password: string): string {
 export function verifyPassword(password: string, storedHash: string): boolean {
   try {
     const parts = storedHash.split(':');
-    
+
     let iterations = LEGACY_ITERATIONS;
     let salt = '';
     let hash = '';
@@ -37,7 +38,7 @@ export function verifyPassword(password: string, storedHash: string): boolean {
     const verifyHash = crypto
       .pbkdf2Sync(password, salt, iterations, 64, 'sha512')
       .toString('hex');
-      
+
     return timingSafeCompare(hash, verifyHash);
   } catch {
     return false;
@@ -56,7 +57,7 @@ export function timingSafeCompare(a: string, b: string): boolean {
 }
 
 export function signJwt(
-  payload: any,
+  payload: Omit<ActiveUser, 'exp'>,
   secret: string,
   expiresInSeconds: number,
 ): string {
@@ -78,7 +79,7 @@ export function signJwt(
   return `${base64Header}.${base64Payload}.${signature}`;
 }
 
-export function verifyJwt(token: string, secret: string): any | null {
+export function verifyJwt(token: string, secret: string): ActiveUser | null {
   try {
     const parts = token.split('.');
     if (parts.length !== 3) return null;
@@ -93,7 +94,7 @@ export function verifyJwt(token: string, secret: string): any | null {
 
     const decodedPayload = JSON.parse(
       Buffer.from(payload, 'base64').toString(),
-    );
+    ) as ActiveUser;
     if (
       decodedPayload.exp &&
       decodedPayload.exp < Math.floor(Date.now() / 1000)
@@ -105,4 +106,3 @@ export function verifyJwt(token: string, secret: string): any | null {
     return null;
   }
 }
-

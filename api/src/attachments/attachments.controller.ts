@@ -14,8 +14,20 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import * as path from 'path';
 import * as fs from 'fs';
-import { Response } from 'express';
+import * as express from 'express';
 import { AuthGuard } from '../auth/auth.guard';
+
+interface UploadedFileDto {
+  fieldname: string;
+  originalname: string;
+  encoding: string;
+  mimetype: string;
+  size: number;
+  destination: string;
+  filename: string;
+  path: string;
+  buffer: Buffer;
+}
 
 // Resolve uploads folder at the root of the project
 const UPLOAD_DIR = path.join(process.cwd(), 'uploads');
@@ -29,9 +41,15 @@ export class AttachmentsController {
   @UseGuards(AuthGuard)
   @UseInterceptors(
     FileInterceptor('file', {
-      storage: diskStorage({
+      storage: (
+        diskStorage as unknown as (options: Record<string, unknown>) => unknown
+      )({
         destination: UPLOAD_DIR,
-        filename: (req, file, cb) => {
+        filename: (
+          req: unknown,
+          file: { originalname: string },
+          cb: (error: Error | null, filename: string) => void,
+        ) => {
           const uniqueSuffix =
             Date.now() + '-' + Math.round(Math.random() * 1e9);
           const ext = path.extname(file.originalname);
@@ -43,7 +61,7 @@ export class AttachmentsController {
       },
     }),
   )
-  uploadFile(@UploadedFile() file: any) {
+  uploadFile(@UploadedFile() file: UploadedFileDto) {
     if (!file) {
       throw new BadRequestException('No file uploaded');
     }
@@ -55,7 +73,10 @@ export class AttachmentsController {
 
   @Get('download/:filename')
   @UseGuards(AuthGuard)
-  downloadFile(@Param('filename') filename: string, @Res() res: any) {
+  downloadFile(
+    @Param('filename') filename: string,
+    @Res() res: express.Response,
+  ): void {
     // Validate filename to prevent path traversal vulnerability
     if (!/^[a-zA-Z0-9.\-_]+$/.test(filename)) {
       throw new BadRequestException('Invalid filename');
@@ -69,11 +90,14 @@ export class AttachmentsController {
 
     // Streams the file with its original file name resolved via HTTP headers if desired,
     // or let the browser handle it. sendFile is safe and efficient.
-    return res.sendFile(filePath);
+    res.sendFile(filePath);
   }
 
   @Get('public/:filename')
-  servePublicFile(@Param('filename') filename: string, @Res() res: any) {
+  servePublicFile(
+    @Param('filename') filename: string,
+    @Res() res: express.Response,
+  ): void {
     // Validate filename to prevent path traversal vulnerability
     if (!/^[a-zA-Z0-9.\-_]+$/.test(filename)) {
       throw new BadRequestException('Invalid filename');
@@ -85,6 +109,6 @@ export class AttachmentsController {
       throw new NotFoundException('File not found');
     }
 
-    return res.sendFile(filePath);
+    res.sendFile(filePath);
   }
 }

@@ -62,7 +62,7 @@ export class CreateSampleDto {
 
   @IsObject()
   @IsOptional()
-  receiptProtocol?: any;
+  receiptProtocol?: Record<string, unknown> | null;
 
   @IsString()
   @IsOptional()

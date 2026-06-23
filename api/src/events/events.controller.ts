@@ -16,6 +16,7 @@ import { EventsService } from './events.service';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
 import { AuthGuard } from '../auth/auth.guard';
+import type { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
 
 @Controller('events')
 @UseGuards(AuthGuard)
@@ -33,16 +34,13 @@ export class EventsController {
   }
 
   @Post()
-  create(@Body() dto: CreateEventDto, @Req() req: any) {
+  create(@Body() dto: CreateEventDto, @Req() req: AuthenticatedRequest) {
     const userId = req.user?.sub;
     return this.eventsService.create(dto, userId);
   }
 
   @Put(':id')
-  update(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() dto: UpdateEventDto,
-  ) {
+  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateEventDto) {
     return this.eventsService.update(id, dto);
   }
 

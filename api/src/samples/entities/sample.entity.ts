@@ -71,7 +71,7 @@ export class Sample {
   parentSample?: Sample | null;
 
   @Column({ name: 'receipt_protocol', type: 'jsonb', nullable: true })
-  receiptProtocol?: any;
+  receiptProtocol?: Record<string, unknown> | null;
 
   @Column({ name: 'article_number', length: 50, nullable: true })
   articleNumber?: string;

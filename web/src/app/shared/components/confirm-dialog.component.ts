@@ -4,77 +4,7 @@ import { DialogService } from '../../core/services/dialog.service';
 @Component({
   selector: 'app-confirm-dialog',
   standalone: true,
-  template: `
-    @if (dialogService.state().isOpen) {
-      <div class="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-        <!-- Backdrop with blur -->
-        <div 
-          (click)="dialogService.no()" 
-          class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300"
-        ></div>
-
-        <!-- Dialog Box -->
-        <div class="relative bg-zinc-900 border border-zinc-800 rounded-xl max-w-md w-full shadow-2xl p-6 overflow-hidden transform transition-all duration-300 scale-100">
-          <!-- Close button -->
-          <button 
-            (click)="dialogService.no()" 
-            class="absolute top-4 right-4 text-zinc-400 hover:text-white transition-colors"
-          >
-            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-
-          <!-- Icon / Header -->
-          <div class="flex items-center space-x-3 mb-4">
-            <div class="h-10 w-10 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-lg">
-              @if (dialogService.state().isConfirm) {
-                ❓
-              } @else {
-                ℹ️
-              }
-            </div>
-            <h3 class="text-lg font-bold text-white leading-6">
-              {{ dialogService.state().title }}
-            </h3>
-          </div>
-
-          <!-- Body Message -->
-          <p class="text-sm text-zinc-300 mb-6 whitespace-pre-line leading-relaxed">
-            {{ dialogService.state().message }}
-          </p>
-
-          <!-- Actions Footer -->
-          <div class="flex items-center justify-end space-x-3">
-            @if (dialogService.state().isConfirm) {
-              <button
-                type="button"
-                (click)="dialogService.no()"
-                class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-semibold rounded-lg border border-zinc-700 transition-colors"
-              >
-                No
-              </button>
-              <button
-                type="button"
-                (click)="dialogService.yes()"
-                class="px-5 py-2 bg-white text-zinc-900 hover:bg-zinc-100 text-sm font-bold rounded-lg transition-colors shadow-sm"
-              >
-                Yes
-              </button>
-            } @else {
-              <button
-                type="button"
-                (click)="dialogService.yes()"
-                class="px-5 py-2 bg-white text-zinc-900 hover:bg-zinc-100 text-sm font-bold rounded-lg transition-colors shadow-sm"
-              >
-                OK
-              </button>
-            }
-          </div>
-        </div>
-      </div>
-    }
-  `
+  templateUrl: './confirm-dialog.component.html'
 })
 export class ConfirmDialogComponent {
   readonly dialogService = inject(DialogService);

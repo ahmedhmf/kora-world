@@ -37,10 +37,7 @@ export class AccountsController {
   }
 
   @Put(':id')
-  update(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() dto: UpdateAccountDto,
-  ) {
+  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateAccountDto) {
     return this.accountsService.update(id, dto);
   }
 

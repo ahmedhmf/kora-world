@@ -100,10 +100,12 @@ import { PaymentsModule } from './payments/payments.module';
     AccountingModule,
     InvoicesModule,
     PaymentsModule,
-    ThrottlerModule.forRoot([{
-      ttl: 60000,
-      limit: 120,
-    }]),
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000,
+        limit: 120,
+      },
+    ]),
   ],
   controllers: [AppController],
   providers: [
@@ -115,5 +117,3 @@ import { PaymentsModule } from './payments/payments.module';
   ],
 })
 export class AppModule {}
-
-

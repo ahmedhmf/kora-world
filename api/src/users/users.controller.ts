@@ -19,6 +19,8 @@ import { Roles } from '../auth/roles.decorator';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
+import type { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
+
 @Controller('users')
 @UseGuards(AuthGuard, RolesGuard)
 @Roles('admin')
@@ -47,7 +49,10 @@ export class UsersController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  remove(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
+  remove(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: AuthenticatedRequest,
+  ) {
     const currentUserId = req.user.sub; // Attached by AuthGuard: payload.sub holds user.id
     return this.usersService.remove(id, currentUserId);
   }

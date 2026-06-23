@@ -1,13 +1,19 @@
-import { Injectable, BadRequestException, NotFoundException, Inject, forwardRef } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  Inject,
+  forwardRef,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Payment } from './entities/payment.entity';
 import { CreatePaymentDto } from './dto/create-payment.dto';
-import { UpdatePaymentDto } from './dto/update-payment.dto';
 import { InvoicesService } from '../invoices/invoices.service';
 import { AccountingService } from '../accounting/accounting.service';
-import { Invoice, InvoiceStatus, InvoiceType } from '../invoices/entities/invoice.entity';
+import { Invoice, InvoiceStatus } from '../invoices/entities/invoice.entity';
 import { JournalEntryType } from '../accounting/entities/journal-entry.entity';
+import { CreateJournalLineDto } from '../accounting/dto/create-journal-line.dto';
 
 @Injectable()
 export class PaymentsService {
@@ -25,14 +31,20 @@ export class PaymentsService {
     if (dto.invoiceId) {
       invoice = await this.invoicesService.findOne(dto.invoiceId);
       if (!invoice) {
-        throw new NotFoundException(`Invoice with ID ${dto.invoiceId} not found`);
+        throw new NotFoundException(
+          `Invoice with ID ${dto.invoiceId} not found`,
+        );
       }
     }
 
     const currency = dto.currency.toUpperCase();
     let rate = dto.exchangeRate;
     if (!rate) {
-      rate = await this.accountingService.getExchangeRate(currency, 'EGP', dto.date);
+      rate = await this.accountingService.getExchangeRate(
+        currency,
+        'EGP',
+        dto.date,
+      );
     }
 
     const amountEgp = Number((dto.amount * rate).toFixed(2));
@@ -61,8 +73,10 @@ export class PaymentsService {
     // If there is an invoice, update its status
     if (invoice) {
       // Calculate total paid so far for this invoice
-      const payments = await this.paymentRepo.find({ where: { invoiceId: invoice.id } });
-      
+      const payments = await this.paymentRepo.find({
+        where: { invoiceId: invoice.id },
+      });
+
       let totalPaidInInvoiceCurrency = 0;
       for (const p of payments) {
         if (p.currency.toUpperCase() === invoice.currency.toUpperCase()) {
@@ -70,20 +84,26 @@ export class PaymentsService {
         } else {
           // Convert payment amount to invoice currency via EGP
           const pToEgpRate = p.exchangeRate; // exchange rate from payment currency to EGP
-          const egpToInvRate = await this.accountingService.getExchangeRate('EGP', invoice.currency, p.date);
+          const egpToInvRate = await this.accountingService.getExchangeRate(
+            'EGP',
+            invoice.currency,
+            p.date,
+          );
           const amtInv = p.amount * pToEgpRate * egpToInvRate;
           totalPaidInInvoiceCurrency += amtInv;
         }
       }
 
-      totalPaidInInvoiceCurrency = Number(totalPaidInInvoiceCurrency.toFixed(2));
+      totalPaidInInvoiceCurrency = Number(
+        totalPaidInInvoiceCurrency.toFixed(2),
+      );
 
       // Update status
       let newStatus = InvoiceStatus.SENT; // fallback
       if (totalPaidInInvoiceCurrency >= invoice.total) {
         newStatus = InvoiceStatus.PAID;
       } else if (totalPaidInInvoiceCurrency > 0) {
-        newStatus = 'partially_paid' as any;
+        newStatus = 'partially_paid' as InvoiceStatus;
       }
 
       await this.invoicesService.update(invoice.id, { status: newStatus });
@@ -113,7 +133,7 @@ export class PaymentsService {
   async remove(id: number): Promise<void> {
     const payment = await this.findOne(id);
     const invoiceId = payment.invoiceId;
-    
+
     // Delete payment
     await this.paymentRepo.remove(payment);
 
@@ -125,24 +145,32 @@ export class PaymentsService {
     if (invoiceId) {
       const invoice = await this.invoicesService.findOne(invoiceId);
       if (invoice) {
-        const remainingPayments = await this.paymentRepo.find({ where: { invoiceId } });
+        const remainingPayments = await this.paymentRepo.find({
+          where: { invoiceId },
+        });
         let totalPaidInInvoiceCurrency = 0;
         for (const p of remainingPayments) {
           if (p.currency.toUpperCase() === invoice.currency.toUpperCase()) {
             totalPaidInInvoiceCurrency += p.amount;
           } else {
-             const pToEgpRate = p.exchangeRate;
-             const egpToInvRate = await this.accountingService.getExchangeRate('EGP', invoice.currency, p.date);
-             totalPaidInInvoiceCurrency += p.amount * pToEgpRate * egpToInvRate;
+            const pToEgpRate = p.exchangeRate;
+            const egpToInvRate = await this.accountingService.getExchangeRate(
+              'EGP',
+              invoice.currency,
+              p.date,
+            );
+            totalPaidInInvoiceCurrency += p.amount * pToEgpRate * egpToInvRate;
           }
         }
-        totalPaidInInvoiceCurrency = Number(totalPaidInInvoiceCurrency.toFixed(2));
+        totalPaidInInvoiceCurrency = Number(
+          totalPaidInInvoiceCurrency.toFixed(2),
+        );
 
         let newStatus = InvoiceStatus.SENT;
         if (totalPaidInInvoiceCurrency >= invoice.total) {
           newStatus = InvoiceStatus.PAID;
         } else if (totalPaidInInvoiceCurrency > 0) {
-          newStatus = 'partially_paid' as any;
+          newStatus = 'partially_paid' as InvoiceStatus;
         }
         await this.invoicesService.update(invoice.id, { status: newStatus });
       }
@@ -156,7 +184,7 @@ export class PaymentsService {
       );
     }
 
-    const linesDto: any[] = [];
+    const linesDto: CreateJournalLineDto[] = [];
     const dateStr = new Date(payment.date).toISOString().split('T')[0];
 
     // Debit Category account
@@ -177,7 +205,9 @@ export class PaymentsService {
 
     await this.accountingService.createJournalEntry({
       date: dateStr,
-      description: payment.description || `Payment record Ref: ${payment.reference || 'N/A'}`,
+      description:
+        payment.description ||
+        `Payment record Ref: ${payment.reference || 'N/A'}`,
       reference: payment.reference || `PAY-${payment.id}`,
       type: JournalEntryType.PAYMENT,
       invoiceId: payment.invoiceId || undefined,

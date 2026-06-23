@@ -20,6 +20,7 @@ import { UpdateProductDto } from './dto/update-product.dto';
 import { AuthGuard } from '../auth/auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import type { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
 
 @Controller('products')
 @UseGuards(AuthGuard, RolesGuard)
@@ -28,12 +29,12 @@ export class ProductsController {
 
   @Get()
   async findAll(
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
     @Query('supplierId') supplierId?: number,
     @Query('category') category?: string,
   ) {
     if (req.user.role === 'supplier') {
-      supplierId = req.user.supplierId;
+      supplierId = req.user.supplierId ?? undefined;
     }
     const products = await this.productsService.findAll(supplierId, category);
     if (req.user.role === 'supplier') {
@@ -49,13 +50,15 @@ export class ProductsController {
 
   @Get('next-counter')
   async getNextCounter(
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
     @Query('collection') collection: string,
     @Query('year') year: string,
     @Query('category') category: string,
   ) {
     if (req.user.role === 'supplier') {
-      throw new ForbiddenException('Suppliers are not allowed to use naming counter generator');
+      throw new ForbiddenException(
+        'Suppliers are not allowed to use naming counter generator',
+      );
     }
     const nextCounter = await this.productsService.getNextCounter(
       collection,
@@ -66,11 +69,16 @@ export class ProductsController {
   }
 
   @Get(':id')
-  async findOne(@Req() req: any, @Param('id', ParseIntPipe) id: number) {
+  async findOne(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
     const product = await this.productsService.findOne(id);
     if (req.user.role === 'supplier') {
       if (product.supplierId !== req.user.supplierId) {
-        throw new ForbiddenException('You do not have permission to view this product');
+        throw new ForbiddenException(
+          'You do not have permission to view this product',
+        );
       }
       delete product.landingPrice;
       delete product.onePcPrice;

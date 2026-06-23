@@ -4,7 +4,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, FindOptionsWhere } from 'typeorm';
 import { PurchaseOrder, POStatus } from './entities/purchase-order.entity';
 import { PurchaseOrderLineItem } from './entities/purchase-order-line-item.entity';
 import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
@@ -24,7 +24,7 @@ export class PurchaseOrdersService {
   ) {}
 
   async findAll(supplierId?: number): Promise<PurchaseOrder[]> {
-    const where: any = {};
+    const where: FindOptionsWhere<PurchaseOrder> = {};
     if (supplierId) {
       where.supplierId = supplierId;
     }

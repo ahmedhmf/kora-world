@@ -68,10 +68,17 @@ export class Account {
   @Column({ name: 'payment_terms', length: 50, default: 'Cash in Advance' })
   paymentTerms: string;
 
-  @Column({ name: 'credit_limit', type: 'numeric', precision: 12, scale: 2, default: 0.00, transformer: {
-    to: (value: number) => value,
-    from: (value: string) => parseFloat(value) || 0
-  }})
+  @Column({
+    name: 'credit_limit',
+    type: 'numeric',
+    precision: 12,
+    scale: 2,
+    default: 0.0,
+    transformer: {
+      to: (value: number) => value,
+      from: (value: string) => parseFloat(value) || 0,
+    },
+  })
   creditLimit: number;
 
   @Column({ name: 'vat_number', length: 100, nullable: true })

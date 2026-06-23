@@ -22,6 +22,7 @@
     "@tailwindcss/forms": "^0.5.11",
     "@tailwindcss/vite": "^4.3.1",
     "autoprefixer": "^10.5.0",
+    "lucide-angular": "^1.0.0",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",
     "zone.js": "^0.16.2"

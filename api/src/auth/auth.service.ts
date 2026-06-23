@@ -57,7 +57,11 @@ export class AuthService {
     };
   }
 
-  async changePassword(userId: number, currentPass: string, newPass: string): Promise<void> {
+  async changePassword(
+    userId: number,
+    currentPass: string,
+    newPass: string,
+  ): Promise<void> {
     await this.usersService.updatePassword(userId, currentPass, newPass);
   }
 }

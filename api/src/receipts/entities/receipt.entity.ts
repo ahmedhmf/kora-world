@@ -51,7 +51,12 @@ export class Receipt {
   @Column({ length: 10, default: 'USD' })
   currency: string;
 
-  @Column({ name: 'payment_terms', type: 'varchar', length: 100, nullable: true })
+  @Column({
+    name: 'payment_terms',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
   paymentTerms: string | null;
 
   @Column({

@@ -1,4 +1,10 @@
-import { Injectable, BadRequestException, NotFoundException, Inject, forwardRef } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  Inject,
+  forwardRef,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Invoice, InvoiceStatus, InvoiceType } from './entities/invoice.entity';
@@ -7,6 +13,7 @@ import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { UpdateInvoiceDto } from './dto/update-invoice.dto';
 import { AccountingService } from '../accounting/accounting.service';
 import { JournalEntryType } from '../accounting/entities/journal-entry.entity';
+import { CreateJournalLineDto } from '../accounting/dto/create-journal-line.dto';
 
 @Injectable()
 export class InvoicesService {
@@ -24,13 +31,13 @@ export class InvoicesService {
     const prefix = `INV-${year}-`;
 
     // Find the highest existing number for this year
-    const invoices = await this.invoiceRepo
+    const invoices = (await this.invoiceRepo
       .createQueryBuilder('inv')
       .select('inv.number', 'number')
       .where('inv.number LIKE :prefix', { prefix: `${prefix}%` })
       .orderBy('inv.number', 'DESC')
       .limit(1)
-      .getRawOne();
+      .getRawOne()) as unknown as { number: string } | undefined;
 
     let nextSeq = 1;
     if (invoices?.number) {
@@ -55,15 +62,21 @@ export class InvoicesService {
       const generated = await this.generateNextNumber();
       invoiceNumber = generated.number;
     } else {
-      const existing = await this.invoiceRepo.findOne({ where: { number: invoiceNumber } });
+      const existing = await this.invoiceRepo.findOne({
+        where: { number: invoiceNumber },
+      });
       if (existing) {
-        throw new BadRequestException(`Invoice with number ${invoiceNumber} already exists`);
+        throw new BadRequestException(
+          `Invoice with number ${invoiceNumber} already exists`,
+        );
       }
     }
 
     let subtotal = 0;
-    const lines = dto.lines.map(lineDto => {
-      const lineTotal = Number((lineDto.quantity * lineDto.unitPrice).toFixed(2));
+    const lines = dto.lines.map((lineDto) => {
+      const lineTotal = Number(
+        (lineDto.quantity * lineDto.unitPrice).toFixed(2),
+      );
       subtotal += lineTotal;
       return this.lineRepo.create({
         description: lineDto.description,
@@ -95,7 +108,10 @@ export class InvoicesService {
     const savedInvoice = await this.invoiceRepo.save(invoice);
 
     // If invoice is created as SENT or PAID, generate the double-entry journal entry
-    if (savedInvoice.status === InvoiceStatus.SENT || savedInvoice.status === InvoiceStatus.PAID) {
+    if (
+      savedInvoice.status === InvoiceStatus.SENT ||
+      savedInvoice.status === InvoiceStatus.PAID
+    ) {
       await this.generateJournalEntry(savedInvoice);
     }
 
@@ -111,12 +127,14 @@ export class InvoicesService {
       throw new NotFoundException(`Invoice with ID ${id} not found`);
     }
 
-    const previousStatus = invoice.status;
-
     if (dto.number && dto.number !== invoice.number) {
-      const existing = await this.invoiceRepo.findOne({ where: { number: dto.number } });
+      const existing = await this.invoiceRepo.findOne({
+        where: { number: dto.number },
+      });
       if (existing) {
-        throw new BadRequestException(`Invoice with number ${dto.number} already exists`);
+        throw new BadRequestException(
+          `Invoice with number ${dto.number} already exists`,
+        );
       }
       invoice.number = dto.number;
     }
@@ -125,8 +143,10 @@ export class InvoicesService {
       // Re-create lines
       await this.lineRepo.delete({ invoiceId: invoice.id });
       let subtotal = 0;
-      const lines = dto.lines.map(lineDto => {
-        const lineTotal = Number((lineDto.quantity * lineDto.unitPrice).toFixed(2));
+      const lines = dto.lines.map((lineDto) => {
+        const lineTotal = Number(
+          (lineDto.quantity * lineDto.unitPrice).toFixed(2),
+        );
         subtotal += lineTotal;
         return this.lineRepo.create({
           description: lineDto.description,
@@ -156,7 +176,10 @@ export class InvoicesService {
     const savedInvoice = await this.invoiceRepo.save(invoice);
 
     // If status changed to SENT or PAID, check and generate journal entry
-    if (savedInvoice.status === InvoiceStatus.SENT || savedInvoice.status === InvoiceStatus.PAID) {
+    if (
+      savedInvoice.status === InvoiceStatus.SENT ||
+      savedInvoice.status === InvoiceStatus.PAID
+    ) {
       await this.generateJournalEntry(savedInvoice);
     }
 
@@ -164,7 +187,9 @@ export class InvoicesService {
   }
 
   async findAll(): Promise<Invoice[]> {
-    return this.invoiceRepo.find({ relations: { lines: true, supplier: true, purchaseOrder: true } });
+    return this.invoiceRepo.find({
+      relations: { lines: true, supplier: true, purchaseOrder: true },
+    });
   }
 
   async findOne(id: number): Promise<Invoice> {
@@ -185,26 +210,39 @@ export class InvoicesService {
 
   // --- Double-Entry Posting ---
   private async generateJournalEntry(invoice: Invoice): Promise<void> {
-    console.log(`[generateJournalEntry] Processing invoice ID: ${invoice.id}, Number: ${invoice.number}, Status: ${invoice.status}`);
+    console.log(
+      `[generateJournalEntry] Processing invoice ID: ${invoice.id}, Number: ${invoice.number}, Status: ${invoice.status}`,
+    );
     const allEntries = await this.accountingService.findAllJournalEntries();
 
     // 1. Ensure Step 1 (Invoice Booking: AR vs Revenue) is created
     const existingInvoiceEntry = allEntries.find(
-      entry => entry.invoiceId === invoice.id && entry.type === JournalEntryType.INVOICE
+      (entry) =>
+        entry.invoiceId === invoice.id &&
+        entry.type === JournalEntryType.INVOICE,
     );
-    console.log(`[generateJournalEntry] Step 1 existing: ${!!existingInvoiceEntry}`);
+    console.log(
+      `[generateJournalEntry] Step 1 existing: ${!!existingInvoiceEntry}`,
+    );
 
-    if (!existingInvoiceEntry && (invoice.status === InvoiceStatus.SENT || invoice.status === InvoiceStatus.PAID)) {
+    if (
+      !existingInvoiceEntry &&
+      (invoice.status === InvoiceStatus.SENT ||
+        invoice.status === InvoiceStatus.PAID)
+    ) {
       console.log(`[generateJournalEntry] Creating Step 1 entry...`);
       // Resolve accounts:
       const accounts = await this.accountingService.findAllAccounts();
       const findAccountByCode = (code: string) => {
-        const acc = accounts.find(a => a.code === code);
-        if (!acc) throw new NotFoundException(`Account with code ${code} not found. Please run seeding.`);
+        const acc = accounts.find((a) => a.code === code);
+        if (!acc)
+          throw new NotFoundException(
+            `Account with code ${code} not found. Please run seeding.`,
+          );
         return acc.id;
       };
 
-      const linesDto: any[] = [];
+      const linesDto: CreateJournalLineDto[] = [];
       const dateStr = new Date(invoice.date).toISOString().split('T')[0];
 
       if (invoice.type === InvoiceType.INCOMING) {
@@ -257,7 +295,9 @@ export class InvoicesService {
         }
       }
 
-      console.log(`[generateJournalEntry] Submitting Step 1 journal entry DTO...`);
+      console.log(
+        `[generateJournalEntry] Submitting Step 1 journal entry DTO...`,
+      );
       await this.accountingService.createJournalEntry({
         date: dateStr,
         description: `Auto-generated from Invoice #${invoice.number}`,
@@ -267,25 +307,34 @@ export class InvoicesService {
         poId: invoice.poId || undefined,
         lines: linesDto,
       });
-      console.log(`[generateJournalEntry] Step 1 journal entry created successfully.`);
+      console.log(
+        `[generateJournalEntry] Step 1 journal entry created successfully.`,
+      );
     }
 
     // 2. Ensure Step 2 (Payment Booking: Bank vs AR/AP) is created if PAID
     if (invoice.status === InvoiceStatus.PAID) {
       const existingPaymentEntry = allEntries.find(
-        entry => entry.invoiceId === invoice.id && entry.reference === `${invoice.number}-PAY`
+        (entry) =>
+          entry.invoiceId === invoice.id &&
+          entry.reference === `${invoice.number}-PAY`,
       );
-      console.log(`[generateJournalEntry] Step 2 existing check: ${!!existingPaymentEntry}`);
+      console.log(
+        `[generateJournalEntry] Step 2 existing check: ${!!existingPaymentEntry}`,
+      );
 
       if (!existingPaymentEntry) {
         const accounts = await this.accountingService.findAllAccounts();
         const findAccountByCode = (code: string) => {
-          const acc = accounts.find(a => a.code === code);
-          if (!acc) throw new NotFoundException(`Account with code ${code} not found. Please run seeding.`);
+          const acc = accounts.find((a) => a.code === code);
+          if (!acc)
+            throw new NotFoundException(
+              `Account with code ${code} not found. Please run seeding.`,
+            );
           return acc.id;
         };
 
-        const linesDto: any[] = [];
+        const linesDto: CreateJournalLineDto[] = [];
         const dateStr = new Date().toISOString().split('T')[0];
 
         // Determine bank account based on invoice currency
@@ -323,7 +372,9 @@ export class InvoicesService {
           });
         }
 
-        console.log(`[generateJournalEntry] Submitting Step 2 payment entry DTO...`);
+        console.log(
+          `[generateJournalEntry] Submitting Step 2 payment entry DTO...`,
+        );
         await this.accountingService.createJournalEntry({
           date: dateStr,
           description: `Auto-generated Payment for Invoice #${invoice.number}`,
@@ -333,7 +384,9 @@ export class InvoicesService {
           poId: invoice.poId || undefined,
           lines: linesDto,
         });
-        console.log(`[generateJournalEntry] Step 2 payment entry created successfully.`);
+        console.log(
+          `[generateJournalEntry] Step 2 payment entry created successfully.`,
+        );
       }
     }
   }

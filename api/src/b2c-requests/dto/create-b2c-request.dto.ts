@@ -1,4 +1,11 @@
-import { IsNotEmpty, IsString, IsOptional, IsNumber, IsEmail, Min } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsString,
+  IsOptional,
+  IsNumber,
+  IsEmail,
+  Min,
+} from 'class-validator';
 
 export class CreateB2cRequestDto {
   @IsString()

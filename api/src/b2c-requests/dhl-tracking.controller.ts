@@ -1,20 +1,61 @@
-import { Controller, Get, Query, UseGuards, HttpException, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Query,
+  UseGuards,
+  HttpException,
+  HttpStatus,
+} from '@nestjs/common';
 import { AuthGuard } from '../auth/auth.guard.js';
 import { ConfigService } from '@nestjs/config';
+
+interface DhlEvent {
+  statusCode?: string;
+  timestamp?: string;
+  location?: {
+    address?: {
+      addressLocality?: string;
+    };
+  };
+  description?: string;
+}
+
+interface DhlShipment {
+  status?: {
+    statusCode?: string;
+    timestamp?: string;
+  };
+  events?: DhlEvent[];
+  estimatedTimeOfDelivery?: string;
+}
+
+interface DhlTrackingResponse {
+  shipments?: DhlShipment[];
+}
+
+interface TrackingCheckpoint {
+  timestamp: string;
+  location: string;
+  description: string;
+  code: string;
+}
 
 @Controller('dhl-tracking')
 @UseGuards(AuthGuard)
 export class DhlTrackingController {
   constructor(private readonly config: ConfigService) {}
-  
+
   @Get()
   async getTracking(@Query('trackingNumber') trackingNumber: string) {
     if (!trackingNumber) {
-      throw new HttpException('trackingNumber query parameter is required', HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        'trackingNumber query parameter is required',
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
     const apiKey = this.config.get<string>('DHL_API_KEY');
-    
+
     // If no real API key is supplied yet, fall back to simulated checkpoints
     if (!apiKey || apiKey === 'your_dhl_api_key_here') {
       return this.getMockTracking(trackingNumber);
@@ -27,24 +68,33 @@ export class DhlTrackingController {
           method: 'GET',
           headers: {
             'DHL-API-Key': apiKey,
-            'Accept': 'application/json',
+            Accept: 'application/json',
           },
-        }
+        },
       );
 
       if (response.status === 404) {
-        throw new HttpException('Shipment not found in DHL system', HttpStatus.NOT_FOUND);
+        throw new HttpException(
+          'Shipment not found in DHL system',
+          HttpStatus.NOT_FOUND,
+        );
       }
 
       if (!response.ok) {
-        throw new HttpException(`DHL API Error: ${response.statusText}`, HttpStatus.BAD_GATEWAY);
+        throw new HttpException(
+          `DHL API Error: ${response.statusText}`,
+          HttpStatus.BAD_GATEWAY,
+        );
       }
 
-      const data = await response.json();
-      
+      const data = (await response.json()) as DhlTrackingResponse;
+
       // Parse DHL Unified Tracking format
       if (!data.shipments || data.shipments.length === 0) {
-        throw new HttpException('No shipments found matching tracking number', HttpStatus.NOT_FOUND);
+        throw new HttpException(
+          'No shipments found matching tracking number',
+          HttpStatus.NOT_FOUND,
+        );
       }
 
       const shipment = data.shipments[0];
@@ -54,17 +104,25 @@ export class DhlTrackingController {
       let status = 'IN_TRANSIT';
       if (dhlStatus === 'DELIVERED') {
         status = 'DELIVERED';
-      } else if (dhlStatus === 'OUT_FOR_DELIVERY' || dhlStatus === 'OUT-FOR-DELIVERY') {
+      } else if (
+        dhlStatus === 'OUT_FOR_DELIVERY' ||
+        dhlStatus === 'OUT-FOR-DELIVERY'
+      ) {
         status = 'OUT_FOR_DELIVERY';
       }
 
       // Map DHL checkpoints to app format
-      const checkpoints = (shipment.events || []).map((event: any) => {
+      const checkpoints = (shipment.events || []).map((event: DhlEvent) => {
         let code = 'IN_TRANSIT';
         const dhlEventCode = event.statusCode?.toUpperCase();
         if (dhlEventCode === 'DELIVERED') code = 'DELIVERED';
-        else if (dhlEventCode === 'PICKED_UP' || dhlEventCode === 'PICKUP') code = 'PICKED_UP';
-        else if (dhlEventCode === 'OUT_FOR_DELIVERY' || dhlEventCode === 'OUT-FOR-DELIVERY') code = 'OUT_FOR_DELIVERY';
+        else if (dhlEventCode === 'PICKED_UP' || dhlEventCode === 'PICKUP')
+          code = 'PICKED_UP';
+        else if (
+          dhlEventCode === 'OUT_FOR_DELIVERY' ||
+          dhlEventCode === 'OUT-FOR-DELIVERY'
+        )
+          code = 'OUT_FOR_DELIVERY';
 
         return {
           timestamp: event.timestamp || new Date().toISOString(),
@@ -82,22 +140,28 @@ export class DhlTrackingController {
         estimatedDelivery: shipment.estimatedTimeOfDelivery || null,
         checkpoints: checkpoints, // DHL events are typically newest first
       };
-
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
       }
-      console.warn(`Failed to reach DHL API: ${error.message}. Falling back to mock tracking.`);
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(
+        `Failed to reach DHL API: ${message}. Falling back to mock tracking.`,
+      );
       return this.getMockTracking(trackingNumber);
     }
   }
 
   // Simulated fallback helper
   private getMockTracking(trackingNumber: string) {
-    const isGermany = trackingNumber.toLowerCase().includes('de') || trackingNumber.toLowerCase().includes('germany') || (trackingNumber.charCodeAt(0) % 2 === 0);
-    const isDelivered = trackingNumber.endsWith('9') || trackingNumber.endsWith('7');
+    const isGermany =
+      trackingNumber.toLowerCase().includes('de') ||
+      trackingNumber.toLowerCase().includes('germany') ||
+      trackingNumber.charCodeAt(0) % 2 === 0;
+    const isDelivered =
+      trackingNumber.endsWith('9') || trackingNumber.endsWith('7');
 
-    const statuses: any[] = [];
+    const statuses: TrackingCheckpoint[] = [];
     statuses.push({
       timestamp: new Date(Date.now() - 36 * 60 * 60 * 1000).toISOString(),
       location: 'Shenzhen, China',
@@ -117,14 +181,18 @@ export class DhlTrackingController {
       code: 'IN_TRANSIT',
     });
 
-    const seedValue = (trackingNumber.length + trackingNumber.charCodeAt(trackingNumber.length - 1)) % 3;
+    const seedValue =
+      (trackingNumber.length +
+        trackingNumber.charCodeAt(trackingNumber.length - 1)) %
+      3;
 
     if (isDelivered) {
       const dest = isGermany ? 'Frankfurt, Germany' : 'Cairo, Egypt';
       statuses.push({
         timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
         location: isGermany ? 'Frankfurt, Germany' : 'Cairo Hub, Egypt',
-        description: 'Arrived at DHL destination delivery facility and out for delivery',
+        description:
+          'Arrived at DHL destination delivery facility and out for delivery',
         code: 'OUT_FOR_DELIVERY',
       });
       statuses.push({
@@ -137,7 +205,8 @@ export class DhlTrackingController {
       statuses.push({
         timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
         location: isGermany ? 'Frankfurt, Germany' : 'Cairo Hub, Egypt',
-        description: 'Arrived at DHL destination delivery facility and out for delivery',
+        description:
+          'Arrived at DHL destination delivery facility and out for delivery',
         code: 'OUT_FOR_DELIVERY',
       });
     }
@@ -154,7 +223,9 @@ export class DhlTrackingController {
       carrier: 'DHL',
       status: currentStatus,
       lastUpdate: statuses[statuses.length - 1].timestamp,
-      estimatedDelivery: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+      estimatedDelivery: new Date(
+        Date.now() + 48 * 60 * 60 * 1000,
+      ).toISOString(),
       checkpoints: [...statuses].reverse(),
     };
   }

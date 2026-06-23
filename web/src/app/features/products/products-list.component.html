@@ -1,0 +1,192 @@
+<div class="p-8">
+
+      <!-- Header -->
+      <div class="flex items-center justify-between mb-8">
+        <div>
+          <h1 class="text-2xl font-bold text-white">Product Catalog</h1>
+          <p class="text-zinc-400 text-sm mt-1">{{ store.totalProducts() }} products across all suppliers</p>
+        </div>
+        @if (authService.currentUser()?.role !== 'supplier') {
+          <a
+            routerLink="/products/new"
+            class="px-4 py-2 bg-white text-zinc-900 text-sm font-semibold rounded-lg hover:bg-zinc-100 transition-colors"
+          >
+            + Add Product
+          </a>
+        }
+      </div>
+
+      <!-- Filters -->
+      <div class="flex flex-wrap items-center gap-3 mb-6">
+        @if (authService.currentUser()?.role !== 'supplier') {
+          <select
+            [(ngModel)]="selectedSupplier"
+            (ngModelChange)="applyFilter()"
+            class="bg-zinc-900 border border-zinc-700 text-zinc-300 text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-zinc-500"
+          >
+            <option [ngValue]="null">All Suppliers</option>
+            @for (s of suppliersStore.suppliers(); track s.id) {
+              <option [ngValue]="s.id">{{ s.name }}</option>
+            }
+          </select>
+        }
+
+        <select
+          [(ngModel)]="selectedCategory"
+          (ngModelChange)="applyFilter()"
+          class="bg-zinc-900 border border-zinc-700 text-zinc-300 text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-zinc-500"
+        >
+          <option [ngValue]="null">All Categories</option>
+          <option value="football">Football</option>
+          <option value="handball">Handball</option>
+          <option value="lifestyle">Lifestyle</option>
+        </select>
+
+        <!-- Live Currency Converter Toggle -->
+        <div class="flex items-center space-x-2 sm:ml-auto">
+          <span class="text-zinc-400 text-xs font-medium">Display Currency:</span>
+          <select
+            [(ngModel)]="targetCurrency"
+            class="bg-zinc-900 border border-zinc-700 text-zinc-300 text-sm font-semibold rounded-lg px-3 py-2 focus:outline-none focus:border-zinc-500"
+          >
+            <option value="ORIGINAL">Original Currency</option>
+            <option value="EGP">EGP (Egyptian Pound)</option>
+            <option value="USD">USD (US Dollar)</option>
+            <option value="EUR">EUR (Euro)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Loading -->
+      @if (store.loading()) {
+        <div class="flex items-center justify-center py-20">
+          <div class="w-6 h-6 border-2 border-zinc-600 border-t-white rounded-full animate-spin"></div>
+        </div>
+      }
+
+      <!-- Error -->
+      @if (store.error()) {
+        <div class="bg-red-900/30 border border-red-800 text-red-300 px-4 py-3 rounded-lg mb-6 text-sm">
+          {{ store.error() }}
+        </div>
+      }
+
+      <!-- Empty state -->
+      @if (!store.loading() && store.products().length === 0) {
+        <div class="text-center py-20">
+          <lucide-icon name="dribbble" class="w-8 h-8 text-zinc-400 mb-2"></lucide-icon>
+          <p class="text-zinc-400 text-sm">No products yet.</p>
+          @if (authService.currentUser()?.role !== 'supplier') {
+            <a routerLink="/products/new" class="text-white text-sm underline mt-2 inline-block">Add your first product</a>
+          }
+        </div>
+      }
+
+      <!-- Table -->
+      @if (!store.loading() && store.filteredProducts().length > 0) {
+        <div class="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-zinc-800">
+                <th class="text-left px-6 py-4 text-zinc-400 font-medium">Article #</th>
+                <th class="text-left px-6 py-4 text-zinc-400 font-medium">Name</th>
+                <th class="text-left px-6 py-4 text-zinc-400 font-medium">Category</th>
+                <th class="text-left px-6 py-4 text-zinc-400 font-medium">Supplier</th>
+                <th class="text-left px-6 py-4 text-zinc-400 font-medium text-right">Unit Price</th>
+                @if (authService.currentUser()?.role !== 'supplier') {
+                  <th class="text-left px-6 py-4 text-zinc-400 font-medium text-right">Landing Price</th>
+                  <th class="text-left px-6 py-4 text-zinc-400 font-medium text-right">1 PC Price</th>
+                  <th class="text-left px-6 py-4 text-zinc-400 font-medium text-right">Bulk Price</th>
+                }
+                <th class="text-left px-6 py-4 text-zinc-400 font-medium">MOQ</th>
+                <th class="px-6 py-4"></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (product of store.filteredProducts(); track product.id) {
+                <tr class="border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors">
+                  <td class="px-6 py-4 text-zinc-400 font-mono text-xs">{{ product.articleNumber }}</td>
+                  <td class="px-6 py-4 font-medium text-white">
+                    <div class="flex items-center space-x-3">
+                      <!-- Thumbnail -->
+                      @if (product.imagePath) {
+                        <img [src]="getPublicUrl(product.imagePath)" class="h-10 w-10 object-cover rounded-full border border-zinc-700 flex-shrink-0" alt="Product" />
+                      } @else {
+                        <div class="h-10 w-10 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-lg flex-shrink-0 select-none">
+                          {{ getCategoryPlaceholder(product.category) }}
+                        </div>
+                      }
+                      
+                      <!-- Name & details -->
+                      <div>
+                        <div>
+                          <a [routerLink]="['/products', product.id]" class="text-white hover:underline">{{ product.name }}</a>
+                        </div>
+                        @if (product.construction && Object.keys(product.construction).length > 0) {
+                          <div class="flex flex-wrap gap-1.5 mt-1.5">
+                            @for (entry of Object.entries(product.construction); track entry[0]) {
+                              <span class="text-[10px] bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded border border-zinc-700/50">
+                                {{ entry[0] }}: {{ entry[1] }}
+                              </span>
+                            }
+                          </div>
+                        }
+                        @if (product.techPackPath) {
+                          <div
+                            (click)="downloadTechPack(product.techPackPath, product.techPackName || '')"
+                            class="mt-2 flex items-center space-x-1.5 text-xs text-zinc-400 hover:text-white cursor-pointer select-none"
+                          >
+                            <svg class="h-3.5 w-3.5 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                            <span class="underline truncate max-w-[180px]">{{ product.techPackName || 'Download Tech Pack' }}</span>
+                          </div>
+                        }
+                      </div>
+                    </div>
+                  </td>
+                  <td class="px-6 py-4">
+                    <span class="px-2 py-1 rounded-md text-xs font-medium"
+                      [class]="categoryClass(product.category)">
+                      {{ product.category ?? '—' }}
+                    </span>
+                  </td>
+                  <td class="px-6 py-4 text-zinc-400">{{ product.supplier?.name ?? '—' }}</td>
+                  <td class="px-6 py-4 text-white font-medium font-mono text-right">
+                    {{ getFormattedPrice(product.unitPrice, product.currency) }}
+                  </td>
+                  @if (authService.currentUser()?.role !== 'supplier') {
+                    <td class="px-6 py-4 text-white font-medium font-mono text-right">
+                      {{ getFormattedPrice(product.landingPrice, product.currency) }}
+                    </td>
+                    <td class="px-6 py-4 text-white font-medium font-mono text-right">
+                      {{ getFormattedPrice(product.onePcPrice, product.currency) }}
+                    </td>
+                    <td class="px-6 py-4 text-white font-medium font-mono text-right">
+                      {{ getFormattedPrice(product.bulkPrice, product.currency) }}
+                    </td>
+                  }
+                  <td class="px-6 py-4 text-zinc-400">{{ product.moq ?? '—' }}</td>
+                  <td class="px-6 py-4 text-right">
+                    <a
+                      [routerLink]="['/products', product.id]"
+                      class="text-zinc-400 hover:text-white text-xs underline mr-4"
+                    >View</a>
+                    @if (authService.currentUser()?.role !== 'supplier') {
+                      <a
+                        [routerLink]="['/products', product.id, 'edit']"
+                        class="text-zinc-400 hover:text-white text-xs underline mr-4"
+                      >Edit</a>
+                      <button
+                        (click)="delete(product.id)"
+                        class="text-red-400 hover:text-red-300 text-xs"
+                      >Delete</button>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>

@@ -29,16 +29,28 @@ export class AddSupplierContacts1750000000008 implements MigrationInterface {
     `);
 
     // 3. Drop old columns from suppliers
-    await queryRunner.query(`ALTER TABLE "suppliers" DROP COLUMN "contact_name"`);
-    await queryRunner.query(`ALTER TABLE "suppliers" DROP COLUMN "contact_email"`);
-    await queryRunner.query(`ALTER TABLE "suppliers" DROP COLUMN "contact_phone"`);
+    await queryRunner.query(
+      `ALTER TABLE "suppliers" DROP COLUMN "contact_name"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "suppliers" DROP COLUMN "contact_email"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "suppliers" DROP COLUMN "contact_phone"`,
+    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // 1. Add back columns to suppliers table
-    await queryRunner.query(`ALTER TABLE "suppliers" ADD COLUMN "contact_name" VARCHAR(100)`);
-    await queryRunner.query(`ALTER TABLE "suppliers" ADD COLUMN "contact_email" VARCHAR(150)`);
-    await queryRunner.query(`ALTER TABLE "suppliers" ADD COLUMN "contact_phone" VARCHAR(50)`);
+    await queryRunner.query(
+      `ALTER TABLE "suppliers" ADD COLUMN "contact_name" VARCHAR(100)`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "suppliers" ADD COLUMN "contact_email" VARCHAR(150)`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "suppliers" ADD COLUMN "contact_phone" VARCHAR(50)`,
+    );
 
     // 2. Restore data from supplier_contacts to suppliers
     await queryRunner.query(`

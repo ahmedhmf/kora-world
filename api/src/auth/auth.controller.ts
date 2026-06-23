@@ -10,9 +10,11 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { Response, Request } from 'express';
+import type { Response } from 'express';
 import { AuthGuard } from './auth.guard';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { LoginDto } from './dto/login.dto';
+import type { AuthenticatedRequest } from './interfaces/authenticated-request.interface';
 
 @Controller('auth')
 export class AuthController {
@@ -21,8 +23,8 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @Post('login')
   async login(
-    @Body() body: any,
-    @Res({ passthrough: true }) response: any,
+    @Body() body: LoginDto,
+    @Res({ passthrough: true }) response: Response,
   ) {
     const result = await this.authService.login(body.email, body.password);
 
@@ -41,7 +43,7 @@ export class AuthController {
 
   @HttpCode(HttpStatus.OK)
   @Post('logout')
-  async logout(@Res({ passthrough: true }) response: any) {
+  logout(@Res({ passthrough: true }) response: Response) {
     // Clear the JWT token cookie
     response.clearCookie('kora_token', {
       httpOnly: true,
@@ -53,7 +55,7 @@ export class AuthController {
 
   @UseGuards(AuthGuard)
   @Get('me')
-  async getMe(@Req() req: any) {
+  getMe(@Req() req: AuthenticatedRequest) {
     return {
       user: req.user,
     };
@@ -62,9 +64,16 @@ export class AuthController {
   @UseGuards(AuthGuard)
   @HttpCode(HttpStatus.OK)
   @Post('change-password')
-  async changePassword(@Req() req: any, @Body() dto: ChangePasswordDto) {
+  async changePassword(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: ChangePasswordDto,
+  ) {
     const userId = req.user.sub;
-    await this.authService.changePassword(userId, dto.currentPassword, dto.newPassword);
+    await this.authService.changePassword(
+      userId,
+      dto.currentPassword,
+      dto.newPassword,
+    );
     return { success: true };
   }
 }

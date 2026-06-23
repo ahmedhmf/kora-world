@@ -37,10 +37,7 @@ export class ContactsController {
   }
 
   @Put(':id')
-  update(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() dto: UpdateContactDto,
-  ) {
+  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateContactDto) {
     return this.contactsService.update(id, dto);
   }
 

@@ -1,12 +1,29 @@
-import { Injectable, Inject, forwardRef, NotFoundException } from '@nestjs/common';
+import { Injectable, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AccountingService } from './accounting.service';
 import { JournalLine } from './entities/journal-line.entity';
-import { AccountingAccount, AccountType } from './entities/accounting-account.entity';
+import {
+  AccountingAccount,
+  AccountType,
+} from './entities/accounting-account.entity';
 import { InvoicesService } from '../invoices/invoices.service';
 import { PaymentsService } from '../payments/payments.service';
-import { InvoiceType, InvoiceStatus } from '../invoices/entities/invoice.entity';
+import {
+  InvoiceType,
+  InvoiceStatus,
+} from '../invoices/entities/invoice.entity';
+
+interface OutstandingInvoice {
+  id: number;
+  number: string;
+  date: Date | string;
+  dueDate: Date | string;
+  total: number;
+  paid: number;
+  outstanding: number;
+  currency: string;
+}
 
 @Injectable()
 export class ReportsService {
@@ -39,12 +56,15 @@ export class ReportsService {
     const formattedEndDate = new Date(endDate).toISOString().split('T')[0];
     const targetCurrency = currency ? currency.toUpperCase() : 'EGP';
 
-    const lines = await this.lineRepo.createQueryBuilder('line')
+    const lines = await this.lineRepo
+      .createQueryBuilder('line')
       .innerJoinAndSelect('line.journalEntry', 'entry')
       .innerJoinAndSelect('line.account', 'account')
       .where('entry.date >= :startDate', { startDate: formattedStartDate })
       .andWhere('entry.date <= :endDate', { endDate: formattedEndDate })
-      .andWhere('account.type IN (:...types)', { types: [AccountType.REVENUE, AccountType.EXPENSE] })
+      .andWhere('account.type IN (:...types)', {
+        types: [AccountType.REVENUE, AccountType.EXPENSE],
+      })
       .getMany();
 
     const revenueMap = new Map<string, { name: string; amountBase: number }>();
@@ -57,14 +77,24 @@ export class ReportsService {
       const amountBase = Number(line.amountBase || 0); // amountBase is debit - credit
 
       if (acc.type === AccountType.REVENUE) {
-        const existing = revenueMap.get(code) || { name: acc.name, amountBase: 0 };
+        const existing = revenueMap.get(code) || {
+          name: acc.name,
+          amountBase: 0,
+        };
         // Revenue increases with Credit (amountBase is negative for credit), so subtract amountBase to get positive revenue
-        existing.amountBase = Number((existing.amountBase - amountBase).toFixed(2));
+        existing.amountBase = Number(
+          (existing.amountBase - amountBase).toFixed(2),
+        );
         revenueMap.set(code, existing);
       } else {
-        const existing = expenseMap.get(code) || { name: acc.name, amountBase: 0 };
+        const existing = expenseMap.get(code) || {
+          name: acc.name,
+          amountBase: 0,
+        };
         // Expense increases with Debit (amountBase is positive for debit), so add amountBase
-        existing.amountBase = Number((existing.amountBase + amountBase).toFixed(2));
+        existing.amountBase = Number(
+          (existing.amountBase + amountBase).toFixed(2),
+        );
         expenseMap.set(code, existing);
       }
     }
@@ -73,15 +103,23 @@ export class ReportsService {
     const convert = async (egpAmt: number): Promise<number> => {
       if (targetCurrency === 'EGP') return egpAmt;
       try {
-        const rate = await this.accountingService.getExchangeRate('EGP', targetCurrency, endDate);
+        const rate = await this.accountingService.getExchangeRate(
+          'EGP',
+          targetCurrency,
+          endDate,
+        );
         return Number((egpAmt * rate).toFixed(2));
-      } catch (err) {
+      } catch {
         // Fallback to 1.0 if exchange rate cannot be resolved
         return egpAmt;
       }
     };
 
-    const revenueList: any[] = [];
+    const revenueList: Array<{
+      code: string;
+      name: string;
+      amount: number;
+    }> = [];
     let totalRevenue = 0;
     for (const [code, val] of revenueMap.entries()) {
       const amount = await convert(val.amountBase);
@@ -89,7 +127,11 @@ export class ReportsService {
       totalRevenue += amount;
     }
 
-    const expenseList: any[] = [];
+    const expenseList: Array<{
+      code: string;
+      name: string;
+      amount: number;
+    }> = [];
     let totalExpenses = 0;
     let totalCOGS = 0;
     for (const [code, val] of expenseMap.entries()) {
@@ -130,25 +172,41 @@ export class ReportsService {
     const balances = new Map<number, number>();
 
     // Initialize all account balances to 0
-    accounts.forEach(acc => balances.set(acc.id, 0));
+    accounts.forEach((acc) => balances.set(acc.id, 0));
 
-    const lines = await this.lineRepo.createQueryBuilder('line')
+    const lines = (await this.lineRepo
+      .createQueryBuilder('line')
       .innerJoin('line.journalEntry', 'entry')
       .select('line.accountId', 'accountId')
       .addSelect('SUM(line.amount_base)', 'totalAmountBase')
       .where('entry.date <= :asOfDate', { asOfDate: formattedAsOf })
       .groupBy('line.accountId')
-      .getRawMany();
+      .getRawMany()) as unknown as Array<{
+      accountId: string;
+      totalAmountBase: string;
+    }>;
 
-    lines.forEach(row => {
+    lines.forEach((row) => {
       const accId = parseInt(row.accountId);
       const amtBase = parseFloat(row.totalAmountBase) || 0;
       balances.set(accId, Number(amtBase.toFixed(2))); // balance in base currency (EGP)
     });
 
-    const assetsList: any[] = [];
-    const liabilitiesList: any[] = [];
-    const equityList: any[] = [];
+    const assetsList: Array<{
+      code: string;
+      name: string;
+      balance: number;
+    }> = [];
+    const liabilitiesList: Array<{
+      code: string;
+      name: string;
+      balance: number;
+    }> = [];
+    const equityList: Array<{
+      code: string;
+      name: string;
+      balance: number;
+    }> = [];
 
     let totalAssets = 0;
     let totalLiabilities = 0;
@@ -181,8 +239,12 @@ export class ReportsService {
     totalLiabilities = Number(totalLiabilities.toFixed(2));
     totalEquity = Number(totalEquity.toFixed(2));
 
-    const liabilitiesAndEquity = Number((totalLiabilities + totalEquity).toFixed(2));
-    const difference = Number(Math.abs(totalAssets - liabilitiesAndEquity).toFixed(2));
+    const liabilitiesAndEquity = Number(
+      (totalLiabilities + totalEquity).toFixed(2),
+    );
+    const difference = Number(
+      Math.abs(totalAssets - liabilitiesAndEquity).toFixed(2),
+    );
     const isBalanced = difference <= 0.02;
 
     return {
@@ -201,21 +263,26 @@ export class ReportsService {
   async getCashFlow(
     startDate: string,
     endDate: string,
-  ): Promise<Array<{
-    period: string; // YYYY-MM
-    inflows: number;
-    outflows: number;
-    netChange: number;
-  }>> {
+  ): Promise<
+    Array<{
+      period: string; // YYYY-MM
+      inflows: number;
+      outflows: number;
+      netChange: number;
+    }>
+  > {
     const formattedStartDate = new Date(startDate).toISOString().split('T')[0];
     const formattedEndDate = new Date(endDate).toISOString().split('T')[0];
 
-    const lines = await this.lineRepo.createQueryBuilder('line')
+    const lines = await this.lineRepo
+      .createQueryBuilder('line')
       .innerJoinAndSelect('line.journalEntry', 'entry')
       .innerJoinAndSelect('line.account', 'account')
       .where('entry.date >= :startDate', { startDate: formattedStartDate })
       .andWhere('entry.date <= :endDate', { endDate: formattedEndDate })
-      .andWhere('account.code IN (:...codes)', { codes: ['1101', '1102', '1103'] })
+      .andWhere('account.code IN (:...codes)', {
+        codes: ['1101', '1102', '1103'],
+      })
       .orderBy('entry.date', 'ASC')
       .getMany();
 
@@ -224,9 +291,9 @@ export class ReportsService {
     for (const line of lines) {
       const entryDate = new Date(line.journalEntry.date);
       const period = `${entryDate.getFullYear()}-${String(entryDate.getMonth() + 1).padStart(2, '0')}`;
-      
+
       const existing = monthlyMap.get(period) || { inflows: 0, outflows: 0 };
-      
+
       const debit = Number(line.debit);
       const credit = Number(line.credit);
 
@@ -234,11 +301,16 @@ export class ReportsService {
       // Credit to bank account = cash outflow
       existing.inflows = Number((existing.inflows + debit).toFixed(2));
       existing.outflows = Number((existing.outflows + credit).toFixed(2));
-      
+
       monthlyMap.set(period, existing);
     }
 
-    const result: any[] = [];
+    const result: Array<{
+      period: string;
+      inflows: number;
+      outflows: number;
+      netChange: number;
+    }> = [];
     for (const [period, val] of monthlyMap.entries()) {
       result.push({
         period,
@@ -252,43 +324,60 @@ export class ReportsService {
   }
 
   // 4. Accounts Payable Report
-  async getAccountsPayable(): Promise<Array<{
-    supplierId: number;
-    supplierName: string;
-    totalOutstanding: number;
-    invoices: Array<{
-      id: number;
-      number: string;
-      date: Date | string;
-      dueDate: Date | string;
-      total: number;
-      paid: number;
-      outstanding: number;
-      currency: string;
-    }>;
-  }>> {
+  async getAccountsPayable(): Promise<
+    Array<{
+      supplierId: number;
+      supplierName: string;
+      totalOutstanding: number;
+      invoices: Array<{
+        id: number;
+        number: string;
+        date: Date | string;
+        dueDate: Date | string;
+        total: number;
+        paid: number;
+        outstanding: number;
+        currency: string;
+      }>;
+    }>
+  > {
     const invoices = await this.invoicesService.findAll();
     const payments = await this.paymentsService.findAll();
 
     const incoming = invoices.filter(
-      inv => inv.type === InvoiceType.INCOMING && inv.status !== InvoiceStatus.PAID && inv.status !== InvoiceStatus.CANCELLED
+      (inv) =>
+        inv.type === InvoiceType.INCOMING &&
+        inv.status !== InvoiceStatus.PAID &&
+        inv.status !== InvoiceStatus.CANCELLED,
     );
 
-    const supplierMap = new Map<number, { name: string; invoices: any[]; totalOutstandingEgp: number }>();
+    const supplierMap = new Map<
+      number,
+      {
+        name: string;
+        invoices: OutstandingInvoice[];
+        totalOutstandingEgp: number;
+      }
+    >();
 
     for (const inv of incoming) {
       const supplierId = inv.supplierId || 0;
-      const supplierName = inv.supplier?.name || inv.customerName || 'Unknown Supplier';
+      const supplierName =
+        inv.supplier?.name || inv.customerName || 'Unknown Supplier';
 
       // Sum payments for this invoice
-      const invPayments = payments.filter(p => p.invoiceId === inv.id);
+      const invPayments = payments.filter((p) => p.invoiceId === inv.id);
       let totalPaid = 0;
       for (const p of invPayments) {
         if (p.currency.toUpperCase() === inv.currency.toUpperCase()) {
           totalPaid += p.amount;
         } else {
           // simple convert
-          const rate = await this.accountingService.getExchangeRate(p.currency, inv.currency, p.date);
+          const rate = await this.accountingService.getExchangeRate(
+            p.currency,
+            inv.currency,
+            p.date,
+          );
           totalPaid += p.amount * rate;
         }
       }
@@ -297,10 +386,18 @@ export class ReportsService {
 
       if (outstanding <= 0) continue;
 
-      const existing = supplierMap.get(supplierId) || { name: supplierName, invoices: [], totalOutstandingEgp: 0 };
-      
+      const existing = supplierMap.get(supplierId) || {
+        name: supplierName,
+        invoices: [],
+        totalOutstandingEgp: 0,
+      };
+
       // Calculate outstanding in EGP for supplier total aggregation
-      const rateToEgp = await this.accountingService.getExchangeRate(inv.currency, 'EGP', inv.date);
+      const rateToEgp = await this.accountingService.getExchangeRate(
+        inv.currency,
+        'EGP',
+        inv.date,
+      );
       const outstandingEgp = Number((outstanding * rateToEgp).toFixed(2));
 
       existing.invoices.push({
@@ -314,11 +411,18 @@ export class ReportsService {
         currency: inv.currency,
       });
 
-      existing.totalOutstandingEgp = Number((existing.totalOutstandingEgp + outstandingEgp).toFixed(2));
+      existing.totalOutstandingEgp = Number(
+        (existing.totalOutstandingEgp + outstandingEgp).toFixed(2),
+      );
       supplierMap.set(supplierId, existing);
     }
 
-    const result: any[] = [];
+    const result: Array<{
+      supplierId: number;
+      supplierName: string;
+      totalOutstanding: number;
+      invoices: OutstandingInvoice[];
+    }> = [];
     for (const [supplierId, val] of supplierMap.entries()) {
       result.push({
         supplierId,
@@ -332,40 +436,52 @@ export class ReportsService {
   }
 
   // 5. Accounts Receivable Report
-  async getAccountsReceivable(): Promise<Array<{
-    customerName: string;
-    totalOutstanding: number;
-    invoices: Array<{
-      id: number;
-      number: string;
-      date: Date | string;
-      dueDate: Date | string;
-      total: number;
-      paid: number;
-      outstanding: number;
-      currency: string;
-    }>;
-  }>> {
+  async getAccountsReceivable(): Promise<
+    Array<{
+      customerName: string;
+      totalOutstanding: number;
+      invoices: Array<{
+        id: number;
+        number: string;
+        date: Date | string;
+        dueDate: Date | string;
+        total: number;
+        paid: number;
+        outstanding: number;
+        currency: string;
+      }>;
+    }>
+  > {
     const invoices = await this.invoicesService.findAll();
     const payments = await this.paymentsService.findAll();
 
     const outgoing = invoices.filter(
-      inv => inv.type === InvoiceType.OUTGOING && inv.status !== InvoiceStatus.PAID && inv.status !== InvoiceStatus.CANCELLED
+      (inv) =>
+        inv.type === InvoiceType.OUTGOING &&
+        inv.status !== InvoiceStatus.PAID &&
+        inv.status !== InvoiceStatus.CANCELLED,
     );
 
-    const customerMap = new Map<string, { invoices: any[]; totalOutstandingEgp: number }>();
+    const customerMap = new Map<
+      string,
+      { invoices: OutstandingInvoice[]; totalOutstandingEgp: number }
+    >();
 
     for (const inv of outgoing) {
       const customerName = inv.customerName || 'Unknown Customer';
 
       // Sum payments for this invoice
-      const invPayments = payments.filter(p => p.invoiceId === inv.id);
+      const invPayments = payments.filter((p) => p.invoiceId === inv.id);
       let totalPaid = 0;
       for (const p of invPayments) {
         if (p.currency.toUpperCase() === inv.currency.toUpperCase()) {
           totalPaid += p.amount;
         } else {
-          const rate = await this.accountingService.getExchangeRate(p.currency, inv.currency, p.date);
+          const rate = await this.accountingService.getExchangeRate(
+            p.currency,
+            inv.currency,
+            p.date,
+          );
           totalPaid += p.amount * rate;
         }
       }
@@ -374,9 +490,16 @@ export class ReportsService {
 
       if (outstanding <= 0) continue;
 
-      const existing = customerMap.get(customerName) || { invoices: [], totalOutstandingEgp: 0 };
-      
-      const rateToEgp = await this.accountingService.getExchangeRate(inv.currency, 'EGP', inv.date);
+      const existing = customerMap.get(customerName) || {
+        invoices: [],
+        totalOutstandingEgp: 0,
+      };
+
+      const rateToEgp = await this.accountingService.getExchangeRate(
+        inv.currency,
+        'EGP',
+        inv.date,
+      );
       const outstandingEgp = Number((outstanding * rateToEgp).toFixed(2));
 
       existing.invoices.push({
@@ -390,11 +513,17 @@ export class ReportsService {
         currency: inv.currency,
       });
 
-      existing.totalOutstandingEgp = Number((existing.totalOutstandingEgp + outstandingEgp).toFixed(2));
+      existing.totalOutstandingEgp = Number(
+        (existing.totalOutstandingEgp + outstandingEgp).toFixed(2),
+      );
       customerMap.set(customerName, existing);
     }
 
-    const result: any[] = [];
+    const result: Array<{
+      customerName: string;
+      totalOutstanding: number;
+      invoices: OutstandingInvoice[];
+    }> = [];
     for (const [customerName, val] of customerMap.entries()) {
       result.push({
         customerName,

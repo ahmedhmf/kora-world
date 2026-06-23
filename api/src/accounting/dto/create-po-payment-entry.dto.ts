@@ -1,4 +1,11 @@
-import { IsInt, IsNotEmpty, IsNumber, IsString, Min, Length } from 'class-validator';
+import {
+  IsInt,
+  IsNotEmpty,
+  IsNumber,
+  IsString,
+  Min,
+  Length,
+} from 'class-validator';
 
 export class CreatePOPaymentEntryDto {
   @IsInt()

@@ -40,7 +40,12 @@ export class Invoice {
   @Column({ type: 'integer', name: 'supplier_id', nullable: true })
   supplierId?: number | null;
 
-  @Column({ type: 'varchar', name: 'customer_name', length: 150, nullable: true })
+  @Column({
+    type: 'varchar',
+    name: 'customer_name',
+    length: 150,
+    nullable: true,
+  })
   customerName?: string | null;
 
   @Column({ type: 'date' })
@@ -63,7 +68,7 @@ export class Invoice {
     type: 'numeric',
     precision: 12,
     scale: 2,
-    default: 0.00,
+    default: 0.0,
     transformer: {
       to: (value: number) => value,
       from: (value: string) => parseFloat(value) || 0,
@@ -75,7 +80,7 @@ export class Invoice {
     type: 'numeric',
     precision: 12,
     scale: 2,
-    default: 0.00,
+    default: 0.0,
     transformer: {
       to: (value: number) => value,
       from: (value: string) => parseFloat(value) || 0,
@@ -87,7 +92,7 @@ export class Invoice {
     type: 'numeric',
     precision: 12,
     scale: 2,
-    default: 0.00,
+    default: 0.0,
     transformer: {
       to: (value: number) => value,
       from: (value: string) => parseFloat(value) || 0,

@@ -19,6 +19,7 @@ import { UpdatePurchaseOrderDto } from './dto/update-purchase-order.dto';
 import { AuthGuard } from '../auth/auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import type { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
 
 @Controller('purchase-orders')
 @UseGuards(AuthGuard, RolesGuard)
@@ -26,19 +27,24 @@ export class PurchaseOrdersController {
   constructor(private readonly purchaseOrdersService: PurchaseOrdersService) {}
 
   @Get()
-  findAll(@Req() req: any) {
+  findAll(@Req() req: AuthenticatedRequest) {
     let supplierId: number | undefined;
     if (req.user.role === 'supplier') {
-      supplierId = req.user.supplierId;
+      supplierId = req.user.supplierId ?? undefined;
     }
     return this.purchaseOrdersService.findAll(supplierId);
   }
 
   @Get(':id')
-  async findOne(@Req() req: any, @Param('id', ParseIntPipe) id: number) {
+  async findOne(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
     const po = await this.purchaseOrdersService.findOne(id);
     if (req.user.role === 'supplier' && po.supplierId !== req.user.supplierId) {
-      throw new ForbiddenException('You do not have permission to view this purchase order');
+      throw new ForbiddenException(
+        'You do not have permission to view this purchase order',
+      );
     }
     return po;
   }

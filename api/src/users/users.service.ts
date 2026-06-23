@@ -7,6 +7,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
 import { hashPassword, verifyPassword } from '../auth/crypto-auth.helper';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 
 @Injectable()
 export class UsersService {
@@ -56,7 +58,7 @@ export class UsersService {
     return user;
   }
 
-  async create(dto: any): Promise<User> {
+  async create(dto: CreateUserDto): Promise<User> {
     const email = dto.email.toLowerCase().trim();
     const existing = await this.findByEmail(email);
     if (existing) {
@@ -83,7 +85,7 @@ export class UsersService {
     return saved;
   }
 
-  async update(id: number, dto: any): Promise<User> {
+  async update(id: number, dto: UpdateUserDto): Promise<User> {
     const user = await this.usersRepository.findOneBy({ id });
     if (!user) {
       throw new NotFoundException(`User with ID ${id} not found`);
@@ -137,7 +139,11 @@ export class UsersService {
     await this.usersRepository.remove(user);
   }
 
-  async updatePassword(id: number, currentPass: string, newPass: string): Promise<void> {
+  async updatePassword(
+    id: number,
+    currentPass: string,
+    newPass: string,
+  ): Promise<void> {
     const user = await this.usersRepository.findOne({
       where: { id },
       select: {

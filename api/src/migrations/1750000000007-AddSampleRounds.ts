@@ -19,9 +19,7 @@ export class AddSampleRounds1750000000007 implements MigrationInterface {
     await queryRunner.query(
       `ALTER TABLE "samples" DROP CONSTRAINT "FK_samples_parent_sample"`,
     );
-    await queryRunner.query(
-      `ALTER TABLE "samples" DROP COLUMN "round_number"`,
-    );
+    await queryRunner.query(`ALTER TABLE "samples" DROP COLUMN "round_number"`);
     await queryRunner.query(
       `ALTER TABLE "samples" DROP COLUMN "parent_sample_id"`,
     );

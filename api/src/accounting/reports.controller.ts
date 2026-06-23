@@ -20,7 +20,9 @@ export class ReportsController {
     @Query('currency') currency?: string,
   ) {
     if (!startDate || !endDate) {
-      throw new BadRequestException('startDate and endDate query parameters are required');
+      throw new BadRequestException(
+        'startDate and endDate query parameters are required',
+      );
     }
     return this.reportsService.getProfitAndLoss(startDate, endDate, currency);
   }
@@ -39,7 +41,9 @@ export class ReportsController {
     @Query('endDate') endDate: string,
   ) {
     if (!startDate || !endDate) {
-      throw new BadRequestException('startDate and endDate query parameters are required');
+      throw new BadRequestException(
+        'startDate and endDate query parameters are required',
+      );
     }
     return this.reportsService.getCashFlow(startDate, endDate);
   }

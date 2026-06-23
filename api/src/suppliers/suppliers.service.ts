@@ -7,6 +7,16 @@ import { UpdateSupplierDto } from './dto/update-supplier.dto';
 
 import { SupplierContact } from './entities/supplier-contact.entity';
 
+interface ContactUpdate {
+  id?: number;
+  name?: string;
+  email?: string;
+  phone?: string;
+  role?: string;
+  sendInfo?: boolean;
+  sendPo?: boolean;
+}
+
 @Injectable()
 export class SuppliersService {
   constructor(
@@ -43,13 +53,16 @@ export class SuppliersService {
     if (contacts) {
       // Map contacts array for update/insert/delete cascading
       supplier.contacts = contacts.map((c) => {
-        const existing = supplier.contacts?.find((ec) => ec.id === (c as any).id);
+        const contactUpdate = c as ContactUpdate;
+        const existing = supplier.contacts?.find(
+          (ec) => ec.id === contactUpdate.id,
+        );
         if (existing) {
-          Object.assign(existing, c);
+          Object.assign(existing, contactUpdate);
           return existing;
         } else {
           const newContact = new SupplierContact();
-          Object.assign(newContact, c);
+          Object.assign(newContact, contactUpdate);
           return newContact;
         }
       });

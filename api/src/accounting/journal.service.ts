@@ -1,10 +1,16 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AccountingService } from './accounting.service';
-import { JournalEntry, JournalEntryType } from './entities/journal-entry.entity';
+import {
+  JournalEntry,
+  JournalEntryType,
+} from './entities/journal-entry.entity';
 import { JournalLine } from './entities/journal-line.entity';
-import { AccountingAccount, AccountType } from './entities/accounting-account.entity';
+import {
+  AccountingAccount,
+  AccountType,
+} from './entities/accounting-account.entity';
 import { CreateJournalEntryDto } from './dto/create-journal-entry.dto';
 
 @Injectable()
@@ -31,16 +37,22 @@ export class JournalService {
     bankAccountId: number,
   ): Promise<JournalEntry> {
     // Validate bank account exists and is active
-    const bankAccount = await this.accountRepo.findOne({ where: { id: bankAccountId } });
+    const bankAccount = await this.accountRepo.findOne({
+      where: { id: bankAccountId },
+    });
     if (!bankAccount) {
-      throw new NotFoundException(`Bank account with ID ${bankAccountId} not found`);
+      throw new NotFoundException(
+        `Bank account with ID ${bankAccountId} not found`,
+      );
     }
 
     // Resolve Accounts Payable
     const accounts = await this.accountingService.findAllAccounts();
-    const apAccount = accounts.find(a => a.code === '2100');
+    const apAccount = accounts.find((a) => a.code === '2100');
     if (!apAccount) {
-      throw new NotFoundException('Accounts Payable (code 2100) not found. Please seed accounts.');
+      throw new NotFoundException(
+        'Accounts Payable (code 2100) not found. Please seed accounts.',
+      );
     }
 
     const currUpper = currency.toUpperCase();
@@ -78,11 +90,13 @@ export class JournalService {
   ): Promise<JournalEntry> {
     // Resolve Inventory (1300) and Accounts Payable (2100)
     const accounts = await this.accountingService.findAllAccounts();
-    const inventoryAccount = accounts.find(a => a.code === '1300');
-    const apAccount = accounts.find(a => a.code === '2100');
+    const inventoryAccount = accounts.find((a) => a.code === '1300');
+    const apAccount = accounts.find((a) => a.code === '2100');
 
     if (!inventoryAccount || !apAccount) {
-      throw new NotFoundException('Inventory (code 1300) or Accounts Payable (code 2100) not found. Please seed accounts.');
+      throw new NotFoundException(
+        'Inventory (code 1300) or Accounts Payable (code 2100) not found. Please seed accounts.',
+      );
     }
 
     const currUpper = currency.toUpperCase();
@@ -123,27 +137,39 @@ export class JournalService {
     rawBalance: number;
     balance: number;
   }> {
-    const account = await this.accountRepo.findOne({ where: { id: accountId } });
+    const account = await this.accountRepo.findOne({
+      where: { id: accountId },
+    });
     if (!account) {
       throw new NotFoundException(`Account with ID ${accountId} not found`);
     }
 
-    const query = this.lineRepo.createQueryBuilder('line')
+    const query = this.lineRepo
+      .createQueryBuilder('line')
       .innerJoin('line.journalEntry', 'entry')
       .select('SUM(line.debit)', 'totalDebit')
       .addSelect('SUM(line.credit)', 'totalCredit')
       .where('line.accountId = :accountId', { accountId });
 
     if (startDate) {
-      query.andWhere('entry.date >= :startDate', { startDate: new Date(startDate).toISOString().split('T')[0] });
+      query.andWhere('entry.date >= :startDate', {
+        startDate: new Date(startDate).toISOString().split('T')[0],
+      });
     }
     if (endDate) {
-      query.andWhere('entry.date <= :endDate', { endDate: new Date(endDate).toISOString().split('T')[0] });
+      query.andWhere('entry.date <= :endDate', {
+        endDate: new Date(endDate).toISOString().split('T')[0],
+      });
     }
 
-    const result = await query.getRawOne();
-    const totalDebit = parseFloat(result?.totalDebit) || 0;
-    const totalCredit = parseFloat(result?.totalCredit) || 0;
+    const result = (await query.getRawOne()) as unknown as
+      | {
+          totalDebit?: string | null;
+          totalCredit?: string | null;
+        }
+      | undefined;
+    const totalDebit = parseFloat(result?.totalDebit ?? '0') || 0;
+    const totalCredit = parseFloat(result?.totalCredit ?? '0') || 0;
 
     // raw balance is debit - credit
     const rawBalance = Number((totalDebit - totalCredit).toFixed(2));
@@ -188,7 +214,9 @@ export class JournalService {
       runningBalance: number;
     }>;
   }> {
-    const account = await this.accountRepo.findOne({ where: { id: accountId } });
+    const account = await this.accountRepo.findOne({
+      where: { id: accountId },
+    });
     if (!account) {
       throw new NotFoundException(`Account with ID ${accountId} not found`);
     }
@@ -196,10 +224,13 @@ export class JournalService {
     // First fetch lines before the start date to calculate opening balance if startDate is specified
     let openingBalance = 0;
     if (startDate) {
-      const priorLines = await this.lineRepo.createQueryBuilder('line')
+      const priorLines = await this.lineRepo
+        .createQueryBuilder('line')
         .innerJoin('line.journalEntry', 'entry')
         .where('line.accountId = :accountId', { accountId })
-        .andWhere('entry.date < :startDate', { startDate: new Date(startDate).toISOString().split('T')[0] })
+        .andWhere('entry.date < :startDate', {
+          startDate: new Date(startDate).toISOString().split('T')[0],
+        })
         .getMany();
 
       for (const line of priorLines) {
@@ -208,23 +239,28 @@ export class JournalService {
     }
 
     // Fetch lines in range
-    const query = this.lineRepo.createQueryBuilder('line')
+    const query = this.lineRepo
+      .createQueryBuilder('line')
       .innerJoinAndSelect('line.journalEntry', 'entry')
       .where('line.accountId = :accountId', { accountId })
       .addOrderBy('entry.date', 'ASC')
       .addOrderBy('line.id', 'ASC');
 
     if (startDate) {
-      query.andWhere('entry.date >= :startDate', { startDate: new Date(startDate).toISOString().split('T')[0] });
+      query.andWhere('entry.date >= :startDate', {
+        startDate: new Date(startDate).toISOString().split('T')[0],
+      });
     }
     if (endDate) {
-      query.andWhere('entry.date <= :endDate', { endDate: new Date(endDate).toISOString().split('T')[0] });
+      query.andWhere('entry.date <= :endDate', {
+        endDate: new Date(endDate).toISOString().split('T')[0],
+      });
     }
 
     const lines = await query.getMany();
-    
+
     let currentBalance = openingBalance;
-    const ledgerLines = lines.map(line => {
+    const ledgerLines = lines.map((line) => {
       const debit = Number(line.debit);
       const credit = Number(line.credit);
       currentBalance = Number((currentBalance + debit - credit).toFixed(2));

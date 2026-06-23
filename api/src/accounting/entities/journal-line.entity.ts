@@ -23,7 +23,7 @@ export class JournalLine {
     type: 'numeric',
     precision: 12,
     scale: 2,
-    default: 0.00,
+    default: 0.0,
     transformer: {
       to: (value: number) => value,
       from: (value: string) => parseFloat(value) || 0,
@@ -35,7 +35,7 @@ export class JournalLine {
     type: 'numeric',
     precision: 12,
     scale: 2,
-    default: 0.00,
+    default: 0.0,
     transformer: {
       to: (value: number) => value,
       from: (value: string) => parseFloat(value) || 0,
@@ -51,7 +51,7 @@ export class JournalLine {
     type: 'numeric',
     precision: 12,
     scale: 6,
-    default: 1.000000,
+    default: 1.0,
     transformer: {
       to: (value: number) => value,
       from: (value: string) => parseFloat(value) || 1.0,
@@ -64,7 +64,7 @@ export class JournalLine {
     type: 'numeric',
     precision: 12,
     scale: 2,
-    default: 0.00,
+    default: 0.0,
     transformer: {
       to: (value: number) => value,
       from: (value: string) => parseFloat(value) || 0,
@@ -85,7 +85,9 @@ export class JournalLine {
   })
   amountEgp?: number;
 
-  @ManyToOne(() => JournalEntry, (entry) => entry.lines, { onDelete: 'CASCADE' })
+  @ManyToOne(() => JournalEntry, (entry) => entry.lines, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'journal_entry_id' })
   journalEntry: JournalEntry;
 

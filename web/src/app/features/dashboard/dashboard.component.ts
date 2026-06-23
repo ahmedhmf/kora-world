@@ -10,6 +10,7 @@ import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
+import { LucideAngularModule } from 'lucide-angular';
 
 interface TrackingTimeline {
   id: number;
@@ -29,142 +30,8 @@ interface TrackingTimeline {
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterLink, FormsModule],
-  template: `
-    <div class="p-8">
-      <div class="mb-8">
-        <h1 class="text-2xl font-bold text-white">Dashboard</h1>
-        <p class="text-zinc-400 text-sm mt-1">Welcome to Kora World</p>
-      </div>
-
-      <!-- Stats Grid -->
-      <div 
-        class="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-8"
-        [class.lg:grid-cols-3]="authService.currentUser()?.role === 'supplier'"
-        [class.lg:grid-cols-4]="authService.currentUser()?.role !== 'supplier'"
-      >
-        <!-- Suppliers -->
-        @if (authService.currentUser()?.role !== 'supplier') {
-          <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-            <p class="text-zinc-400 text-sm mb-1">Suppliers</p>
-            <p class="text-3xl font-bold text-white">{{ suppliersStore.totalSuppliers() }}</p>
-            <a routerLink="/suppliers" class="text-zinc-500 text-xs hover:text-zinc-300 mt-2 inline-block">View all →</a>
-          </div>
-        }
-
-        <!-- Products -->
-        <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-          <p class="text-zinc-400 text-sm mb-1">Products</p>
-          <p class="text-3xl font-bold text-white">{{ productsStore.totalProducts() }}</p>
-          <a routerLink="/products" class="text-zinc-500 text-xs hover:text-zinc-300 mt-2 inline-block">View all →</a>
-        </div>
-
-        <!-- Samples -->
-        <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-          <p class="text-zinc-400 text-sm mb-1">Samples</p>
-          <p class="text-3xl font-bold text-white">{{ samplesStore.totalSamples() }}</p>
-          <a routerLink="/samples" class="text-zinc-500 text-xs hover:text-zinc-300 mt-2 inline-block">View all →</a>
-        </div>
-
-        <!-- Purchase Orders -->
-        <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-          <p class="text-zinc-400 text-sm mb-1">Purchase Orders</p>
-          <p class="text-3xl font-bold text-white">{{ purchaseOrdersStore.totalOrders() }}</p>
-          <a routerLink="/purchase-orders" class="text-zinc-500 text-xs hover:text-zinc-300 mt-2 inline-block">View all →</a>
-        </div>
-      </div>
-
-      <!-- DHL Timelines Section -->
-      <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6 mb-8">
-        <h2 class="text-lg font-bold text-white mb-6 flex items-center space-x-2">
-          <span>✈️</span>
-          <span>Active DHL Shipments Timeline</span>
-        </h2>
-
-        @if (loadingTimelines()) {
-          <div class="text-zinc-500 text-sm py-8 text-center font-mono">Quiring DHL live tracking data...</div>
-        } @else if (timelines().length === 0) {
-          <div class="text-center py-10 bg-zinc-950/20 border border-dashed border-zinc-800 rounded-lg">
-            <p class="text-2xl mb-2">📦</p>
-            <p class="text-zinc-500 text-sm">No active DHL shipments currently in transit.</p>
-          </div>
-        } @else {
-          <div class="space-y-8">
-            @for (t of timelines(); track t.trackingNumber) {
-              <div class="bg-zinc-950/50 border border-zinc-800/80 rounded-xl p-5 space-y-4">
-                <!-- Timeline Header Info -->
-                <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-zinc-800/60 pb-3">
-                  <div>
-                    <span class="px-2 py-0.5 bg-yellow-950/50 text-yellow-400 border border-yellow-800/30 rounded text-[10px] font-bold tracking-wider mr-2 uppercase">DHL Express</span>
-                    
-                    @if (t.type === 'Purchase Order') {
-                      <a [routerLink]="['/purchase-orders', t.id]" class="text-white hover:text-yellow-400 font-semibold text-sm hover:underline transition-colors">
-                        {{ t.referenceName }}
-                      </a>
-                    } @else {
-                      <a [routerLink]="['/samples', t.id]" class="text-white hover:text-yellow-400 font-semibold text-sm hover:underline transition-colors">
-                        {{ t.referenceName }}
-                      </a>
-                    }
-                    
-                    <span class="text-zinc-500 text-xs ml-2">({{ t.type }})</span>
-                    <span class="ml-2 px-2 py-0.5 rounded text-[10px] font-bold tracking-wider capitalize border"
-                      [class.bg-emerald-950/50]="t.status === 'DELIVERED'"
-                      [class.text-emerald-400]="t.status === 'DELIVERED'"
-                      [class.border-emerald-900/30]="t.status === 'DELIVERED'"
-                      [class.bg-blue-950/50]="t.status !== 'DELIVERED'"
-                      [class.text-blue-400]="t.status !== 'DELIVERED'"
-                      [class.border-blue-900/30]="t.status !== 'DELIVERED'"
-                    >
-                      Status: {{ t.status }}
-                    </span>
-                  </div>
-                  <div class="text-xs sm:text-right">
-                    <span class="text-zinc-500">Tracking:</span>
-                    <span class="font-mono text-zinc-300 font-bold ml-1">{{ t.trackingNumber }}</span>
-                  </div>
-                </div>
-
-                <!-- Horizontal Process Flow -->
-                <div class="py-4">
-                  <!-- Stepper line container -->
-                  <div class="grid grid-cols-1 md:grid-cols-4 gap-4 relative">
-                    <!-- Connector line behind items -->
-                    <div class="hidden md:block absolute top-4 left-6 right-6 h-0.5 bg-zinc-800 z-0"></div>
-
-                    @for (step of getTimelineSteps(t); track step.code; let i = $index) {
-                      <div class="flex items-start md:flex-col md:items-center text-left md:text-center relative z-10 gap-3 md:gap-0">
-                        <!-- Step Bubble Icon -->
-                        <div 
-                          [class]="step.active ? 'bg-emerald-500 text-zinc-950 font-bold shadow-lg ring-4 ring-emerald-950/60' : 'bg-zinc-850 text-zinc-500 border border-zinc-700'" 
-                          class="w-8 h-8 rounded-full flex items-center justify-center text-xs flex-shrink-0 md:mb-3"
-                        >
-                          {{ step.icon }}
-                        </div>
-                        <!-- Step Description -->
-                        <div class="min-w-0">
-                          <p [class.text-white]="step.active" [class.text-zinc-500]="!step.active" class="font-semibold text-xs transition-colors">
-                            {{ step.title }}
-                          </p>
-                          <p class="text-[10px] text-zinc-500 mt-1 max-w-[150px] mx-auto md:line-clamp-2" [title]="step.desc || ''">
-                            {{ step.desc || 'Waiting...' }}
-                          </p>
-                          @if (step.timestamp) {
-                            <p class="text-[9px] text-zinc-600 font-mono mt-0.5">{{ step.timestamp | date:'dd MMM, hh:mm a' }}</p>
-                          }
-                        </div>
-                      </div>
-                    }
-                  </div>
-                </div>
-              </div>
-            }
-          </div>
-        }
-      </div>
-
-    </div>
-  `,
+  imports: [CommonModule, RouterLink, FormsModule, LucideAngularModule],
+  templateUrl: './dashboard.component.html',
 })
 export class DashboardComponent implements OnInit {
   readonly suppliersStore = inject(SuppliersStore);
@@ -284,7 +151,7 @@ export class DashboardComponent implements OnInit {
       {
         code: 'PICKED_UP',
         title: 'Picked Up',
-        icon: '📤',
+        icon: 'upload',
         active: !!pickedUp,
         timestamp: pickedUp?.timestamp || '',
         desc: pickedUp?.description || 'Package picked up by DHL',
@@ -292,7 +159,7 @@ export class DashboardComponent implements OnInit {
       {
         code: 'IN_TRANSIT',
         title: 'In Transit',
-        icon: '✈️',
+        icon: 'plane',
         active: !!inTransit,
         timestamp: inTransit?.timestamp || '',
         desc: inTransit?.description || 'In transit to destination',
@@ -300,7 +167,7 @@ export class DashboardComponent implements OnInit {
       {
         code: 'OUT_FOR_DELIVERY',
         title: 'Out for Delivery',
-        icon: '🚚',
+        icon: 'truck',
         active: !!outForDelivery,
         timestamp: outForDelivery?.timestamp || '',
         desc: outForDelivery?.description || 'Out for final delivery',
@@ -308,7 +175,7 @@ export class DashboardComponent implements OnInit {
       {
         code: 'DELIVERED',
         title: 'Delivered',
-        icon: '✅',
+        icon: 'check-circle',
         active: !!delivered,
         timestamp: delivered?.timestamp || '',
         desc: delivered?.description || 'Delivered & signed',

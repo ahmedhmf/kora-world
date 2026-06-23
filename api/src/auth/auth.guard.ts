@@ -5,8 +5,8 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Request } from 'express';
 import { verifyJwt } from './crypto-auth.helper';
+import { AuthenticatedRequest } from './interfaces/authenticated-request.interface';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -26,8 +26,8 @@ export class AuthGuard implements CanActivate {
     this.jwtSecret = secret || defaultSecret;
   }
 
-  async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest<Request>();
+  canActivate(context: ExecutionContext): boolean {
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const token = this.extractToken(request);
     if (!token) {
       throw new UnauthorizedException('Missing authentication token');
@@ -41,14 +41,14 @@ export class AuthGuard implements CanActivate {
     }
 
     // Attach user payload to request
-    request['user'] = payload;
+    request.user = payload;
     return true;
   }
 
-  private extractToken(request: Request): string | undefined {
+  private extractToken(request: AuthenticatedRequest): string | undefined {
     // 1. Try to read from cookies first (HttpOnly cookies)
     if (request.cookies && request.cookies['kora_token']) {
-      return request.cookies['kora_token'];
+      return request.cookies['kora_token'] as string;
     }
 
     // 2. Fall back to Authorization Bearer header

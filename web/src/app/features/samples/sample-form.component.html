@@ -1,0 +1,328 @@
+<div class="p-8 max-w-2xl">
+
+      <!-- Header -->
+      <div class="mb-8">
+        <a routerLink="/samples" class="text-zinc-500 hover:text-zinc-300 text-sm mb-4 inline-block">← Back to Samples</a>
+        <h1 class="text-2xl font-bold text-white">
+          {{ isEdit() ? 'Edit Sample' : 'New Sample' }}
+          @if (form.roundNumber && form.roundNumber > 1) {
+            <span class="ml-2 text-sm font-semibold bg-zinc-800 text-zinc-400 border border-zinc-700 px-2.5 py-0.5 rounded">
+              Round {{ form.roundNumber }}
+            </span>
+          }
+        </h1>
+        @if (form.parentSampleId) {
+          <div class="text-zinc-500 text-xs mt-2 select-none">
+            ← Next round of: <a [routerLink]="['/samples', form.parentSampleId]" class="text-zinc-400 hover:text-zinc-300 underline">Previous Round (Round {{ (form.roundNumber || 1) - 1 }})</a>
+          </div>
+        }
+      </div>
+
+      <!-- Error -->
+      @if (store.error()) {
+        <div class="bg-red-900/30 border border-red-800 text-red-300 px-4 py-3 rounded-lg mb-6 text-sm">
+          {{ store.error() }}
+        </div>
+      }
+
+      <form #sampleForm="ngForm" (ngSubmit)="sampleForm.valid && submit()" class="space-y-5">
+        
+        <!-- Article Number (Read-only, Edit Mode Only) -->
+        @if (isEdit() && form.articleNumber) {
+          <div class="bg-zinc-900 border border-zinc-800 rounded-lg p-4 flex items-center justify-between text-sm mb-4">
+            <div>
+              <span class="block text-zinc-500 font-medium mb-0.5">Article Number</span>
+              <span class="text-white font-bold font-mono tracking-wider text-base">{{ form.articleNumber }}</span>
+            </div>
+            <span class="text-[10px] uppercase bg-zinc-800 text-zinc-400 border border-zinc-700 px-2.5 py-0.5 rounded font-semibold tracking-wider select-none">
+              Auto-Generated
+            </span>
+          </div>
+        }
+
+        <div class="grid grid-cols-2 gap-5">
+
+          <!-- Supplier (Required) -->
+          <div class="col-span-2">
+            <label class="block text-sm font-medium text-zinc-400 mb-1.5">Supplier *</label>
+            <select
+              [(ngModel)]="form.supplierId" name="supplierId" required #supplierInput="ngModel"
+              class="w-full bg-zinc-900 border rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-zinc-500"
+              [class.border-zinc-700]="!supplierInput.invalid || (!supplierInput.dirty && !supplierInput.touched)"
+              [class.border-red-500]="supplierInput.invalid && (supplierInput.dirty || supplierInput.touched)"
+            >
+              <option [ngValue]="0" disabled>Select a supplier</option>
+              @for (s of suppliersStore.suppliers(); track s.id) {
+                <option [ngValue]="s.id">{{ s.name }}</option>
+              }
+            </select>
+            @if (supplierInput.invalid && (supplierInput.dirty || supplierInput.touched)) {
+              <p class="text-red-500 text-xs mt-1.5">Supplier is required</p>
+            }
+          </div>
+
+          <!-- Name / Label (Required) -->
+          <div class="col-span-2">
+            <label class="block text-sm font-medium text-zinc-400 mb-1.5">Sample Name / Title *</label>
+            <input
+              [(ngModel)]="form.name" name="name" required #nameInput="ngModel"
+              class="w-full bg-zinc-900 border rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
+              [class.border-zinc-700]="!nameInput.invalid || (!nameInput.dirty && !nameInput.touched)"
+              [class.border-red-500]="nameInput.invalid && (nameInput.dirty || nameInput.touched)"
+              placeholder="e.g. Match Ball V2 - Latex Bladder Test"
+            />
+            @if (nameInput.invalid && (nameInput.dirty || nameInput.touched)) {
+              <p class="text-red-500 text-xs mt-1.5">Sample Name is required</p>
+            }
+          </div>
+
+          <!-- Collection, Year, Category and Preview (Create Mode Only) -->
+          @if (!isEdit()) {
+            <div>
+              <label class="block text-sm font-medium text-zinc-400 mb-1.5">Collection *</label>
+              <select
+                [(ngModel)]="form.collection" name="collection" required
+                (change)="updateArticleNumberPreview()"
+                class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-zinc-500"
+              >
+                <option value="" disabled>Select collection</option>
+                <option value="SS">SS (Spring/Summer)</option>
+                <option value="FW">FW (Fall/Winter)</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-zinc-400 mb-1.5">Year *</label>
+              <input
+                [(ngModel)]="form.year" name="year" type="number" required
+                (input)="updateArticleNumberPreview()"
+                class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
+                placeholder="e.g. 2026"
+              />
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-zinc-400 mb-1.5">Category *</label>
+              <select
+                [(ngModel)]="form.category" name="category" required
+                (change)="updateArticleNumberPreview()"
+                class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-zinc-500"
+              >
+                <option [ngValue]="undefined" disabled>Select category</option>
+                <option value="football">Football</option>
+                <option value="handball">Handball</option>
+                <option value="lifestyle">Lifestyle</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-zinc-400 mb-1.5">Article Number Preview</label>
+              <input
+                [value]="articleNumberPreview()"
+                readonly
+                disabled
+                class="w-full bg-zinc-950 border border-zinc-800 text-zinc-400 rounded-lg px-4 py-2.5 text-sm select-all"
+              />
+            </div>
+          } @else {
+            <div>
+              <label class="block text-sm font-medium text-zinc-400 mb-1.5">Category</label>
+              <select
+                [(ngModel)]="form.category" name="category" disabled
+                class="w-full bg-zinc-950 border border-zinc-800 text-zinc-400 rounded-lg px-4 py-2.5 text-sm focus:outline-none"
+              >
+                <option [ngValue]="undefined">Select category</option>
+                <option value="football">Football</option>
+                <option value="handball">Handball</option>
+                <option value="lifestyle">Lifestyle</option>
+              </select>
+            </div>
+          }
+
+          <!-- Status (Required) -->
+          <div>
+            <label class="block text-sm font-medium text-zinc-400 mb-1.5">Status *</label>
+            <select
+              [(ngModel)]="form.status" name="status" required #statusInput="ngModel"
+              class="w-full bg-zinc-900 border rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-zinc-500"
+              [class.border-zinc-700]="!statusInput.invalid || (!statusInput.dirty && !statusInput.touched)"
+              [class.border-red-500]="statusInput.invalid && (statusInput.dirty || statusInput.touched)"
+            >
+              <option value="requested">Requested</option>
+              <option value="shipped">Shipped</option>
+              <option value="received">Received</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+            </select>
+            @if (statusInput.invalid && (statusInput.dirty || statusInput.touched)) {
+              <p class="text-red-500 text-xs mt-1.5">Status is required</p>
+            }
+          </div>
+
+          <!-- Carrier (Optional) -->
+          <div>
+            <label class="block text-sm font-medium text-zinc-400 mb-1.5">Carrier</label>
+            <input
+              type="text"
+              [(ngModel)]="form.carrier" name="carrier"
+              placeholder="e.g. DHL, Fedex, UPS"
+              class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
+            />
+          </div>
+
+          <!-- Tracking Number (Optional) -->
+          <div>
+            <label class="block text-sm font-medium text-zinc-400 mb-1.5">Tracking Number</label>
+            <input
+              type="text"
+              [(ngModel)]="form.trackingNumber" name="trackingNumber"
+              placeholder="e.g. 1Z999AA10123456784"
+              class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
+            />
+          </div>
+
+          <!-- Comments (Optional) -->
+          <div class="col-span-2">
+            <label class="block text-sm font-medium text-zinc-400 mb-1.5">Comments / Evaluation Notes</label>
+            <textarea
+              [(ngModel)]="form.comments" name="comments" rows="3"
+              class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600 resize-none"
+              placeholder="Record feedback, test performance, or reasons for approval/rejection..."
+            ></textarea>
+          </div>
+
+          <!-- Tech Pack File (Optional) -->
+          <div class="col-span-2 border-t border-zinc-800 pt-5 mt-2">
+            <app-file-upload
+              label="Digital Tech Pack Spec Sheet"
+              [filePath]="form.techPackPath || ''"
+              [fileName]="form.techPackName || ''"
+              (fileUploaded)="onTechPackUploaded($event)"
+              (fileRemoved)="onTechPackRemoved()"
+            ></app-file-upload>
+          </div>
+
+          <!-- Ball Construction Details (Football & Handball only) -->
+          @if (form.category === 'football' || form.category === 'handball') {
+            <div class="col-span-2 border-t border-zinc-800 pt-5 mt-2">
+              <h3 class="text-sm font-semibold text-white mb-4">Construction Details</h3>
+              <div class="grid grid-cols-2 gap-4">
+
+                <div>
+                  <label class="block text-xs font-medium text-zinc-400 mb-1.5">Backing</label>
+                  <input
+                    type="text" [(ngModel)]="ballConstruction.backing" name="backing"
+                    placeholder="e.g. 4 layers poly-cotton"
+                    class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
+                  />
+                </div>
+
+                <div>
+                  <label class="block text-xs font-medium text-zinc-400 mb-1.5">Bladder</label>
+                  <input
+                    type="text" [(ngModel)]="ballConstruction.bladder" name="bladder"
+                    placeholder="e.g. SR bladder, Latex bladder"
+                    class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
+                  />
+                </div>
+
+                <div>
+                  <label class="block text-xs font-medium text-zinc-400 mb-1.5">Cover Material</label>
+                  <input
+                    type="text" [(ngModel)]="ballConstruction.coverMaterial" name="coverMaterial"
+                    placeholder="e.g. PU leather, TPU"
+                    class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
+                  />
+                </div>
+
+                <div>
+                  <label class="block text-xs font-medium text-zinc-400 mb-1.5">Cutting Die / Panels</label>
+                  <input
+                    type="number" step="0.01" [(ngModel)]="ballConstruction.cuttingDiePanels" name="cuttingDiePanels"
+                    placeholder="e.g. 32.00"
+                    class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
+                  />
+                </div>
+
+                <div>
+                  <label class="block text-xs font-medium text-zinc-400 mb-1.5">Number of Colors</label>
+                  <input
+                    type="number" step="1" [(ngModel)]="ballConstruction.numberOfColors" name="numberOfColors"
+                    placeholder="e.g. 3"
+                    class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
+                  />
+                </div>
+
+                <div>
+                  <label class="block text-xs font-medium text-zinc-400 mb-1.5">Bonding</label>
+                  <select
+                    [(ngModel)]="ballConstruction.bonding" name="bonding"
+                    class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-zinc-500"
+                  >
+                    <option value="">Select bonding</option>
+                    <option value="machine stitched">Machine Stitched</option>
+                    <option value="hand stitched">Hand Stitched</option>
+                    <option value="hybrid">Hybrid</option>
+                    <option value="thermal bonding">Thermal Bonding</option>
+                  </select>
+                </div>
+
+                <div class="col-span-2">
+                  <label class="block text-xs font-medium text-zinc-400 mb-1.5">Carcass</label>
+                  <input
+                    type="text" [(ngModel)]="ballConstruction.carcass" name="carcass"
+                    placeholder="e.g. Wound carcass"
+                    class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
+                  />
+                </div>
+
+                <div class="flex items-center space-x-3 py-2">
+                  <input
+                    type="checkbox"
+                    [(ngModel)]="ballConstruction.debossing"
+                    name="debossing"
+                    id="debossingCheckbox"
+                    class="h-4 w-4 rounded border-zinc-700 bg-zinc-900 text-white focus:ring-0 focus:ring-offset-0 cursor-pointer"
+                  />
+                  <label for="debossingCheckbox" class="text-sm font-medium text-zinc-400 cursor-pointer select-none">
+                    Debossing
+                  </label>
+                </div>
+
+                <div class="flex items-center space-x-3 py-2">
+                  <input
+                    type="checkbox"
+                    [(ngModel)]="ballConstruction.finishes"
+                    name="finishes"
+                    id="finishesCheckbox"
+                    class="h-4 w-4 rounded border-zinc-700 bg-zinc-900 text-white focus:ring-0 focus:ring-offset-0 cursor-pointer"
+                  />
+                  <label for="finishesCheckbox" class="text-sm font-medium text-zinc-400 cursor-pointer select-none">
+                    Finishes
+                  </label>
+                </div>
+
+              </div>
+            </div>
+          }
+
+        </div>
+
+        <!-- Submit & Cancel -->
+        <div class="flex gap-3 pt-2">
+          <button
+            type="submit"
+            [disabled]="store.loading() || sampleForm.invalid"
+            class="px-6 py-2.5 bg-white text-zinc-900 text-sm font-semibold rounded-lg hover:bg-zinc-100 transition-colors disabled:opacity-50"
+          >
+            {{ store.loading() ? 'Saving...' : (isEdit() ? 'Update Sample' : 'Create Sample') }}
+          </button>
+          <a
+            routerLink="/samples"
+            class="px-6 py-2.5 bg-zinc-800 text-zinc-300 text-sm font-medium rounded-lg hover:bg-zinc-700 transition-colors"
+          >
+            Cancel
+          </a>
+        </div>
+      </form>
+    </div>

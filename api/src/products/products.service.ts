@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Product } from './entities/product.entity';
+import { Repository, FindOptionsWhere } from 'typeorm';
+import { Product, ProductCategory } from './entities/product.entity';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { SuppliersService } from '../suppliers/suppliers.service';
@@ -15,9 +15,9 @@ export class ProductsService {
   ) {}
 
   async findAll(supplierId?: number, category?: string): Promise<Product[]> {
-    const where: any = { isActive: true };
+    const where: FindOptionsWhere<Product> = { isActive: true };
     if (supplierId) where.supplierId = supplierId;
-    if (category) where.category = category;
+    if (category) where.category = category as ProductCategory;
 
     return this.productRepo.find({
       where,
@@ -42,7 +42,11 @@ export class ProductsService {
     });
   }
 
-  async getNextCounter(collection: string, year: number, category: string): Promise<number> {
+  async getNextCounter(
+    collection: string,
+    year: number,
+    category: string,
+  ): Promise<number> {
     const maxProduct = await this.productRepo
       .createQueryBuilder('product')
       .where('product.collection = :collection', { collection })
@@ -61,14 +65,18 @@ export class ProductsService {
 
     // Auto-generate article number if collection, year, and category are specified
     if (dto.collection && dto.year && dto.category) {
-      const counter = await this.getNextCounter(dto.collection, dto.year, dto.category);
+      const counter = await this.getNextCounter(
+        dto.collection,
+        dto.year,
+        dto.category,
+      );
       product.articleCounter = counter;
 
       const yearStr = String(dto.year).slice(-2);
       let catCode = 'OTH';
-      if (dto.category === 'football') catCode = 'FB';
-      else if (dto.category === 'handball') catCode = 'HB';
-      else if (dto.category === 'lifestyle') catCode = 'APP';
+      if (dto.category === ProductCategory.FOOTBALL) catCode = 'FB';
+      else if (dto.category === ProductCategory.HANDBALL) catCode = 'HB';
+      else if (dto.category === ProductCategory.LIFESTYLE) catCode = 'APP';
 
       const counterStr = String(counter).padStart(4, '0');
       product.articleNumber = `${dto.collection}${yearStr}${counterStr}${catCode}`;

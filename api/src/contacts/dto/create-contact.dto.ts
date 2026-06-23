@@ -1,4 +1,12 @@
-import { IsNotEmpty, IsString, IsOptional, IsArray, ValidateNested, IsEmail, IsNumber } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsString,
+  IsOptional,
+  IsArray,
+  ValidateNested,
+  IsEmail,
+  IsNumber,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class ContactPhoneDto {

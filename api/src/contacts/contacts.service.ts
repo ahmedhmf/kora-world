@@ -36,7 +36,7 @@ export class ContactsService {
   async update(id: number, dto: UpdateContactDto): Promise<Contact> {
     const contact = await this.findOne(id);
     Object.assign(contact, dto);
-    
+
     if (dto.supplierId === null || dto.type !== 'supplier') {
       contact.supplierId = undefined;
       contact.supplier = undefined;

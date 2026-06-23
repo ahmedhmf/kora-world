@@ -1,0 +1,173 @@
+<div class="p-8 max-w-7xl mx-auto">
+      
+      <!-- Header -->
+      <div class="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+        <div>
+          <h1 class="text-2xl font-bold text-white">Contact Book</h1>
+          <p class="text-zinc-400 text-sm mt-1">Manage personnel contacts across marketing, legal, finance, accounts, suppliers, warehouses, and logistics.</p>
+        </div>
+        
+        <a
+          routerLink="/contacts/new"
+          class="px-5 py-2.5 bg-white text-zinc-900 hover:bg-zinc-100 text-sm font-semibold rounded-lg transition-colors flex items-center gap-1.5 self-start md:self-auto cursor-pointer"
+        >
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
+          </svg>
+          Add Contact
+        </a>
+      </div>
+
+      <!-- Controls Card (Filters & Search) -->
+      <div class="bg-zinc-900/40 border border-zinc-800 rounded-xl p-4 mb-6 flex flex-col md:flex-row gap-4 items-center justify-between">
+        
+        <!-- Type Filter Chips -->
+        <div class="flex flex-wrap gap-2 items-center w-full md:w-auto">
+          <span class="text-xs text-zinc-500 uppercase tracking-wider font-semibold mr-2 font-mono">Filter by Type:</span>
+          @for (filter of filterOptions; track filter.value) {
+            <button
+              (click)="selectedTypeFilter.set(filter.value)"
+              class="px-3 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer"
+              [class.bg-white]="selectedTypeFilter() === filter.value"
+              [class.text-zinc-900]="selectedTypeFilter() === filter.value"
+              [class.border-white]="selectedTypeFilter() === filter.value"
+              [class.bg-zinc-800]="selectedTypeFilter() !== filter.value"
+              [class.text-zinc-400]="selectedTypeFilter() !== filter.value"
+              [class.border-zinc-800]="selectedTypeFilter() !== filter.value"
+              [class.hover:text-white]="selectedTypeFilter() !== filter.value"
+            >
+              {{ filter.label }}
+            </button>
+          }
+        </div>
+
+        <!-- Search Box -->
+        <div class="relative w-full md:w-80">
+          <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <svg class="h-4 w-4 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </span>
+          <input
+            type="text"
+            [(ngModel)]="searchQuery"
+            placeholder="Search by name, company, email..."
+            class="w-full pl-9 pr-4 py-2 bg-zinc-900 border border-zinc-800 text-white rounded-lg focus:outline-none focus:border-zinc-700 text-sm placeholder-zinc-500"
+          />
+        </div>
+
+      </div>
+
+      <!-- Contacts Table Card -->
+      <div class="bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden shadow-2xl">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="bg-zinc-900/60 border-b border-zinc-800 text-zinc-500 uppercase tracking-wider text-[10px]">
+                <th class="p-4 font-semibold">Name</th>
+                <th class="p-4 font-semibold">Company / Role</th>
+                <th class="p-4 font-semibold">Type</th>
+                <th class="p-4 font-semibold">Contact Methods</th>
+                <th class="p-4 font-semibold text-center w-28">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-zinc-900">
+              @for (contact of filteredContacts(); track contact.id) {
+                <tr class="hover:bg-zinc-900/35 transition-colors">
+                  <!-- Name -->
+                  <td class="p-4">
+                    <div class="font-bold text-white text-sm hover:underline">
+                      <a [routerLink]="['/contacts', contact.id]">{{ contact.name }}</a>
+                    </div>
+                    @if (contact.position) {
+                      <span class="text-zinc-400 text-[10px] mt-0.5 block">{{ contact.position }}</span>
+                    }
+                  </td>
+                  
+                  <!-- Company / Role -->
+                  <td class="p-4">
+                    <div class="font-semibold text-zinc-200">
+                      @if (contact.type === 'supplier' && contact.supplier) {
+                        <span class="text-xs text-zinc-400">Supplier:</span> 
+                        <span class="text-white ml-1 font-semibold">{{ contact.supplier.name }}</span>
+                      } @else if (contact.type === 'account' && contact.account) {
+                        <span class="text-xs text-zinc-400">Account:</span> 
+                        <span class="text-white ml-1 font-semibold">{{ contact.account.companyName }}</span>
+                      } @else {
+                        {{ contact.company || '—' }}
+                      }
+                    </div>
+                  </td>
+                  
+                  <!-- Type Badge -->
+                  <td class="p-4">
+                    <span [class]="getTypeClass(contact.type)" class="px-2.5 py-1 rounded-full text-[10px] font-bold border capitalize">
+                      {{ contact.type }}
+                    </span>
+                  </td>
+                  
+                  <!-- Contact Methods -->
+                  <td class="p-4">
+                    <div class="space-y-1">
+                      @if (contact.email) {
+                        <div class="flex items-center gap-1.5 text-zinc-300">
+                          <span class="text-[10px] text-zinc-500">✉</span>
+                          <a [href]="'mailto:' + contact.email" class="hover:underline font-mono text-[11px]">{{ contact.email }}</a>
+                        </div>
+                      }
+                      @if (contact.phones && contact.phones.length > 0) {
+                        <div class="flex items-center gap-1.5 text-zinc-300">
+                          <span class="text-[10px] text-zinc-500">📞</span>
+                          <span class="font-mono text-[11px]">
+                            {{ contact.phones[0].number }} 
+                            <span class="text-zinc-500 text-[9px] uppercase">({{ contact.phones[0].label }})</span>
+                            @if (contact.phones.length > 1) {
+                              <span class="text-zinc-500 text-[10px] ml-1">+{{ contact.phones.length - 1 }} more</span>
+                            }
+                          </span>
+                        </div>
+                      }
+                      @if (!contact.email && (!contact.phones || contact.phones.length === 0)) {
+                        <span class="text-zinc-600 font-italic">No basic contacts details</span>
+                      }
+                    </div>
+                  </td>
+                  
+                  <!-- Action buttons -->
+                  <td class="p-4 text-center">
+                    <div class="flex items-center justify-center gap-2">
+                      <a
+                        [routerLink]="['/contacts', contact.id]"
+                        class="p-1.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white rounded transition-colors"
+                        title="View Details"
+                      >
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                      </a>
+                      <a
+                        [routerLink]="['/contacts', contact.id, 'edit']"
+                        class="p-1.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white rounded transition-colors"
+                        title="Edit Details"
+                      >
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                        </svg>
+                      </a>
+                    </div>
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="5" class="p-8 text-center text-zinc-500 font-medium">
+                    No contacts found matching the criteria.
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>

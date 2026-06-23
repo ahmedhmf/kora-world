@@ -16,7 +16,8 @@ export class ExchangeRatesService {
 
     const formattedDate = new Date(date).toISOString().split('T')[0];
 
-    const rateRecord = await this.rateRepo.createQueryBuilder('rate')
+    const rateRecord = await this.rateRepo
+      .createQueryBuilder('rate')
       .where('rate.fromCurrency = :from', { from })
       .andWhere('rate.toCurrency = :to', { to: 'EGP' })
       .andWhere('rate.date <= :date', { date: formattedDate })
@@ -28,7 +29,8 @@ export class ExchangeRatesService {
     }
 
     // fallback: check inverse rate
-    const inverseRecord = await this.rateRepo.createQueryBuilder('rate')
+    const inverseRecord = await this.rateRepo
+      .createQueryBuilder('rate')
       .where('rate.fromCurrency = :from', { from: 'EGP' })
       .andWhere('rate.toCurrency = :to', { to: from })
       .andWhere('rate.date <= :date', { date: formattedDate })
@@ -39,10 +41,16 @@ export class ExchangeRatesService {
       return 1.0 / Number(inverseRecord.rate);
     }
 
-    throw new BadRequestException(`No exchange rate found for ${from} on ${formattedDate}. Please add the rate first.`);
+    throw new BadRequestException(
+      `No exchange rate found for ${from} on ${formattedDate}. Please add the rate first.`,
+    );
   }
 
-  async convertToEGP(amount: number, fromCurrency: string, date: Date | string): Promise<number> {
+  async convertToEGP(
+    amount: number,
+    fromCurrency: string,
+    date: Date | string,
+  ): Promise<number> {
     const rate = await this.getRate(fromCurrency, date);
     return Number((amount * rate).toFixed(2));
   }
@@ -53,7 +61,13 @@ export class ExchangeRatesService {
     });
   }
 
-  async create(dto: { fromCurrency: string; toCurrency?: string; rate: number; date: Date | string; notes?: string }): Promise<ExchangeRate> {
+  async create(dto: {
+    fromCurrency: string;
+    toCurrency?: string;
+    rate: number;
+    date: Date | string;
+    notes?: string;
+  }): Promise<ExchangeRate> {
     const rate = this.rateRepo.create({
       fromCurrency: dto.fromCurrency.toUpperCase(),
       toCurrency: 'EGP',
