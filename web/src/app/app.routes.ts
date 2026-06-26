@@ -34,6 +34,12 @@ export const routes: Routes = [
           import('./features/users/user-form.component').then((m) => m.UserFormComponent),
       },
       {
+        path: 'settings/dropdowns',
+        canActivate: [roleGuard],
+        loadComponent: () =>
+          import('./features/settings/dropdown-settings.component').then((m) => m.DropdownSettingsComponent),
+      },
+      {
         path: 'dashboard',
         loadComponent: () =>
           import('./features/dashboard/dashboard.component').then((m) => m.DashboardComponent),

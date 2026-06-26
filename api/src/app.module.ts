@@ -44,6 +44,8 @@ import { AccountingModule } from './accounting/accounting.module';
 import { InvoicesModule } from './invoices/invoices.module';
 import { PaymentsModule } from './payments/payments.module';
 import { SourcingModule } from './sourcing/sourcing.module';
+import { DropdownOption } from './dropdown-options/entities/dropdown-option.entity';
+import { DropdownOptionsModule } from './dropdown-options/dropdown-options.module';
 
 @Module({
   imports: [
@@ -78,6 +80,7 @@ import { SourcingModule } from './sourcing/sourcing.module';
           Invoice,
           InvoiceLine,
           Payment,
+          DropdownOption,
         ],
         migrations: [__dirname + '/migrations/*{.ts,.js}'],
         migrationsRun: true,
@@ -102,6 +105,7 @@ import { SourcingModule } from './sourcing/sourcing.module';
     InvoicesModule,
     PaymentsModule,
     SourcingModule,
+    DropdownOptionsModule,
     ThrottlerModule.forRoot([
       {
         ttl: 60000,

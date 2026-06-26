@@ -59,17 +59,17 @@ export class Product {
   @Column({ type: 'jsonb', nullable: true })
   construction?: Record<string, string>;
 
-  @Column({ name: 'tech_pack_path', length: 255, nullable: true })
-  techPackPath?: string;
+  @Column({ type: 'varchar', name: 'tech_pack_path', length: 255, nullable: true })
+  techPackPath?: string | null;
 
-  @Column({ name: 'tech_pack_name', length: 255, nullable: true })
-  techPackName?: string;
+  @Column({ type: 'varchar', name: 'tech_pack_name', length: 255, nullable: true })
+  techPackName?: string | null;
 
-  @Column({ name: 'image_path', length: 255, nullable: true })
-  imagePath?: string;
+  @Column({ type: 'varchar', name: 'image_path', length: 255, nullable: true })
+  imagePath?: string | null;
 
-  @Column({ name: 'image_name', length: 255, nullable: true })
-  imageName?: string;
+  @Column({ type: 'varchar', name: 'image_name', length: 255, nullable: true })
+  imageName?: string | null;
 
   @Column({ name: 'collection', length: 10, nullable: true })
   collection?: string;
@@ -80,8 +80,8 @@ export class Product {
   @Column({ name: 'article_counter', type: 'integer', nullable: true })
   articleCounter?: number;
 
-  @Column({ name: 'pricepoint', length: 50, nullable: true })
-  pricepoint?: string;
+  @Column({ type: 'varchar', name: 'pricepoint', length: 50, nullable: true })
+  pricepoint?: string | null;
 
   @Column({
     name: 'landing_price',

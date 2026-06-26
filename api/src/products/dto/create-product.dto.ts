@@ -8,6 +8,7 @@ import {
   IsPositive,
   Min,
   IsObject,
+  ValidateIf,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ProductCategory } from '../entities/product.entity';
@@ -58,19 +59,23 @@ export class CreateProductDto {
 
   @IsString()
   @IsOptional()
-  techPackPath?: string;
+  @ValidateIf((o, v) => v !== null)
+  techPackPath?: string | null;
 
   @IsString()
   @IsOptional()
-  techPackName?: string;
+  @ValidateIf((o, v) => v !== null)
+  techPackName?: string | null;
 
   @IsString()
   @IsOptional()
-  imagePath?: string;
+  @ValidateIf((o, v) => v !== null)
+  imagePath?: string | null;
 
   @IsString()
   @IsOptional()
-  imageName?: string;
+  @ValidateIf((o, v) => v !== null)
+  imageName?: string | null;
 
   @IsString()
   @IsOptional()
@@ -88,7 +93,8 @@ export class CreateProductDto {
 
   @IsString()
   @IsOptional()
-  pricepoint?: string;
+  @ValidateIf((o, v) => v !== null)
+  pricepoint?: string | null;
 
   @IsNumber()
   @IsOptional()

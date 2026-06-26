@@ -73,6 +73,7 @@ export class LayoutComponent {
     { label: 'Calendar', route: '/calendar', icon: 'calendar' },
     { label: 'Contacts', route: '/contacts', icon: 'contact' },
     { label: 'Employees', route: '/users', icon: 'users', roles: ['admin'] },
+    { label: 'Dropdown Settings', route: '/settings/dropdowns', icon: 'settings', roles: ['admin'] },
   ];
 
   // Collapsible submenus state

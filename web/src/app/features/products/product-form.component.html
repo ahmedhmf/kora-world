@@ -98,11 +98,9 @@
                   class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-zinc-500"
                 >
                   <option value="" disabled>Select pricepoint</option>
-                  <option value="Club">Club</option>
-                  <option value="Training">Training</option>
-                  <option value="League">League</option>
-                  <option value="Competition">Competition</option>
-                  <option value="Match Pro">Match Pro</option>
+                  @for (p of pricepoints(); track p) {
+                    <option [value]="p">{{ p }}</option>
+                  }
                 </select>
               </div>
             }
@@ -138,11 +136,9 @@
                   class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-zinc-500"
                 >
                   <option value="" disabled>Select pricepoint</option>
-                  <option value="Club">Club</option>
-                  <option value="Training">Training</option>
-                  <option value="League">League</option>
-                  <option value="Competition">Competition</option>
-                  <option value="Match Pro">Match Pro</option>
+                  @for (p of pricepoints(); track p) {
+                    <option [value]="p">{{ p }}</option>
+                  }
                 </select>
               </div>
             }
@@ -168,11 +164,15 @@
 
           <div>
             <label class="block text-sm font-medium text-zinc-400 mb-1.5">Currency</label>
-            <input
+            <select
               [(ngModel)]="form.currency" name="currency"
-              class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
-              placeholder="e.g. PKR, EUR, USD"
-            />
+              class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-zinc-500"
+            >
+              <option value="" disabled>Select Currency</option>
+              @for (c of currencies(); track c) {
+                <option [value]="c">{{ c }}</option>
+              }
+            </select>
           </div>
 
           <div>
@@ -259,29 +259,41 @@
 
                 <div>
                   <label class="block text-xs font-medium text-zinc-400 mb-1.5">Backing</label>
-                  <input
-                    type="text" [(ngModel)]="ballConstruction.backing" name="backing"
-                    placeholder="e.g. 4 layers poly-cotton"
-                    class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
-                  />
+                  <select
+                    [(ngModel)]="ballConstruction.backing" name="backing"
+                    class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-zinc-500"
+                  >
+                    <option value="">Select backing</option>
+                    @for (b of backings(); track b) {
+                      <option [value]="b">{{ b }}</option>
+                    }
+                  </select>
                 </div>
 
                 <div>
                   <label class="block text-xs font-medium text-zinc-400 mb-1.5">Bladder</label>
-                  <input
-                    type="text" [(ngModel)]="ballConstruction.bladder" name="bladder"
-                    placeholder="e.g. SR bladder, Latex bladder"
-                    class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
-                  />
+                  <select
+                    [(ngModel)]="ballConstruction.bladder" name="bladder"
+                    class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-zinc-500"
+                  >
+                    <option value="">Select bladder</option>
+                    @for (b of bladders(); track b) {
+                      <option [value]="b">{{ b }}</option>
+                    }
+                  </select>
                 </div>
 
                 <div>
                   <label class="block text-xs font-medium text-zinc-400 mb-1.5">Cover Material</label>
-                  <input
-                    type="text" [(ngModel)]="ballConstruction.coverMaterial" name="coverMaterial"
-                    placeholder="e.g. PU leather, TPU"
-                    class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
-                  />
+                  <select
+                    [(ngModel)]="ballConstruction.coverMaterial" name="coverMaterial"
+                    class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-zinc-500"
+                  >
+                    <option value="">Select cover material</option>
+                    @for (c of coverMaterials(); track c) {
+                      <option [value]="c">{{ c }}</option>
+                    }
+                  </select>
                 </div>
 
                 <div>
@@ -309,10 +321,9 @@
                     class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-zinc-500"
                   >
                     <option value="">Select bonding</option>
-                    <option value="machine stitched">Machine Stitched</option>
-                    <option value="hand stitched">Hand Stitched</option>
-                    <option value="hybrid">Hybrid</option>
-                    <option value="thermal bonding">Thermal Bonding</option>
+                    @for (b of bondings(); track b) {
+                      <option [value]="b">{{ b }}</option>
+                    }
                   </select>
                 </div>
 

@@ -174,6 +174,11 @@
                     >View</a>
                     @if (authService.currentUser()?.role !== 'supplier') {
                       <a
+                        [routerLink]="['/products', 'new']"
+                        [queryParams]="{ copyFrom: product.id }"
+                        class="text-zinc-400 hover:text-white text-xs underline mr-4"
+                      >Copy</a>
+                      <a
                         [routerLink]="['/products', product.id, 'edit']"
                         class="text-zinc-400 hover:text-white text-xs underline mr-4"
                       >Edit</a>

@@ -9,6 +9,7 @@ import { CreateProductDto, ProductCategory } from '../../core/models/product.mod
 
 
 import { FileUploadComponent } from '../../shared/components/file-upload.component';
+import { DropdownOptionsService } from '../../core/services/dropdown-options.service';
 
 @Component({
   selector: 'app-product-form',
@@ -23,6 +24,14 @@ export class ProductFormComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly cdr = inject(ChangeDetectorRef);
+  private readonly dropdownService = inject(DropdownOptionsService);
+
+  readonly currencies = signal<string[]>([]);
+  readonly backings = signal<string[]>([]);
+  readonly bladders = signal<string[]>([]);
+  readonly coverMaterials = signal<string[]>([]);
+  readonly bondings = signal<string[]>([]);
+  readonly pricepoints = signal<string[]>([]);
 
   readonly isEdit = signal(false);
   private editId = signal<number | null>(null);
@@ -94,6 +103,20 @@ export class ProductFormComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.dropdownService.getOptions().subscribe({
+      next: (opts) => {
+        const filterVals = (cat: string) => opts.filter(o => o.category === cat).map(o => o.value);
+        this.currencies.set(filterVals('currency'));
+        this.backings.set(filterVals('backing'));
+        this.bladders.set(filterVals('bladder'));
+        this.coverMaterials.set(filterVals('coverMaterial'));
+        this.bondings.set(filterVals('bonding'));
+        this.pricepoints.set(filterVals('pricepoint'));
+        this.cdr.detectChanges();
+      },
+      error: (err) => console.error('ProductForm: error loading dropdown options:', err)
+    });
+
     this.route.paramMap.subscribe((params) => {
       const id = params.get('id');
       if (id) {
@@ -174,8 +197,9 @@ export class ProductFormComponent implements OnInit {
           next: (suppliers) => {
             this.suppliersStore.setSuppliers(suppliers);
 
-            // Check if prefilling from a sample promotion
+             // Check if prefilling from a sample promotion or copyFrom
             const fromSampleId = this.route.snapshot.queryParamMap.get('fromSampleId');
+            const copyFromId = this.route.snapshot.queryParamMap.get('copyFrom');
             if (fromSampleId) {
               this.api.getSample(+fromSampleId).subscribe((sample) => {
                 this.fromSampleName.set(sample.name);
@@ -194,6 +218,33 @@ export class ProductFormComponent implements OnInit {
                 };
                 this.updateArticleNumberPreview();
                 this.loadConstruction(sample.construction);
+                this.cdr.detectChanges();
+              });
+            } else if (copyFromId) {
+              this.api.getProduct(+copyFromId).subscribe((product) => {
+                this.form = {
+                  ...this.form,
+                  supplierId: product.supplierId,
+                  name: `${product.name} (Copy)`,
+                  category: product.category,
+                  description: product.description || '',
+                  unitPrice: product.unitPrice,
+                  landingPrice: product.landingPrice,
+                  onePcPrice: product.onePcPrice,
+                  bulkPrice: product.bulkPrice,
+                  currency: product.currency || '',
+                  moq: product.moq,
+                  weightKg: product.weightKg,
+                  techPackPath: product.techPackPath || '',
+                  techPackName: product.techPackName || '',
+                  imagePath: product.imagePath || '',
+                  imageName: product.imageName || '',
+                  collection: product.collection || '',
+                  year: product.year || new Date().getFullYear(),
+                  pricepoint: product.pricepoint || '',
+                };
+                this.updateArticleNumberPreview();
+                this.loadConstruction(product.construction);
                 this.cdr.detectChanges();
               });
             } else {
@@ -290,20 +341,24 @@ export class ProductFormComponent implements OnInit {
   onTechPackUploaded(file: { path: string; name: string }): void {
     this.form.techPackPath = file.path;
     this.form.techPackName = file.name;
+    this.cdr.detectChanges();
   }
 
   onTechPackRemoved(): void {
     this.form.techPackPath = '';
     this.form.techPackName = '';
+    this.cdr.detectChanges();
   }
 
   onProductPhotoUploaded(file: { path: string; name: string }): void {
     this.form.imagePath = file.path;
     this.form.imageName = file.name;
+    this.cdr.detectChanges();
   }
 
   onProductPhotoRemoved(): void {
     this.form.imagePath = '';
     this.form.imageName = '';
+    this.cdr.detectChanges();
   }
 }
