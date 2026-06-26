@@ -2,6 +2,8 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, FindOptionsWhere } from 'typeorm';
@@ -11,6 +13,7 @@ import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { UpdatePurchaseOrderDto } from './dto/update-purchase-order.dto';
 import { SuppliersService } from '../suppliers/suppliers.service';
 import { ProductsService } from '../products/products.service';
+import { AccountsService } from '../accounts/accounts.service';
 
 @Injectable()
 export class PurchaseOrdersService {
@@ -21,6 +24,8 @@ export class PurchaseOrdersService {
     private readonly lineItemRepo: Repository<PurchaseOrderLineItem>,
     private readonly suppliersService: SuppliersService,
     private readonly productsService: ProductsService,
+    @Inject(forwardRef(() => AccountsService))
+    private readonly accountsService: AccountsService,
   ) {}
 
   async findAll(supplierId?: number): Promise<PurchaseOrder[]> {
@@ -171,6 +176,30 @@ export class PurchaseOrdersService {
 
   async remove(id: number): Promise<void> {
     const po = await this.findOne(id);
+    
+    // Parse notes to check if it was auto-generated from a B2B Client Forecast
+    // Notes format: "Auto-generated from B2B Client Forecast (Year: 2027) for Account: Acme Corp"
+    if (po.notes && po.notes.includes('Auto-generated from B2B Client Forecast')) {
+      try {
+        const yearMatch = po.notes.match(/Year:\s*(\d+)/);
+        const accountMatch = po.notes.match(/Account:\s*(.+)$/);
+        
+        if (yearMatch && accountMatch) {
+          const year = parseInt(yearMatch[1], 10);
+          const companyName = accountMatch[1].trim();
+          
+          const itemsToRollback = po.lineItems.map((item) => ({
+            productId: item.productId,
+            quantity: item.quantity,
+          }));
+          
+          await this.accountsService.rollbackForecastQuantities(companyName, year, itemsToRollback);
+        }
+      } catch (err) {
+        console.error('Failed to rollback forecast quantities during PO deletion:', err);
+      }
+    }
+
     await this.poRepo.remove(po);
   }
 }

@@ -7,15 +7,17 @@
           <p class="text-zinc-400 text-sm mt-1">Manage B2B customers, credit configurations, and onboarding discussions.</p>
         </div>
         
-        <a
-          routerLink="/accounts/new"
-          class="px-5 py-2.5 bg-white text-zinc-900 hover:bg-zinc-100 text-sm font-semibold rounded-lg transition-colors flex items-center gap-1.5 self-start md:self-auto cursor-pointer"
-        >
-          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
-          </svg>
-          Add Account
-        </a>
+        @if (authService.currentUser()?.role !== 'supplier') {
+          <a
+            routerLink="/accounts/new"
+            class="px-5 py-2.5 bg-white text-zinc-900 hover:bg-zinc-100 text-sm font-semibold rounded-lg transition-colors flex items-center gap-1.5 self-start md:self-auto cursor-pointer"
+          >
+            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
+            </svg>
+            Add Account
+          </a>
+        }
       </div>
 
       <!-- Controls Card (Filters & Search) -->
@@ -127,15 +129,17 @@
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                         </svg>
                       </a>
-                      <a
-                        [routerLink]="['/accounts', account.id, 'edit']"
-                        class="p-1.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white rounded transition-colors"
-                        title="Edit Details"
-                      >
-                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                        </svg>
-                      </a>
+                      @if (authService.currentUser()?.role !== 'supplier') {
+                        <a
+                          [routerLink]="['/accounts', account.id, 'edit']"
+                          class="p-1.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white rounded transition-colors"
+                          title="Edit Details"
+                        >
+                          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                          </svg>
+                        </a>
+                      }
                     </div>
                   </td>
                 </tr>

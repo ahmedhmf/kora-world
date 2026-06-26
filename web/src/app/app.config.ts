@@ -41,6 +41,9 @@ import {
   Copy,
   ChevronDown,
   ChevronUp,
+  Plus,
+  X,
+  FileText,
 } from 'lucide-angular';
 
 export const appConfig: ApplicationConfig = {
@@ -85,6 +88,9 @@ export const appConfig: ApplicationConfig = {
         Copy,
         ChevronDown,
         ChevronUp,
+        Plus,
+        X,
+        FileText,
       })
     ),
   ]

@@ -7,6 +7,8 @@ import { PurchaseOrderLineItem } from './entities/purchase-order-line-item.entit
 import { SuppliersService } from '../suppliers/suppliers.service';
 import { ProductsService } from '../products/products.service';
 
+import { AccountsService } from '../accounts/accounts.service';
+
 describe('PurchaseOrdersService', () => {
   let service: PurchaseOrdersService;
 
@@ -31,6 +33,10 @@ describe('PurchaseOrdersService', () => {
     findOne: jest.fn(),
   };
 
+  const mockAccountsService = {
+    rollbackForecastQuantities: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -50,6 +56,10 @@ describe('PurchaseOrdersService', () => {
         {
           provide: ProductsService,
           useValue: mockProductsService,
+        },
+        {
+          provide: AccountsService,
+          useValue: mockAccountsService,
         },
       ],
     }).compile();

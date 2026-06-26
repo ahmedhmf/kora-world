@@ -201,6 +201,14 @@ export class ApiService {
     return this.http.delete<void>(`${this.base}/accounts/${id}`);
   }
 
+  updateAccountForecasts(id: number, forecasts: any[]): Observable<B2BAccount> {
+    return this.http.put<B2BAccount>(`${this.base}/accounts/${id}/forecasts`, forecasts);
+  }
+
+  createPOsFromForecast(id: number, forecastId: string, selectedItems?: Array<{ productId: number; quantity: number }>): Observable<{ success: boolean; poIds: number[] }> {
+    return this.http.post<{ success: boolean; poIds: number[] }>(`${this.base}/accounts/${id}/forecasts/${forecastId}/create-pos`, { items: selectedItems });
+  }
+
   // Receipts
   getReceipts(): Observable<Receipt[]> {
     return this.http.get<Receipt[]>(`${this.base}/receipts`);

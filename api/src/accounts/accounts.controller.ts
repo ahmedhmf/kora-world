@@ -46,4 +46,21 @@ export class AccountsController {
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.accountsService.remove(id);
   }
+
+  @Put(':id/forecasts')
+  updateForecasts(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() forecasts: any[],
+  ) {
+    return this.accountsService.updateForecasts(id, forecasts);
+  }
+
+  @Post(':id/forecasts/:forecastId/create-pos')
+  createPOs(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('forecastId') forecastId: string,
+    @Body() body?: { items?: Array<{ productId: number; quantity: number }> },
+  ) {
+    return this.accountsService.createPOsFromForecast(id, forecastId, body?.items);
+  }
 }

@@ -94,6 +94,18 @@ export class Account {
   @Column({ type: 'text', nullable: true })
   remarks?: string;
 
+  @Column({ type: 'jsonb', default: [] })
+  forecasts: Array<{
+    id: string;
+    year: number;
+    status: 'draft' | 'po_created';
+    items: Array<{
+      productId: number;
+      quantity: number;
+      orderedQuantity?: number;
+    }>;
+  }>;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 

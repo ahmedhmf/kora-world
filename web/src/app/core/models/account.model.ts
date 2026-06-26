@@ -30,6 +30,16 @@ export interface B2BAccount {
   remarks?: string;
   createdAt?: string;
   updatedAt?: string;
+  forecasts?: Array<{
+    id: string;
+    year: number;
+    status: 'draft' | 'po_created';
+    items: Array<{
+      productId: number;
+      quantity: number;
+      orderedQuantity?: number;
+    }>;
+  }>;
 }
 
 export interface CreateAccountDto {

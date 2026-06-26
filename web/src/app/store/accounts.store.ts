@@ -97,5 +97,45 @@ export const AccountsStore = signalStore(
     selectAccount(account: B2BAccount | null): void {
       patchState(store, { selectedAccount: account });
     },
+
+    updateForecasts: rxMethod<{ id: number; forecasts: any[] }>(
+      pipe(
+        tap(() => patchState(store, { loading: true, error: null })),
+        switchMap(({ id, forecasts }) =>
+          api.updateAccountForecasts(id, forecasts).pipe(
+            tapResponse({
+              next: (updated: B2BAccount) => {
+                const accounts = store.accounts().map((a) => (a.id === id ? updated : a));
+                const selectedAccount = store.selectedAccount()?.id === id ? updated : store.selectedAccount();
+                patchState(store, { accounts, selectedAccount, loading: false });
+              },
+              error: (error: Error) => patchState(store, { error: error.message, loading: false }),
+            })
+          )
+        )
+      )
+    ),
+
+    createPOsFromForecast: rxMethod<{ id: number; forecastId: string; selectedItems?: Array<{ productId: number; quantity: number }>; onSuccess?: () => void }>(
+      pipe(
+        tap(() => patchState(store, { loading: true, error: null })),
+        switchMap(({ id, forecastId, selectedItems, onSuccess }) =>
+          api.createPOsFromForecast(id, forecastId, selectedItems).pipe(
+            tapResponse({
+              next: () => {
+                // Fetch the updated account details to reflect updated forecast status
+                api.getAccount(id).subscribe((updated: B2BAccount) => {
+                  const accounts = store.accounts().map((a) => (a.id === id ? updated : a));
+                  const selectedAccount = store.selectedAccount()?.id === id ? updated : store.selectedAccount();
+                  patchState(store, { accounts, selectedAccount, loading: false });
+                  if (onSuccess) onSuccess();
+                });
+              },
+              error: (error: Error) => patchState(store, { error: error.message, loading: false }),
+            })
+          )
+        )
+      )
+    ),
   }))
 );

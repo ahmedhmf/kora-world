@@ -4,6 +4,7 @@ import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { AccountsStore } from '../../store/accounts.store';
 import { B2BAccount, AccountStatus } from '../../core/models/account.model';
+import { AuthService } from '../../core/services/auth.service';
 
 @Component({
   selector: 'app-accounts-list',
@@ -13,6 +14,7 @@ import { B2BAccount, AccountStatus } from '../../core/models/account.model';
 })
 export class AccountsListComponent implements OnInit {
   readonly store = inject(AccountsStore);
+  readonly authService = inject(AuthService);
 
   selectedStatusFilter = signal<string>('all');
   searchQuery = signal<string>('');

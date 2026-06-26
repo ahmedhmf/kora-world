@@ -6,6 +6,9 @@ import { Account } from './entities/account.entity';
 import { CreateAccountDto } from './dto/create-account.dto';
 import { UpdateAccountDto } from './dto/update-account.dto';
 
+import { ProductsService } from '../products/products.service';
+import { PurchaseOrdersService } from '../purchase-orders/purchase-orders.service';
+
 describe('AccountsService', () => {
   let service: AccountsService;
 
@@ -17,6 +20,14 @@ describe('AccountsService', () => {
     remove: jest.fn(),
   };
 
+  const mockProductsService = {
+    findOne: jest.fn(),
+  };
+
+  const mockPurchaseOrdersService = {
+    create: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -24,6 +35,14 @@ describe('AccountsService', () => {
         {
           provide: getRepositoryToken(Account),
           useValue: mockAccountRepo,
+        },
+        {
+          provide: ProductsService,
+          useValue: mockProductsService,
+        },
+        {
+          provide: PurchaseOrdersService,
+          useValue: mockPurchaseOrdersService,
         },
       ],
     }).compile();
@@ -188,6 +207,109 @@ describe('AccountsService', () => {
       mockAccountRepo.findOne.mockResolvedValue(null);
 
       await expect(service.remove(999)).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  // ─── updateForecasts ────────────────────────────────────────────────────────
+  describe('updateForecasts', () => {
+    it('should update forecasts property and save', async () => {
+      const existingAccount = { id: 1, companyName: 'Acme', forecasts: [] } as Account;
+      mockAccountRepo.findOne.mockResolvedValue(existingAccount);
+      mockAccountRepo.save.mockImplementation((val: Account) => Promise.resolve(val));
+
+      const newForecasts = [{ id: 'f1', year: 2026, status: 'draft', items: [] }];
+      const result = await service.updateForecasts(1, newForecasts);
+
+      expect(result.forecasts).toEqual(newForecasts);
+      expect(mockAccountRepo.save).toHaveBeenCalledWith(existingAccount);
+    });
+  });
+
+  // ─── createPOsFromForecast ──────────────────────────────────────────────────
+  describe('createPOsFromForecast', () => {
+    it('should successfully group items by supplier and create draft POs', async () => {
+      const existingAccount = {
+        id: 1,
+        companyName: 'Acme',
+        forecasts: [
+          {
+            id: 'f1',
+            year: 2027,
+            status: 'draft',
+            items: [
+              { productId: 101, quantity: 50 },
+              { productId: 102, quantity: 30 },
+            ],
+          },
+        ],
+      } as unknown as Account;
+
+      mockAccountRepo.findOne.mockResolvedValue(existingAccount);
+      mockAccountRepo.save.mockImplementation((val: Account) => Promise.resolve(val));
+
+      mockProductsService.findOne.mockImplementation(async (id: number) => {
+        if (id === 101) return { id: 101, supplierId: 10 };
+        if (id === 102) return { id: 102, supplierId: 20 };
+        return null;
+      });
+
+      mockPurchaseOrdersService.create.mockImplementation(async (dto: any) => {
+        if (dto.supplierId === 10) return { id: 501 };
+        if (dto.supplierId === 20) return { id: 502 };
+        return null;
+      });
+
+      const result = await service.createPOsFromForecast(1, 'f1');
+
+      expect(result).toEqual({ success: true, poIds: [501, 502] });
+      expect(mockPurchaseOrdersService.create).toHaveBeenCalledTimes(2);
+      expect(mockPurchaseOrdersService.create).toHaveBeenNthCalledWith(1, {
+        supplierId: 10,
+        orderDate: expect.any(String),
+        notes: expect.any(String),
+        lineItems: [{ productId: 101, quantity: 50 }],
+      });
+      expect(existingAccount.forecasts[0].status).toBe('po_created');
+      expect(mockAccountRepo.save).toHaveBeenCalledWith(existingAccount);
+    });
+
+    it('should generate POs for only a custom subset of items if provided', async () => {
+      const existingAccount = {
+        id: 1,
+        companyName: 'Acme',
+        forecasts: [
+          {
+            id: 'f1',
+            year: 2027,
+            status: 'draft',
+            items: [
+              { productId: 101, quantity: 50, orderedQuantity: 0 },
+              { productId: 102, quantity: 30, orderedQuantity: 0 },
+            ],
+          },
+        ],
+      } as unknown as Account;
+
+      mockAccountRepo.findOne.mockResolvedValue(existingAccount);
+      mockAccountRepo.save.mockImplementation((val: Account) => Promise.resolve(val));
+
+      mockProductsService.findOne.mockImplementation(async (id: number) => {
+        if (id === 101) return { id: 101, supplierId: 10 };
+        return null;
+      });
+
+      mockPurchaseOrdersService.create.mockImplementation(async (dto: any) => {
+        if (dto.supplierId === 10) return { id: 501 };
+        return null;
+      });
+
+      const result = await service.createPOsFromForecast(1, 'f1', [
+        { productId: 101, quantity: 20 },
+      ]);
+
+      expect(result).toEqual({ success: true, poIds: [501] });
+      expect(existingAccount.forecasts[0].items[0].orderedQuantity).toBe(20);
+      expect(existingAccount.forecasts[0].status).toBe('draft'); // Not fully fulfilled yet
     });
   });
 });

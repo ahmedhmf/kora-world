@@ -45,12 +45,16 @@ export class LayoutComponent {
       ],
     },
     {
+      label: 'Accounts',
+      route: '/accounts',
+      icon: 'building-2',
+    },
+    {
       label: 'Commercial Operations',
       route: '/commercial',
       icon: 'briefcase',
       subItems: [
         { label: 'Purchase Orders', route: '/purchase-orders', icon: 'clipboard-list' },
-        { label: 'Accounts', route: '/accounts', icon: 'building-2' },
         { label: 'B2C Requests', route: '/b2c-requests', icon: 'smartphone' },
       ],
     },
@@ -151,7 +155,8 @@ export class LayoutComponent {
           item.label === 'Dashboard' ||
           item.label === 'Products' ||
           item.label === 'Samples' ||
-          item.label === 'Purchase Orders',
+          item.label === 'Purchase Orders' ||
+          item.label === 'Accounts',
       );
     }
     return this.navItems.filter((item) => !item.roles || (role && item.roles.includes(role)));
