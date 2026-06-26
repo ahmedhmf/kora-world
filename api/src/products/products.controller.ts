@@ -33,16 +33,22 @@ export class ProductsController {
     @Query('supplierId') supplierId?: number,
     @Query('category') category?: string,
   ) {
-    if (req.user.role === 'supplier') {
-      supplierId = req.user.supplierId ?? undefined;
-    }
+    // If not supplier, we can filter by supplierId query param. If supplier, we fetch all to let them see basic product names in forecasts.
     const products = await this.productsService.findAll(supplierId, category);
+    
     if (req.user.role === 'supplier') {
+      const mySupplierId = req.user.supplierId;
       products.forEach((p) => {
+        // Strip sensitive internal pricing fields for all products
         delete p.landingPrice;
         delete p.onePcPrice;
         delete p.bulkPrice;
         delete p.pricepoint;
+
+        // If the product belongs to another supplier, also strip the unitPrice
+        if (p.supplierId !== mySupplierId) {
+          delete (p as any).unitPrice;
+        }
       });
     }
     return products;

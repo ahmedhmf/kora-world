@@ -239,7 +239,7 @@ export class AccountDetailComponent implements OnInit {
   }
 
   getProductName(id: number): string {
-    const prod = this.allProducts().find((p) => p.id === id);
+    const prod = this.allProducts().find((p) => Number(p.id) === Number(id));
     return prod ? `${prod.name} (${prod.articleNumber})` : `Product #${id}`;
   }
 

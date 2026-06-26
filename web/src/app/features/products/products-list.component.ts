@@ -35,7 +35,9 @@ export class ProductsListComponent implements OnInit {
   };
  
   ngOnInit(): void {
-    this.store.loadProducts({});
+    const user = this.authService.currentUser();
+    const supplierId = user?.role === 'supplier' ? user.supplierId : undefined;
+    this.store.loadProducts({ supplierId });
     this.suppliersStore.loadSuppliers();
     this.fetchExchangeRates();
   }
@@ -85,8 +87,10 @@ export class ProductsListComponent implements OnInit {
   }
 
   applyFilter(): void {
+    const user = this.authService.currentUser();
+    const supplierId = user?.role === 'supplier' ? user.supplierId : (this.selectedSupplier ?? undefined);
     this.store.loadProducts({
-      supplierId: this.selectedSupplier ?? undefined,
+      supplierId,
       category: this.selectedCategory ?? undefined,
     });
   }
