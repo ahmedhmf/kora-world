@@ -241,77 +241,6 @@ export const AccountingStore = signalStore(
       )
     ),
 
-    createPayment: rxMethod<{ dto: any; onSuccess?: () => void }>(
-      pipe(
-        tap(() => patchState(store, { loading: true, error: null })),
-        switchMap(({ dto, onSuccess }) =>
-          api.createPayment(dto).pipe(
-            tapResponse({
-              next: (payment) => {
-                patchState(store, {
-                  payments: [payment, ...store.payments()],
-                  loading: false,
-                });
-                if (onSuccess) onSuccess();
-                (store as any).loadInvoices();
-                (store as any).loadJournalEntries();
-                (store as any).loadAccounts();
-                // Refresh all financial reports so they reflect the new payment
-                const year = new Date().getFullYear();
-                const startDate = `${year}-01-01`;
-                const endDate = `${year}-12-31`;
-                if (store.profitLoss()) {
-                  (store as any).loadProfitAndLoss({ startDate, endDate, currency: store.profitLoss().currency ?? 'EGP' });
-                }
-                if (store.balanceSheet()) {
-                  (store as any).loadBalanceSheet({ asOfDate: endDate });
-                }
-                if (store.cashFlow()) {
-                  (store as any).loadCashFlow({ startDate, endDate });
-                }
-              },
-              error: (error: Error) => patchState(store, { error: error.message, loading: false }),
-            })
-          )
-        )
-      )
-    ),
-
-    deletePayment: rxMethod<number>(
-      pipe(
-        tap(() => patchState(store, { loading: true, error: null })),
-        switchMap((id) =>
-          api.deletePayment(id).pipe(
-            tapResponse({
-              next: () => {
-                patchState(store, {
-                  payments: store.payments().filter((p) => p.id !== id),
-                  loading: false,
-                });
-                (store as any).loadInvoices();
-                (store as any).loadJournalEntries();
-                (store as any).loadAccounts();
-                // Refresh reports
-                const year = new Date().getFullYear();
-                const startDate = `${year}-01-01`;
-                const endDate = `${year}-12-31`;
-                if (store.profitLoss()) {
-                  (store as any).loadProfitAndLoss({ startDate, endDate, currency: store.profitLoss().currency ?? 'EGP' });
-                }
-                if (store.balanceSheet()) {
-                  (store as any).loadBalanceSheet({ asOfDate: endDate });
-                }
-                if (store.cashFlow()) {
-                  (store as any).loadCashFlow({ startDate, endDate });
-                }
-              },
-              error: (error: Error) => patchState(store, { error: error.message, loading: false }),
-            })
-          )
-        )
-      )
-    ),
-
     loadProfitAndLoss: rxMethod<{ startDate: string; endDate: string; currency?: string }>(
       pipe(
         tap(() => patchState(store, { loading: true, error: null })),
@@ -347,6 +276,78 @@ export const AccountingStore = signalStore(
           api.getCashFlow(startDate, endDate).pipe(
             tapResponse({
               next: (cashFlow) => patchState(store, { cashFlow, loading: false }),
+              error: (error: Error) => patchState(store, { error: error.message, loading: false }),
+            })
+          )
+        )
+      )
+    ),
+  })),
+  withMethods((store, api = inject(AccountingApiService)) => ({
+    createPayment: rxMethod<{ dto: any; onSuccess?: () => void }>(
+      pipe(
+        tap(() => patchState(store, { loading: true, error: null })),
+        switchMap(({ dto, onSuccess }) =>
+          api.createPayment(dto).pipe(
+            tapResponse({
+              next: (payment) => {
+                patchState(store, {
+                  payments: [payment, ...store.payments()],
+                  loading: false,
+                });
+                if (onSuccess) onSuccess();
+                store.loadInvoices();
+                store.loadJournalEntries();
+                store.loadAccounts();
+                // Refresh all financial reports so they reflect the new payment
+                const year = new Date().getFullYear();
+                const startDate = `${year}-01-01`;
+                const endDate = `${year}-12-31`;
+                if (store.profitLoss()) {
+                  store.loadProfitAndLoss({ startDate, endDate, currency: store.profitLoss().currency ?? 'EGP' });
+                }
+                if (store.balanceSheet()) {
+                  store.loadBalanceSheet({ asOfDate: endDate });
+                }
+                if (store.cashFlow()) {
+                  store.loadCashFlow({ startDate, endDate });
+                }
+              },
+              error: (error: Error) => patchState(store, { error: error.message, loading: false }),
+            })
+          )
+        )
+      )
+    ),
+
+    deletePayment: rxMethod<number>(
+      pipe(
+        tap(() => patchState(store, { loading: true, error: null })),
+        switchMap((id) =>
+          api.deletePayment(id).pipe(
+            tapResponse({
+              next: () => {
+                patchState(store, {
+                  payments: store.payments().filter((p) => p.id !== id),
+                  loading: false,
+                });
+                store.loadInvoices();
+                store.loadJournalEntries();
+                store.loadAccounts();
+                // Refresh reports
+                const year = new Date().getFullYear();
+                const startDate = `${year}-01-01`;
+                const endDate = `${year}-12-31`;
+                if (store.profitLoss()) {
+                  store.loadProfitAndLoss({ startDate, endDate, currency: store.profitLoss().currency ?? 'EGP' });
+                }
+                if (store.balanceSheet()) {
+                  store.loadBalanceSheet({ asOfDate: endDate });
+                }
+                if (store.cashFlow()) {
+                  store.loadCashFlow({ startDate, endDate });
+                }
+              },
               error: (error: Error) => patchState(store, { error: error.message, loading: false }),
             })
           )

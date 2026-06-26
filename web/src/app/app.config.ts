@@ -38,6 +38,9 @@ import {
   Lock,
   HelpCircle,
   Info,
+  Copy,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-angular';
 
 export const appConfig: ApplicationConfig = {
@@ -79,6 +82,9 @@ export const appConfig: ApplicationConfig = {
         Lock,
         HelpCircle,
         Info,
+        Copy,
+        ChevronDown,
+        ChevronUp,
       })
     ),
   ]

@@ -1,0 +1,263 @@
+<div class="space-y-6">
+  <!-- Header -->
+  <div>
+    <h1 class="text-2xl font-semibold text-zinc-100 flex items-center gap-2">
+      <lucide-icon name="search" class="w-6 h-6 text-zinc-400"></lucide-icon>
+      AI Sourcing Agent
+    </h1>
+    <p class="text-sm text-zinc-400 mt-1">Research and analyze real manufacturers worldwide powered by Claude with Web Search.</p>
+  </div>
+
+  <!-- Form Query Panel -->
+  <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-xl">
+    <form (ngSubmit)="onSubmit()" #form="ngForm" class="space-y-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        <!-- Sport Selector -->
+        <div>
+          <label class="block text-sm font-medium text-zinc-300 mb-2">Sport Type</label>
+          <div class="flex gap-2">
+            <button
+              type="button"
+              (click)="setSport('football')"
+              [class.bg-zinc-800]="sport === 'football'"
+              [class.text-zinc-100]="sport === 'football'"
+              [class.border-zinc-700]="sport === 'football'"
+              class="flex-1 py-2 px-4 border border-zinc-800 rounded-lg text-zinc-400 hover:text-zinc-200 transition text-sm font-medium"
+            >
+              Football
+            </button>
+            <button
+              type="button"
+              (click)="setSport('handball')"
+              [class.bg-zinc-800]="sport === 'handball'"
+              [class.text-zinc-100]="sport === 'handball'"
+              [class.border-zinc-700]="sport === 'handball'"
+              class="flex-1 py-2 px-4 border border-zinc-800 rounded-lg text-zinc-400 hover:text-zinc-200 transition text-sm font-medium"
+            >
+              Handball
+            </button>
+          </div>
+        </div>
+
+        <!-- Tier Selector -->
+        <div>
+          <label for="tier" class="block text-sm font-medium text-zinc-300 mb-2">Quality Tier</label>
+          <select
+            id="tier"
+            name="tier"
+            [(ngModel)]="tier"
+            class="w-full bg-zinc-950 border border-zinc-800 text-zinc-100 rounded-lg py-2 px-3 focus:outline-none focus:border-zinc-700 text-sm"
+          >
+            <option value="match_pro">Match Pro (Top Grade)</option>
+            <option value="competition">Competition</option>
+            <option value="training">Training</option>
+            <option value="club">Club</option>
+          </select>
+        </div>
+
+        <!-- Target Market -->
+        <div>
+          <label for="targetMarket" class="block text-sm font-medium text-zinc-300 mb-2">Target Market</label>
+          <input
+            type="text"
+            id="targetMarket"
+            name="targetMarket"
+            [(ngModel)]="targetMarket"
+            placeholder="e.g. Egypt"
+            class="w-full bg-zinc-950 border border-zinc-800 text-zinc-100 rounded-lg py-2 px-3 focus:outline-none focus:border-zinc-700 text-sm"
+          />
+        </div>
+
+        <!-- Unit Budget -->
+        <div>
+          <label for="budgetPerUnit" class="block text-sm font-medium text-zinc-300 mb-2">Target Budget Per Unit (FOB)</label>
+          <input
+            type="text"
+            id="budgetPerUnit"
+            name="budgetPerUnit"
+            [(ngModel)]="budgetPerUnit"
+            placeholder="e.g. $8–12"
+            class="w-full bg-zinc-950 border border-zinc-800 text-zinc-100 rounded-lg py-2 px-3 focus:outline-none focus:border-zinc-700 text-sm"
+          />
+        </div>
+
+        <!-- Max MOQ -->
+        <div>
+          <label for="moqMax" class="block text-sm font-medium text-zinc-300 mb-2">Maximum MOQ</label>
+          <input
+            type="number"
+            id="moqMax"
+            name="moqMax"
+            [(ngModel)]="moqMax"
+            placeholder="e.g. 500"
+            class="w-full bg-zinc-950 border border-zinc-800 text-zinc-100 rounded-lg py-2 px-3 focus:outline-none focus:border-zinc-700 text-sm"
+          />
+        </div>
+
+        <!-- Certifications -->
+        <div>
+          <label class="block text-sm font-medium text-zinc-300 mb-2">Certifications Required</label>
+          <div class="flex flex-wrap gap-4 mt-2">
+            <label class="flex items-center gap-2 cursor-pointer text-sm text-zinc-400 hover:text-zinc-200">
+              <input type="checkbox" [checked]="certIhf" (change)="toggleCertIhf()" class="rounded border-zinc-800 bg-zinc-950 text-zinc-700 focus:ring-0 focus:ring-offset-0" />
+              IHF Approved
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer text-sm text-zinc-400 hover:text-zinc-200">
+              <input type="checkbox" [checked]="certFifa" (change)="toggleCertFifa()" class="rounded border-zinc-800 bg-zinc-950 text-zinc-700 focus:ring-0 focus:ring-offset-0" />
+              FIFA Quality
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer text-sm text-zinc-400 hover:text-zinc-200">
+              <input type="checkbox" [checked]="certEn71" (change)="toggleCertEn71()" class="rounded border-zinc-800 bg-zinc-950 text-zinc-700 focus:ring-0 focus:ring-offset-0" />
+              EN 71-1 (Safety)
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Notes -->
+      <div>
+        <label for="notes" class="block text-sm font-medium text-zinc-300 mb-2">Additional Sourcing Notes</label>
+        <textarea
+          id="notes"
+          name="notes"
+          [(ngModel)]="notes"
+          rows="3"
+          placeholder="e.g. require latex bladder only, eco-friendly packaging preferences..."
+          class="w-full bg-zinc-950 border border-zinc-800 text-zinc-100 rounded-lg py-2 px-3 focus:outline-none focus:border-zinc-700 text-sm"
+        ></textarea>
+      </div>
+
+      <!-- Submit -->
+      <div class="flex justify-end">
+        <button
+          type="submit"
+          [disabled]="store.status() === 'loading'"
+          class="flex items-center gap-2 px-5 py-2.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-950 rounded-lg font-medium text-sm transition disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <span *ngIf="store.status() === 'loading'" class="w-4 h-4 border-2 border-zinc-950 border-t-transparent rounded-full animate-spin"></span>
+          <span>{{ store.status() === 'loading' ? 'Searching Web...' : 'Find Suppliers' }}</span>
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Loading State placeholder -->
+  <div *ngIf="store.status() === 'loading'" class="flex flex-col items-center justify-center p-12 bg-zinc-900 border border-zinc-800 rounded-xl space-y-4">
+    <div class="w-8 h-8 border-4 border-zinc-500 border-t-transparent rounded-full animate-spin"></div>
+    <div class="text-center">
+      <p class="text-zinc-200 font-medium">Researching Manufacturers...</p>
+      <p class="text-xs text-zinc-400 mt-1">This query utilizes Claude with Web Search to crawl supplier directories. It might take up to a minute.</p>
+    </div>
+  </div>
+
+  <!-- Error State -->
+  <div *ngIf="store.status() === 'error'" class="p-4 bg-red-950/20 border border-red-800/40 rounded-xl text-red-400 text-sm flex gap-2 items-start">
+    <lucide-icon name="alert-triangle" class="w-5 h-5 flex-shrink-0 mt-0.5 text-red-500"></lucide-icon>
+    <div>
+      <h3 class="font-medium text-red-300">Sourcing Agent Error</h3>
+      <p class="mt-1 opacity-90">{{ store.error() }}</p>
+    </div>
+  </div>
+
+  <!-- Success State / Results -->
+  <div *ngIf="store.status() === 'success' && store.result()" class="space-y-6">
+    <h2 class="text-lg font-semibold text-zinc-200">Research Results</h2>
+
+    <!-- Supplier cards grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div *ngFor="let supplier of store.result()?.suppliers" class="bg-zinc-900 border border-zinc-800 rounded-xl p-5 shadow-lg space-y-4 flex flex-col justify-between">
+        
+        <div>
+          <!-- Name, Country & Score -->
+          <div class="flex justify-between items-start gap-4">
+            <div>
+              <h3 class="font-semibold text-zinc-100 text-base">{{ supplier.name }}</h3>
+              <p class="text-xs text-zinc-400 mt-0.5">{{ supplier.country }} • Fits {{ supplier.tierFit }}</p>
+            </div>
+            <div [class]="getScoreBadgeClass(supplier.score) + ' px-2.5 py-1 border rounded-md text-xs font-semibold'">
+              Score: {{ supplier.score }}/10
+            </div>
+          </div>
+
+          <!-- Specifications Tags -->
+          <div class="flex flex-wrap gap-2 mt-4">
+            <span class="text-xs px-2 py-0.5 bg-zinc-800 border border-zinc-700 text-zinc-300 rounded-full">Cover: {{ supplier.coverMaterial }}</span>
+            <span class="text-xs px-2 py-0.5 bg-zinc-800 border border-zinc-700 text-zinc-300 rounded-full">Bladder: {{ supplier.bladder }}</span>
+            <span class="text-xs px-2 py-0.5 bg-zinc-800 border border-zinc-700 text-zinc-300 rounded-full">Stitching: {{ supplier.stitching }}</span>
+          </div>
+
+          <!-- Certifications badges -->
+          <div *ngIf="supplier.certifications?.length" class="flex flex-wrap gap-2 mt-3">
+            <span *ngFor="let cert of supplier.certifications" class="text-xs px-2 py-0.5 bg-zinc-950 border border-zinc-800 text-zinc-400 rounded">
+              {{ cert }}
+            </span>
+          </div>
+
+          <!-- Description / Notes -->
+          <p class="text-sm text-zinc-400 mt-4 leading-relaxed">{{ supplier.notes }}</p>
+        </div>
+
+        <!-- Logistics / Contact details -->
+        <div class="pt-4 border-t border-zinc-800 space-y-2 text-xs">
+          <div class="flex justify-between">
+            <span class="text-zinc-400">Est. MOQ:</span>
+            <span class="text-zinc-200 font-medium">{{ supplier.estimatedMoq }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-zinc-400">Est. FOB Price:</span>
+            <span class="text-zinc-200 font-medium">{{ supplier.estimatedFobPrice }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-zinc-400">Payment:</span>
+            <span class="text-zinc-200 font-medium">{{ supplier.paymentMethods.join(', ') }}</span>
+          </div>
+          <div class="mt-2 pt-2 border-t border-zinc-800/40">
+            <span class="text-zinc-400 block mb-1">Contact Details:</span>
+            <span class="text-zinc-200 font-mono">{{ supplier.contactInfo }}</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Recommended pick section -->
+    <div class="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-lg">
+      <button (click)="toggleRecommended()" class="w-full flex items-center justify-between p-5 text-left border-b border-zinc-800 bg-zinc-900/50 hover:bg-zinc-900 transition">
+        <h3 class="font-medium text-zinc-200 flex items-center gap-2">
+          <lucide-icon name="check-circle" class="w-5 h-5 text-emerald-500"></lucide-icon>
+          Top Pick Recommendation: <span class="text-zinc-100 font-bold ml-1">{{ store.result()?.recommended }}</span>
+        </h3>
+        <lucide-icon [name]="isRecommendedOpen() ? 'chevron-up' : 'chevron-down'" class="w-4 h-4 text-zinc-400"></lucide-icon>
+      </button>
+      <div *ngIf="isRecommendedOpen()" class="p-5 text-sm text-zinc-400 leading-relaxed bg-zinc-900/20">
+        {{ store.result()?.reasoning }}
+      </div>
+    </div>
+
+    <!-- Draft email section -->
+    <div class="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-lg">
+      <div class="flex items-center justify-between p-5 border-b border-zinc-800 bg-zinc-900/50">
+        <button (click)="toggleEmailDraft()" class="flex items-center justify-between text-left hover:text-zinc-200 transition gap-2">
+          <h3 class="font-medium text-zinc-200 flex items-center gap-2">
+            <lucide-icon name="paperclip" class="w-5 h-5 text-zinc-400"></lucide-icon>
+            Draft Introduction & RFQ Email
+          </h3>
+          <lucide-icon [name]="isEmailDraftOpen() ? 'chevron-up' : 'chevron-down'" class="w-4 h-4 text-zinc-400 ml-2"></lucide-icon>
+        </button>
+        <button
+          *ngIf="store.result()?.contactEmailDraft"
+          (click)="copyEmailDraft(store.result()!.contactEmailDraft)"
+          class="flex items-center gap-2 px-3 py-1.5 border border-zinc-700 hover:border-zinc-600 text-xs font-medium text-zinc-300 hover:text-zinc-100 rounded bg-zinc-800 transition"
+        >
+          <lucide-icon name="copy" class="w-3.5 h-3.5"></lucide-icon>
+          <span>{{ copied() ? 'Copied!' : 'Copy Draft' }}</span>
+        </button>
+      </div>
+      <div *ngIf="isEmailDraftOpen()" class="p-5 bg-zinc-950 font-mono text-xs text-zinc-300 overflow-x-auto">
+        <pre class="whitespace-pre-wrap leading-relaxed">{{ store.result()?.contactEmailDraft }}</pre>
+      </div>
+    </div>
+
+  </div>
+</div>

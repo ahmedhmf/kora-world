@@ -39,6 +39,7 @@ export class LayoutComponent {
       icon: 'package',
       subItems: [
         { label: 'Suppliers', route: '/suppliers', icon: 'factory' },
+        { label: 'Sourcing', route: '/sourcing', icon: 'search' },
         { label: 'Products', route: '/products', icon: 'dribbble' },
         { label: 'Samples', route: '/samples', icon: 'flask-conical' },
       ],

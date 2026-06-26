@@ -272,4 +272,9 @@ export class ApiService {
   getDhlTracking(trackingNumber: string): Observable<any> {
     return this.http.get<any>(`${this.base}/dhl-tracking?trackingNumber=${trackingNumber}`);
   }
+
+  // Sourcing
+  runSourcingResearch(dto: any): Observable<any> {
+    return this.http.post<any>(`${this.base}/sourcing/research`, dto);
+  }
 }

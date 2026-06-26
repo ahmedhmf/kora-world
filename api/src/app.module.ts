@@ -43,6 +43,7 @@ import { Payment } from './payments/entities/payment.entity';
 import { AccountingModule } from './accounting/accounting.module';
 import { InvoicesModule } from './invoices/invoices.module';
 import { PaymentsModule } from './payments/payments.module';
+import { SourcingModule } from './sourcing/sourcing.module';
 
 @Module({
   imports: [
@@ -100,6 +101,7 @@ import { PaymentsModule } from './payments/payments.module';
     AccountingModule,
     InvoicesModule,
     PaymentsModule,
+    SourcingModule,
     ThrottlerModule.forRoot([
       {
         ttl: 60000,

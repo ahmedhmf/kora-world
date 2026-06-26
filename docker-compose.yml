@@ -31,6 +31,7 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       NODE_ENV: development
       DHL_API_KEY: ${DHL_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
     volumes:
       - ./api:/app
       - /app/node_modules
