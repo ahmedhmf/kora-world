@@ -40,6 +40,11 @@ async function bootstrap() {
       // Allow requests with no origin (like mobile apps, curl, or server-to-server)
       if (!origin) return callback(null, true);
 
+      // Always allow in development environment
+      if (!isProd) {
+        return callback(null, true);
+      }
+
       const isAllowed = allowedOrigins.some((allowed) => {
         if (allowed === '*') return true;
         return allowed === origin || origin.startsWith(allowed);
@@ -48,7 +53,8 @@ async function bootstrap() {
       if (isAllowed) {
         callback(null, true);
       } else {
-        callback(new Error('CORS Policy Violation: Origin not allowed'));
+        console.warn(`CORS blocked request from origin: ${origin}`);
+        callback(new Error(`CORS Policy Violation: Origin ${origin} not allowed`));
       }
     },
     credentials: true,
