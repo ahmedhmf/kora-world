@@ -310,6 +310,13 @@ export class TechPackCreatorComponent implements OnInit {
     return Object.values(this.graphicPoints).some(pt => !!pt.path);
   }
 
+  hasConstructionSpecs(): boolean {
+    const b = this.ballConstruction;
+    return !!(b.casingMaterialTier || b.casingFinish || b.casingThickness || b.panelCountShape ||
+      b.constructionMethod || b.liningLayers || b.bladderMaterialType || b.valveType ||
+      b.backing || b.numberOfColors !== null || b.debossing || b.finishes);
+  }
+
   hasCasingSpecs(): boolean {
     const b = this.ballConstruction;
     return !!(b.casingMaterialTier || b.casingFinish || b.casingThickness || b.panelCountShape || b.constructionMethod);
@@ -333,6 +340,17 @@ export class TechPackCreatorComponent implements OnInit {
   hasQualitySpecs(): boolean {
     const q = this.qualitySpecs;
     return !!(q.preProductionSamples || q.aqlInspectionLevel || q.referenceStandard || q.thirdPartyTestingLab || q.rejectionCriteria);
+  }
+
+  get activePageCount(): number {
+    // Cover page (1) is always included
+    let count = 1;
+    if (this.hasConstructionSpecs()) count++;
+    if (this.hasPhysicalSpecs()) count++;
+    if (this.hasAnyGraphicImage()) count++;
+    if (this.hasPackagingSpecs()) count++;
+    if (this.hasQualitySpecs()) count++;
+    return count;
   }
 
   exportPdf(): void {
