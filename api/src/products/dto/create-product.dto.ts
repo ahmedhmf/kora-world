@@ -99,6 +99,11 @@ export class CreateProductDto {
 
   @IsString()
   @IsOptional()
+  @ValidateIf((o, v) => v !== null)
+  size?: string | null;
+
+  @IsString()
+  @IsOptional()
   collection?: string;
 
   @IsInt()

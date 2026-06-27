@@ -83,6 +83,9 @@ export class Product {
   @Column({ type: 'varchar', name: 'graphic_pattern_name', length: 255, nullable: true })
   graphicPatternName?: string | null;
 
+  @Column({ type: 'varchar', name: 'size', length: 20, nullable: true })
+  size?: string | null;
+
   @Column({ name: 'collection', length: 10, nullable: true })
   collection?: string;
 

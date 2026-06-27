@@ -28,6 +28,7 @@ export interface Product {
   graphicLogoName?: string;
   graphicPatternPath?: string;
   graphicPatternName?: string;
+  size?: string | null;
   collection?: string;
   year?: number;
   articleCounter?: number;
@@ -54,8 +55,9 @@ export interface CreateProductDto {
   imageName?: string;
   graphicLogoPath?: string;
   graphicLogoName?: string;
-  graphicPatternPath?: string;
-  graphicPatternName?: string;
+  graphicPatternPath?: string | null;
+  graphicPatternName?: string | null;
+  size?: string | null;
   collection?: string;
   year?: number;
   articleCounter?: number;

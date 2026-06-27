@@ -62,6 +62,7 @@ export class ProductFormComponent implements OnInit {
     collection: '',
     year: new Date().getFullYear(),
     pricepoint: '',
+    size: '' as string,
   };
 
   ballConstruction = {
@@ -111,6 +112,37 @@ export class ProductFormComponent implements OnInit {
     referenceStandard: '',
     thirdPartyTestingLab: '',
   };
+
+  get availableSizes(): string[] {
+    if (this.form.category === 'football') return ['Mini', '3', '4', '5'];
+    if (this.form.category === 'handball') return ['0', '1', '2', '3'];
+    return [];
+  }
+
+  onCategoryChange(): void {
+    this.form.size = '';
+    this.updateArticleNumberPreview();
+  }
+
+  onSizeChange(): void {
+    if (this.form.category === 'football' && this.form.size) {
+      this.ballConstruction.pressure = '0.6–1.1 bar (8.7–15.9 psi)';
+      this.ballConstruction.rebound = '120–165 cm (dropped from 200 cm height)';
+      this.ballConstruction.waterAbsorption = '≤ 10% weight increase';
+      this.ballConstruction.shapeSizeRetention = 'Circumference change ≤ 1.5% after 2,000 cycles; Roundness max dev ≤ 1.5%';
+
+      if (this.form.size === '3') {
+        this.ballConstruction.circumference = '58–60 cm';
+        this.ballConstruction.weight = '300–320 g';
+      } else if (this.form.size === '4') {
+        this.ballConstruction.circumference = '63–66 cm';
+        this.ballConstruction.weight = '350–390 g';
+      } else if (this.form.size === '5') {
+        this.ballConstruction.circumference = '68–70 cm';
+        this.ballConstruction.weight = '410–450 g';
+      }
+    }
+  }
 
   loadConstruction(construction?: Record<string, any>): void {
     if (!construction) return;
@@ -241,6 +273,7 @@ export class ProductFormComponent implements OnInit {
                 collection: product.collection || '',
                 year: product.year || new Date().getFullYear(),
                 pricepoint: product.pricepoint || '',
+                size: product.size || '',
               };
               this.loadConstruction(product.construction);
               this.cdr.detectChanges();
@@ -275,6 +308,7 @@ export class ProductFormComponent implements OnInit {
           collection: '',
           year: new Date().getFullYear(),
           pricepoint: '',
+          size: '',
         };
         this.articleNumberPreview.set('Pending required fields...');
         this.ballConstruction = {
@@ -353,6 +387,7 @@ export class ProductFormComponent implements OnInit {
                   collection: sample.collection || '',
                   year: sample.year || new Date().getFullYear(),
                   pricepoint: '',
+                  size: '',
                 };
                 this.updateArticleNumberPreview();
                 this.loadConstruction(sample.construction);
@@ -384,6 +419,7 @@ export class ProductFormComponent implements OnInit {
                   collection: product.collection || '',
                   year: product.year || new Date().getFullYear(),
                   pricepoint: product.pricepoint || '',
+                  size: product.size || '',
                 };
                 this.updateArticleNumberPreview();
                 this.loadConstruction(product.construction);
@@ -440,6 +476,7 @@ export class ProductFormComponent implements OnInit {
       this.form.pricepoint = '';
     }
     dto.pricepoint = this.form.pricepoint || null as any;
+    dto.size = this.form.size || null as any;
 
     // Serialize construction if category is football or handball
     if (this.form.category === 'football' || this.form.category === 'handball') {

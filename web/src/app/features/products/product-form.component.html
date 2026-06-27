@@ -70,7 +70,7 @@
               <label class="block text-sm font-medium text-zinc-400 mb-1.5">Category *</label>
               <select
                 [(ngModel)]="form.category" name="category" required
-                (change)="updateArticleNumberPreview()"
+                (change)="onCategoryChange()"
                 class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-zinc-500"
               >
                 <option [ngValue]="undefined" disabled>Select category</option>
@@ -100,6 +100,20 @@
                   <option value="" disabled>Select pricepoint</option>
                   @for (p of pricepoints(); track p) {
                     <option [value]="p">{{ p }}</option>
+                  }
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-zinc-400 mb-1.5">Size</label>
+                <select
+                  [(ngModel)]="form.size" name="size"
+                  (change)="onSizeChange()"
+                  class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-zinc-500"
+                >
+                  <option value="">Select size</option>
+                  @for (sz of availableSizes; track sz) {
+                    <option [value]="sz">Size {{ sz }}</option>
                   }
                 </select>
               </div>
@@ -138,6 +152,20 @@
                   <option value="" disabled>Select pricepoint</option>
                   @for (p of pricepoints(); track p) {
                     <option [value]="p">{{ p }}</option>
+                  }
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-zinc-400 mb-1.5">Size</label>
+                <select
+                  [(ngModel)]="form.size" name="size"
+                  (change)="onSizeChange()"
+                  class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-zinc-500"
+                >
+                  <option value="">Select size</option>
+                  @for (sz of availableSizes; track sz) {
+                    <option [value]="sz">Size {{ sz }}</option>
                   }
                 </select>
               </div>

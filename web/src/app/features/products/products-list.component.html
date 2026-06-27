@@ -146,9 +146,12 @@
                     </div>
                   </td>
                   <td class="px-6 py-4">
-                    <span class="px-2 py-1 rounded-md text-xs font-medium"
+                    <span class="px-2 py-1 rounded-md text-xs font-medium inline-flex items-center gap-1"
                       [class]="categoryClass(product.category)">
-                      {{ product.category ?? '—' }}
+                      <span>{{ product.category ?? '—' }}</span>
+                      @if (product.size) {
+                        <span class="opacity-80 font-normal">({{ product.size }})</span>
+                      }
                     </span>
                   </td>
                   <td class="px-6 py-4 text-zinc-400">{{ product.supplier?.name ?? '—' }}</td>
