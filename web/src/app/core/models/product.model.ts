@@ -24,6 +24,10 @@ export interface Product {
   techPackName?: string;
   imagePath?: string;
   imageName?: string;
+  graphicLogoPath?: string;
+  graphicLogoName?: string;
+  graphicPatternPath?: string;
+  graphicPatternName?: string;
   collection?: string;
   year?: number;
   articleCounter?: number;
@@ -48,6 +52,10 @@ export interface CreateProductDto {
   techPackName?: string;
   imagePath?: string;
   imageName?: string;
+  graphicLogoPath?: string;
+  graphicLogoName?: string;
+  graphicPatternPath?: string;
+  graphicPatternName?: string;
   collection?: string;
   year?: number;
   articleCounter?: number;

@@ -79,6 +79,26 @@ export class CreateProductDto {
 
   @IsString()
   @IsOptional()
+  @ValidateIf((o, v) => v !== null)
+  graphicLogoPath?: string | null;
+
+  @IsString()
+  @IsOptional()
+  @ValidateIf((o, v) => v !== null)
+  graphicLogoName?: string | null;
+
+  @IsString()
+  @IsOptional()
+  @ValidateIf((o, v) => v !== null)
+  graphicPatternPath?: string | null;
+
+  @IsString()
+  @IsOptional()
+  @ValidateIf((o, v) => v !== null)
+  graphicPatternName?: string | null;
+
+  @IsString()
+  @IsOptional()
   collection?: string;
 
   @IsInt()

@@ -1,0 +1,1139 @@
+<div class="p-8 max-w-7xl mx-auto space-y-8">
+  <!-- Header & Actions -->
+  <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 no-print print:hidden">
+    <div>
+      <h1 class="text-2xl font-bold text-white">Tech Pack Creator</h1>
+      <p class="text-zinc-400 text-sm mt-1">Generate technical specifications and construction tech packs for balls.</p>
+    </div>
+    <div class="flex items-center space-x-3">
+      <button
+        type="button"
+        (click)="exportPdf()"
+        class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-xl transition-colors shadow-lg flex items-center space-x-2"
+      >
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+        </svg>
+        <span>Export PDF / Print</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Main Grid: Form Controls on Left, Preview on Right -->
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+    <!-- Left Column: Controls Form -->
+    <div class="lg:col-span-5 space-y-6 no-print print:hidden">
+      <!-- Product Selector Card -->
+      <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-xl space-y-4">
+        <h2 class="text-sm font-bold text-white uppercase tracking-wider text-indigo-400">1. Load Existing Product</h2>
+        <div>
+          <label class="block text-xs font-medium text-zinc-400 mb-2">Select Product to Load Specifications</label>
+          <select
+            (change)="onProductSelect($event)"
+            class="w-full bg-zinc-950 border border-zinc-750 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-indigo-500"
+          >
+            <option value="">-- Choose a Product --</option>
+            @for (prod of products(); track prod.id) {
+              <option [value]="prod.id">{{ prod.name }} ({{ prod.articleNumber }})</option>
+            }
+          </select>
+        </div>
+      </div>
+
+      <!-- Construction Form Specifications for Page 2 -->
+      <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-xl space-y-6">
+        <h2 class="text-sm font-bold text-white uppercase tracking-wider text-indigo-400">2. Page 2: Ball Construction & Specs</h2>
+
+        <!-- General Info -->
+        <div class="space-y-4">
+          <h3 class="text-xs font-semibold text-zinc-500 uppercase tracking-wider border-b border-zinc-800 pb-2">Product Header Info</h3>
+          <div>
+            <label class="block text-xs text-zinc-400 mb-1">Product Name</label>
+            <input
+              type="text"
+              [(ngModel)]="productHeader.name"
+              placeholder="e.g. Kora Match Pro Football"
+              class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+            />
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-zinc-400 mb-1">Article Number</label>
+              <input
+                type="text"
+                [(ngModel)]="productHeader.articleNumber"
+                placeholder="e.g. SS260007FB"
+                class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500 font-mono"
+              />
+            </div>
+            <div>
+              <label class="block text-xs text-zinc-400 mb-1">Pricepoint</label>
+              <select
+                [(ngModel)]="productHeader.pricepoint"
+                class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+              >
+                <option value="">Select pricepoint</option>
+                @for (p of pricepoints(); track p) {
+                  <option [value]="p">{{ p }}</option>
+                }
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Outer Cover (Casing) -->
+        <div class="space-y-4">
+          <h3 class="text-xs font-semibold text-zinc-500 uppercase tracking-wider border-b border-zinc-800 pb-2">Outer Cover (Casing)</h3>
+          <div>
+            <label class="block text-xs text-zinc-400 mb-1">Material (PU Grade / Tier)</label>
+            <input
+              type="text"
+              [(ngModel)]="ballConstruction.casingMaterialTier"
+              placeholder="e.g. Japan PU, Korea PU, PVC"
+              class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+            />
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-zinc-400 mb-1">Finish</label>
+              <input
+                type="text"
+                [(ngModel)]="ballConstruction.casingFinish"
+                placeholder="e.g. Matte, Glossy, Textured"
+                class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+            <div>
+              <label class="block text-xs text-zinc-400 mb-1">Thickness (mm)</label>
+              <input
+                type="text"
+                [(ngModel)]="ballConstruction.casingThickness"
+                placeholder="e.g. 1.0mm PU"
+                class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs text-zinc-400 mb-1">Panel Count & Shape</label>
+            <input
+              type="text"
+              [(ngModel)]="ballConstruction.panelCountShape"
+              placeholder="e.g. Traditional 32-panel (20 hex + 12 penta)"
+              class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+            />
+          </div>
+          <div>
+            <label class="block text-xs text-zinc-400 mb-1">Construction Method & Thread</label>
+            <input
+              type="text"
+              [(ngModel)]="ballConstruction.constructionMethod"
+              placeholder="e.g. Hand-stitched (polyester 5-ply), machine-stitched, thermal bonded"
+              class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+            />
+          </div>
+        </div>
+
+        <!-- Lining Layers -->
+        <div class="space-y-4">
+          <h3 class="text-xs font-semibold text-zinc-500 uppercase tracking-wider border-b border-zinc-800 pb-2">Lining Layers</h3>
+          <div>
+            <label class="block text-xs text-zinc-400 mb-1">Number & Type of Lining Layers</label>
+            <input
+              type="text"
+              [(ngModel)]="ballConstruction.liningLayers"
+              placeholder="e.g. 4-layer: 2 polyester + 2 cotton"
+              class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+            />
+          </div>
+        </div>
+
+        <!-- Bladder & Valve -->
+        <div class="space-y-4">
+          <h3 class="text-xs font-semibold text-zinc-500 uppercase tracking-wider border-b border-zinc-800 pb-2">Bladder & Valve</h3>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-zinc-400 mb-1">Bladder Material</label>
+              <input
+                type="text"
+                [(ngModel)]="ballConstruction.bladderMaterialType"
+                placeholder="e.g. Latex or Butyl"
+                class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+            <div>
+              <label class="block text-xs text-zinc-400 mb-1">Valve Type</label>
+              <input
+                type="text"
+                [(ngModel)]="ballConstruction.valveType"
+                placeholder="e.g. Standard or Supervalve"
+                class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- General Parameters -->
+        <div class="space-y-4">
+          <h3 class="text-xs font-semibold text-zinc-500 uppercase tracking-wider border-b border-zinc-800 pb-2">General Parameters</h3>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-zinc-400 mb-1">Backing</label>
+              <select
+                [(ngModel)]="ballConstruction.backing"
+                class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+              >
+                <option value="">Select backing</option>
+                @for (b of backings(); track b) {
+                  <option [value]="b">{{ b }}</option>
+                }
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs text-zinc-400 mb-1">Number of Colors</label>
+              <input
+                type="number" step="1"
+                [(ngModel)]="ballConstruction.numberOfColors"
+                placeholder="e.g. 3"
+                class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+          </div>
+
+          <div class="flex items-center space-x-6 pt-2">
+            <label class="flex items-center space-x-2 cursor-pointer">
+              <input type="checkbox" [(ngModel)]="ballConstruction.debossing" class="rounded border-zinc-800 text-indigo-600 focus:ring-indigo-500 h-4 w-4" />
+              <span class="text-xs text-zinc-300">Debossing</span>
+            </label>
+            <label class="flex items-center space-x-2 cursor-pointer">
+              <input type="checkbox" [(ngModel)]="ballConstruction.finishes" class="rounded border-zinc-800 text-indigo-600 focus:ring-indigo-500 h-4 w-4" />
+              <span class="text-xs text-zinc-300">Finishes</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dimensions & Physical Specs Form for Page 3 -->
+      <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-xl space-y-6">
+        <h2 class="text-sm font-bold text-white uppercase tracking-wider text-indigo-400">3. Page 3: Dimensions & Physical Specs</h2>
+        <div class="space-y-4">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-zinc-400 mb-1">Circumference</label>
+              <input
+                type="text"
+                [(ngModel)]="ballConstruction.circumference"
+                placeholder="e.g. 68–70 cm"
+                class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+            <div>
+              <label class="block text-xs text-zinc-400 mb-1">Weight</label>
+              <input
+                type="text"
+                [(ngModel)]="ballConstruction.physicalWeight"
+                placeholder="e.g. 410–450 g"
+                class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-zinc-400 mb-1">Pressure</label>
+              <input
+                type="text"
+                [(ngModel)]="ballConstruction.pressure"
+                placeholder="e.g. 0.6–1.1 bar"
+                class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+            <div>
+              <label class="block text-xs text-zinc-400 mb-1">Rebound</label>
+              <input
+                type="text"
+                [(ngModel)]="ballConstruction.rebound"
+                placeholder="e.g. 120–165 cm (from 2m drop)"
+                class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs text-zinc-400 mb-1">Water Absorption</label>
+            <input
+              type="text"
+              [(ngModel)]="ballConstruction.waterAbsorption"
+              placeholder="e.g. Max 10% weight gain"
+              class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+            />
+          </div>
+          <div>
+            <label class="block text-xs text-zinc-400 mb-1">Shape/Size Retention</label>
+            <input
+              type="text"
+              [(ngModel)]="ballConstruction.shapeSizeRetention"
+              placeholder="e.g. Must pass FIFA Basic test"
+              class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Graphic / Visual Specification Form for Page 4 -->
+      <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-xl space-y-6">
+        <h2 class="text-sm font-bold text-white uppercase tracking-wider text-indigo-400">4. Page 4: Graphic Image Attachments</h2>
+        <div class="space-y-4">
+          <!-- 1. Color Callouts -->
+          <div class="bg-zinc-950 p-4 rounded-xl border border-zinc-800 space-y-2">
+            <app-file-upload
+              label="1. Color Callouts (Pantone Codes)"
+              [filePath]="graphicPoints.colorCallouts.path || ''"
+              [fileName]="graphicPoints.colorCallouts.name || ''"
+              (fileUploaded)="onPointFileUploaded('colorCallouts', $event)"
+              (fileRemoved)="onPointFileRemoved('colorCallouts')"
+            ></app-file-upload>
+            <input type="text" [(ngModel)]="graphicPoints.colorCallouts.notes" placeholder="Notes (e.g. PMS 419 C, PMS 186 C)" class="w-full bg-zinc-900 border border-zinc-750 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-indigo-500" />
+          </div>
+
+          <!-- 2. Logo Placement -->
+          <div class="bg-zinc-950 p-4 rounded-xl border border-zinc-800 space-y-2">
+            <app-file-upload
+              label="2. Logo Placement & Position"
+              [filePath]="graphicPoints.logoPlacement.path || ''"
+              [fileName]="graphicPoints.logoPlacement.name || ''"
+              (fileUploaded)="onPointFileUploaded('logoPlacement', $event)"
+              (fileRemoved)="onPointFileRemoved('logoPlacement')"
+            ></app-file-upload>
+            <input type="text" [(ngModel)]="graphicPoints.logoPlacement.notes" placeholder="Notes (e.g. Center panel 4, size 5.5cm)" class="w-full bg-zinc-900 border border-zinc-750 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-indigo-500" />
+          </div>
+
+          <!-- 3. Print Method -->
+          <div class="bg-zinc-950 p-4 rounded-xl border border-zinc-800 space-y-2">
+            <app-file-upload
+              label="3. Print Method"
+              [filePath]="graphicPoints.printMethod.path || ''"
+              [fileName]="graphicPoints.printMethod.name || ''"
+              (fileUploaded)="onPointFileUploaded('printMethod', $event)"
+              (fileRemoved)="onPointFileRemoved('printMethod')"
+            ></app-file-upload>
+            <input type="text" [(ngModel)]="graphicPoints.printMethod.notes" placeholder="Notes (e.g. Screen printing or Sublimation)" class="w-full bg-zinc-900 border border-zinc-750 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-indigo-500" />
+          </div>
+
+          <!-- 4. Print Colors -->
+          <div class="bg-zinc-950 p-4 rounded-xl border border-zinc-800 space-y-2">
+            <app-file-upload
+              label="4. Print Colors (CMYK + Pantone)"
+              [filePath]="graphicPoints.printColors.path || ''"
+              [fileName]="graphicPoints.printColors.name || ''"
+              (fileUploaded)="onPointFileUploaded('printColors', $event)"
+              (fileRemoved)="onPointFileRemoved('printColors')"
+            ></app-file-upload>
+            <input type="text" [(ngModel)]="graphicPoints.printColors.notes" placeholder="Notes (e.g. CMYK + Pantone ref)" class="w-full bg-zinc-900 border border-zinc-750 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-indigo-500" />
+          </div>
+
+          <!-- 5. Logo Vector File -->
+          <div class="bg-zinc-950 p-4 rounded-xl border border-zinc-800 space-y-2">
+            <app-file-upload
+              label="5. Logo Vector File (AI, PDF, SVG)"
+              [filePath]="graphicPoints.logoVector.path || ''"
+              [fileName]="graphicPoints.logoVector.name || ''"
+              (fileUploaded)="onPointFileUploaded('logoVector', $event)"
+              (fileRemoved)="onPointFileRemoved('logoVector')"
+            ></app-file-upload>
+            <input type="text" [(ngModel)]="graphicPoints.logoVector.notes" placeholder="Notes (e.g. Vector AI/PDF min 300 DPI)" class="w-full bg-zinc-900 border border-zinc-750 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-indigo-500" />
+          </div>
+
+          <!-- 6. Label / Badge -->
+          <div class="bg-zinc-950 p-4 rounded-xl border border-zinc-800 space-y-2">
+            <app-file-upload
+              label="6. Label / Badge (FIFA/IHF Quality Mark)"
+              [filePath]="graphicPoints.labelBadge.path || ''"
+              [fileName]="graphicPoints.labelBadge.name || ''"
+              (fileUploaded)="onPointFileUploaded('labelBadge', $event)"
+              (fileRemoved)="onPointFileRemoved('labelBadge')"
+            ></app-file-upload>
+            <input type="text" [(ngModel)]="graphicPoints.labelBadge.notes" placeholder="Notes (e.g. FIFA Quality Pro badge)" class="w-full bg-zinc-900 border border-zinc-750 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-indigo-500" />
+          </div>
+
+          <!-- 7. Ball Color -->
+          <div class="bg-zinc-950 p-4 rounded-xl border border-zinc-800 space-y-2">
+            <app-file-upload
+              label="7. Ball Color (Background Panel)"
+              [filePath]="graphicPoints.ballColor.path || ''"
+              [fileName]="graphicPoints.ballColor.name || ''"
+              (fileUploaded)="onPointFileUploaded('ballColor', $event)"
+              (fileRemoved)="onPointFileRemoved('ballColor')"
+            ></app-file-upload>
+            <input type="text" [(ngModel)]="graphicPoints.ballColor.notes" placeholder="Notes (e.g. Background panel colors)" class="w-full bg-zinc-900 border border-zinc-750 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-indigo-500" />
+          </div>
+
+          <!-- 8. Pattern Layout -->
+          <div class="bg-zinc-950 p-4 rounded-xl border border-zinc-800 space-y-2">
+            <app-file-upload
+              label="8. Pattern & Flat Panel Net Layout"
+              [filePath]="graphicPoints.patternLayout.path || ''"
+              [fileName]="graphicPoints.patternLayout.name || ''"
+              (fileUploaded)="onPointFileUploaded('patternLayout', $event)"
+              (fileRemoved)="onPointFileRemoved('patternLayout')"
+            ></app-file-upload>
+            <input type="text" [(ngModel)]="graphicPoints.patternLayout.notes" placeholder="Notes (e.g. Flat panel net diagram)" class="w-full bg-zinc-900 border border-zinc-750 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-indigo-500" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Packaging Specification Form for Page 5 -->
+      <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-xl space-y-6">
+        <h2 class="text-sm font-bold text-white uppercase tracking-wider text-indigo-400">5. Page 5: Packaging Specification</h2>
+        <div class="space-y-4">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-zinc-400 mb-1">Individual Packaging</label>
+              <input
+                type="text"
+                [(ngModel)]="packagingSpecs.individualPackaging"
+                placeholder="e.g. Poly bag, box, mesh bag"
+                class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+            <div>
+              <label class="block text-xs text-zinc-400 mb-1">Inflation State</label>
+              <input
+                type="text"
+                [(ngModel)]="packagingSpecs.inflationState"
+                placeholder="e.g. Deflated or Inflated"
+                class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-zinc-400 mb-1">Box Dimensions</label>
+              <input
+                type="text"
+                [(ngModel)]="packagingSpecs.boxDimensions"
+                placeholder="e.g. 60 x 40 x 40 cm"
+                class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+            <div>
+              <label class="block text-xs text-zinc-400 mb-1">Units Per Carton</label>
+              <input
+                type="number" step="1"
+                [(ngModel)]="packagingSpecs.unitsPerCarton"
+                placeholder="e.g. 12 or 24"
+                class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+          </div>
+
+          <!-- Kora Branding & Box Artwork -->
+          <div class="bg-zinc-950 p-4 rounded-xl border border-zinc-800 space-y-3">
+            <div class="flex items-center space-x-3">
+              <input type="checkbox" id="techKoraBranding" [(ngModel)]="packagingSpecs.koraBrandingOnBox" class="rounded border-zinc-700 text-indigo-600 focus:ring-indigo-500 h-4 w-4" />
+              <label for="techKoraBranding" class="text-xs font-semibold text-zinc-300 cursor-pointer select-none">Kora Branding on Box?</label>
+            </div>
+            @if (packagingSpecs.koraBrandingOnBox) {
+              <app-file-upload
+                label="Box Branding Artwork File"
+                [filePath]="packagingSpecs.koraBrandingArtwork.path || ''"
+                [fileName]="packagingSpecs.koraBrandingArtwork.name || ''"
+                (fileUploaded)="onBrandingArtworkUploaded($event)"
+                (fileRemoved)="onBrandingArtworkRemoved()"
+              ></app-file-upload>
+            }
+          </div>
+
+          <!-- Barcode / EAN -->
+          <div class="bg-zinc-950 p-4 rounded-xl border border-zinc-800 space-y-3">
+            <div>
+              <label class="block text-xs text-zinc-400 mb-1">Barcode / EAN Requirements</label>
+              <input
+                type="text"
+                [(ngModel)]="packagingSpecs.barcodeEan"
+                placeholder="e.g. EAN-13 code"
+                class="w-full bg-zinc-900 border border-zinc-750 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+            <app-file-upload
+              label="Barcode / EAN Image File"
+              [filePath]="packagingSpecs.barcodeEanFile.path || ''"
+              [fileName]="packagingSpecs.barcodeEanFile.name || ''"
+              (fileUploaded)="onBarcodeFileUploaded($event)"
+              (fileRemoved)="onBarcodeFileRemoved()"
+            ></app-file-upload>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quality Control & Testing Form for Page 6 -->
+      <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-xl space-y-6">
+        <h2 class="text-sm font-bold text-white uppercase tracking-wider text-indigo-400">6. Page 6: Quality Control & Testing</h2>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-xs text-zinc-400 mb-1">Pre-production Sample Requirement</label>
+            <input
+              type="text"
+              [(ngModel)]="qualitySpecs.preProductionSamples"
+              placeholder="e.g. 2–3 samples minimum required before bulk"
+              class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+            />
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-zinc-400 mb-1">AQL Inspection Level</label>
+              <input
+                type="text"
+                [(ngModel)]="qualitySpecs.aqlInspectionLevel"
+                placeholder="e.g. AQL 2.5 (<2.5% defect rate)"
+                class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+            <div>
+              <label class="block text-xs text-zinc-400 mb-1">Reference Standard</label>
+              <input
+                type="text"
+                [(ngModel)]="qualitySpecs.referenceStandard"
+                placeholder="e.g. FIFA Basic, FIFA Quality, IHF Approved"
+                class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs text-zinc-400 mb-1">Third-Party Testing Lab</label>
+            <input
+              type="text"
+              [(ngModel)]="qualitySpecs.thirdPartyTestingLab"
+              placeholder="e.g. SGS, Bureau Veritas"
+              class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+            />
+          </div>
+          <div>
+            <label class="block text-xs text-zinc-400 mb-1">Rejection Criteria</label>
+            <textarea
+              rows="3"
+              [(ngModel)]="qualitySpecs.rejectionCriteria"
+              placeholder="e.g. Stitching irregularities, color deviation >ΔE 2.0, bladder leaks, weight out of range"
+              class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+            ></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column: Document Preview -->
+    <div class="lg:col-span-7 space-y-6">
+      <div class="flex items-center justify-between no-print print:hidden">
+        <h2 class="text-sm font-bold text-white uppercase tracking-wider text-zinc-400">Live Document Preview</h2>
+        <span class="text-xs bg-zinc-800 text-zinc-400 px-2.5 py-1 rounded-md font-mono">6 Pages (Complete Tech Pack)</span>
+      </div>
+
+      <!-- Printable A4 Document Container -->
+      <div id="printable-tech-pack" class="space-y-8">
+        <!-- PAGE 1: COVER PAGE -->
+        <div class="page-break bg-black rounded-2xl shadow-2xl overflow-hidden aspect-[595/842] w-full flex flex-col justify-center items-center">
+          <img src="/tech-pack-cover.svg" alt="KORA World Tech Pack Cover" class="w-full h-full object-contain" />
+        </div>
+
+        <!-- PAGE 2: BALL CONSTRUCTION & DETAILED SPECIFICATIONS -->
+        <div class="page-break bg-white text-zinc-900 rounded-2xl shadow-2xl p-8 md:p-12 min-h-[842px] border border-zinc-200 flex flex-col justify-between">
+          <!-- Document Header -->
+          <div class="space-y-6">
+            <div class="flex justify-between items-start border-b-2 border-zinc-900 pb-6">
+              <div>
+                <h1 class="text-3xl font-black tracking-tight text-zinc-900 uppercase">KORA WORLD</h1>
+                <p class="text-xs font-bold tracking-widest text-zinc-500 uppercase mt-0.5">Technical Specification Sheet</p>
+              </div>
+              <div class="text-right">
+                <span class="inline-block bg-zinc-900 text-white text-xs font-bold px-3 py-1 uppercase tracking-wider rounded">
+                  PAGE 2: BALL CONSTRUCTION
+                </span>
+              </div>
+            </div>
+
+            <!-- Product Details Banner -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 bg-zinc-50 p-4 rounded-lg border border-zinc-200">
+              @if (productHeader.name) {
+                <div>
+                  <p class="text-[10px] uppercase font-bold text-zinc-400">Product Name</p>
+                  <p class="text-sm font-bold text-zinc-900 truncate">{{ productHeader.name }}</p>
+                </div>
+              }
+              @if (productHeader.articleNumber) {
+                <div>
+                  <p class="text-[10px] uppercase font-bold text-zinc-400">Article Number</p>
+                  <p class="text-sm font-mono font-bold text-zinc-900">{{ productHeader.articleNumber }}</p>
+                </div>
+              }
+              @if (productHeader.category) {
+                <div>
+                  <p class="text-[10px] uppercase font-bold text-zinc-400">Category / Pricepoint</p>
+                  <p class="text-sm font-semibold text-zinc-800 capitalize">{{ productHeader.category }} {{ productHeader.pricepoint ? '• ' + productHeader.pricepoint : '' }}</p>
+                </div>
+              }
+              @if (productHeader.collection || productHeader.year) {
+                <div>
+                  <p class="text-[10px] uppercase font-bold text-zinc-400">Collection / Year</p>
+                  <p class="text-sm font-semibold text-zinc-800">{{ productHeader.collection }} {{ productHeader.year }}</p>
+                </div>
+              }
+            </div>
+
+            <!-- Detailed Construction Layout -->
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-8 pt-2">
+              <!-- Left: Product Photo Preview -->
+              @if (productHeader.imagePath) {
+                <div class="md:col-span-4 flex flex-col items-center justify-center bg-zinc-50 border border-zinc-200 rounded-xl p-4 min-h-[240px]">
+                  <img [src]="getPublicUrl(productHeader.imagePath)" class="max-h-52 object-contain rounded-lg shadow-sm" alt="Ball Preview" />
+                </div>
+              }
+
+              <!-- Right: Detailed Specifications Tables -->
+              <div [class]="productHeader.imagePath ? 'md:col-span-8 space-y-5' : 'md:col-span-12 space-y-5'">
+                <!-- Outer Cover (Casing) -->
+                @if (hasCasingSpecs()) {
+                  <div>
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-indigo-950 mb-2 border-b-2 border-indigo-900 pb-1 flex items-center justify-between">
+                      <span>Outer Cover (Casing)</span>
+                      <span class="text-[10px] text-zinc-400 font-normal">Surface & Shell Specifications</span>
+                    </h2>
+                    <table class="w-full text-xs text-left border-collapse">
+                      <tbody>
+                        @if (ballConstruction.casingMaterialTier) {
+                          <tr class="border-b border-zinc-200">
+                            <td class="py-1.5 font-bold text-zinc-500 w-2/5">Material (PU Grade)</td>
+                            <td class="py-1.5 font-semibold text-zinc-900">{{ ballConstruction.casingMaterialTier }}</td>
+                          </tr>
+                        }
+                        @if (ballConstruction.casingFinish) {
+                          <tr class="border-b border-zinc-200">
+                            <td class="py-1.5 font-bold text-zinc-500">Finish & Surface</td>
+                            <td class="py-1.5 font-semibold text-zinc-900">{{ ballConstruction.casingFinish }}</td>
+                          </tr>
+                        }
+                        @if (ballConstruction.casingThickness) {
+                          <tr class="border-b border-zinc-200">
+                            <td class="py-1.5 font-bold text-zinc-500">Thickness (mm)</td>
+                            <td class="py-1.5 font-semibold text-zinc-900">{{ ballConstruction.casingThickness }}</td>
+                          </tr>
+                        }
+                        @if (ballConstruction.panelCountShape) {
+                          <tr class="border-b border-zinc-200">
+                            <td class="py-1.5 font-bold text-zinc-500">Panel Count & Shape</td>
+                            <td class="py-1.5 font-semibold text-zinc-900">{{ ballConstruction.panelCountShape }}</td>
+                          </tr>
+                        }
+                        @if (ballConstruction.constructionMethod) {
+                          <tr class="border-b border-zinc-200">
+                            <td class="py-1.5 font-bold text-zinc-500">Construction Method</td>
+                            <td class="py-1.5 font-semibold text-zinc-900">{{ ballConstruction.constructionMethod }}</td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                }
+
+                <!-- Lining Layers & Bladder Grid -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <!-- Lining Layers -->
+                  @if (ballConstruction.liningLayers) {
+                    <div>
+                      <h2 class="text-xs font-bold uppercase tracking-wider text-indigo-950 mb-2 border-b-2 border-indigo-900 pb-1">Lining Layers</h2>
+                      <table class="w-full text-xs text-left border-collapse">
+                        <tbody>
+                          <tr>
+                            <td class="py-1.5 font-semibold text-zinc-900">{{ ballConstruction.liningLayers }}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  }
+
+                  <!-- Bladder Specifications -->
+                  @if (hasBladderSpecs()) {
+                    <div>
+                      <h2 class="text-xs font-bold uppercase tracking-wider text-indigo-950 mb-2 border-b-2 border-indigo-900 pb-1">Bladder & Air Retention</h2>
+                      <table class="w-full text-xs text-left border-collapse">
+                        <tbody>
+                          @if (ballConstruction.bladderMaterialType) {
+                            <tr class="border-b border-zinc-200">
+                              <td class="py-1.5 font-bold text-zinc-500 w-1/2">Material</td>
+                              <td class="py-1.5 font-semibold text-zinc-900">{{ ballConstruction.bladderMaterialType }}</td>
+                            </tr>
+                          }
+                          @if (ballConstruction.valveType) {
+                            <tr>
+                              <td class="py-1.5 font-bold text-zinc-500">Valve Type</td>
+                              <td class="py-1.5 font-semibold text-zinc-900">{{ ballConstruction.valveType }}</td>
+                            </tr>
+                          }
+                        </tbody>
+                      </table>
+                    </div>
+                  }
+                </div>
+
+                <!-- General Features -->
+                @if (ballConstruction.backing || ballConstruction.numberOfColors !== null) {
+                  <div>
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-zinc-900 mb-1.5 border-b border-zinc-300 pb-1">General Features</h2>
+                    <div class="flex items-center space-x-6 text-xs font-semibold text-zinc-800">
+                      @if (ballConstruction.backing) {
+                        <div>Backing: <span class="font-normal text-zinc-600">{{ ballConstruction.backing }}</span></div>
+                      }
+                      @if (ballConstruction.numberOfColors !== null) {
+                        <div>Colors: <span class="font-normal text-zinc-600">{{ ballConstruction.numberOfColors }}</span></div>
+                      }
+                      @if (ballConstruction.debossing) {
+                        <div>Debossing: <span class="font-normal text-zinc-600">Yes</span></div>
+                      }
+                      @if (ballConstruction.finishes) {
+                        <div>Finishes: <span class="font-normal text-zinc-600">Yes</span></div>
+                      }
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
+          </div>
+
+          <!-- Document Footer -->
+          <div class="border-t border-zinc-300 pt-4 flex justify-between items-center text-[10px] text-zinc-500 font-medium">
+            <div>KORA WORLD Operations • Confidential Technical Document</div>
+            <div>Generated on {{ productHeader.year }}</div>
+          </div>
+        </div>
+
+        <!-- PAGE 3: DIMENSIONS & PHYSICAL SPECS -->
+        <div class="page-break bg-white text-zinc-900 rounded-2xl shadow-2xl p-8 md:p-12 min-h-[842px] border border-zinc-200 flex flex-col justify-between">
+          <!-- Document Header -->
+          <div class="space-y-6">
+            <div class="flex justify-between items-start border-b-2 border-zinc-900 pb-6">
+              <div>
+                <h1 class="text-3xl font-black tracking-tight text-zinc-900 uppercase">KORA WORLD</h1>
+                <p class="text-xs font-bold tracking-widest text-zinc-500 uppercase mt-0.5">Technical Specification Sheet</p>
+              </div>
+              <div class="text-right">
+                <span class="inline-block bg-zinc-900 text-white text-xs font-bold px-3 py-1 uppercase tracking-wider rounded">
+                  PAGE 3: PHYSICAL SPECS
+                </span>
+              </div>
+            </div>
+
+            <!-- Product Details Banner -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 bg-zinc-50 p-4 rounded-lg border border-zinc-200">
+              @if (productHeader.name) {
+                <div>
+                  <p class="text-[10px] uppercase font-bold text-zinc-400">Product Name</p>
+                  <p class="text-sm font-bold text-zinc-900 truncate">{{ productHeader.name }}</p>
+                </div>
+              }
+              @if (productHeader.articleNumber) {
+                <div>
+                  <p class="text-[10px] uppercase font-bold text-zinc-400">Article Number</p>
+                  <p class="text-sm font-mono font-bold text-zinc-900">{{ productHeader.articleNumber }}</p>
+                </div>
+              }
+              @if (productHeader.category) {
+                <div>
+                  <p class="text-[10px] uppercase font-bold text-zinc-400">Category / Pricepoint</p>
+                  <p class="text-sm font-semibold text-zinc-800 capitalize">{{ productHeader.category }} {{ productHeader.pricepoint ? '• ' + productHeader.pricepoint : '' }}</p>
+                </div>
+              }
+              @if (productHeader.collection || productHeader.year) {
+                <div>
+                  <p class="text-[10px] uppercase font-bold text-zinc-400">Collection / Year</p>
+                  <p class="text-sm font-semibold text-zinc-800">{{ productHeader.collection }} {{ productHeader.year }}</p>
+                </div>
+              }
+            </div>
+
+            <!-- Physical Specs Table Section -->
+            @if (hasPhysicalSpecs()) {
+              <div class="pt-4 space-y-4">
+                <h2 class="text-sm font-bold uppercase tracking-wider text-indigo-950 border-b-2 border-indigo-900 pb-2">Dimensions & Physical Specifications</h2>
+                <p class="text-xs text-zinc-500">Standardized laboratory testing and physical performance metrics.</p>
+
+                <table class="w-full text-xs text-left border-collapse border border-zinc-300 rounded-lg overflow-hidden">
+                  <thead>
+                    <tr class="bg-zinc-900 text-white uppercase text-[11px] tracking-wider">
+                      <th class="py-3 px-4 w-1/3">Specification</th>
+                      <th class="py-3 px-4">Standard Value / Requirement</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-zinc-200">
+                    @if (ballConstruction.circumference) {
+                      <tr class="hover:bg-zinc-50">
+                        <td class="py-3 px-4 font-bold text-zinc-700">Circumference</td>
+                        <td class="py-3 px-4 font-semibold text-zinc-900">{{ ballConstruction.circumference }}</td>
+                      </tr>
+                    }
+                    @if (ballConstruction.physicalWeight) {
+                      <tr class="hover:bg-zinc-50">
+                        <td class="py-3 px-4 font-bold text-zinc-700">Weight</td>
+                        <td class="py-3 px-4 font-semibold text-zinc-900">{{ ballConstruction.physicalWeight }}</td>
+                      </tr>
+                    }
+                    @if (ballConstruction.pressure) {
+                      <tr class="hover:bg-zinc-50">
+                        <td class="py-3 px-4 font-bold text-zinc-700">Pressure</td>
+                        <td class="py-3 px-4 font-semibold text-zinc-900">{{ ballConstruction.pressure }}</td>
+                      </tr>
+                    }
+                    @if (ballConstruction.rebound) {
+                      <tr class="hover:bg-zinc-50">
+                        <td class="py-3 px-4 font-bold text-zinc-700">Rebound</td>
+                        <td class="py-3 px-4 font-semibold text-zinc-900">{{ ballConstruction.rebound }}</td>
+                      </tr>
+                    }
+                    @if (ballConstruction.waterAbsorption) {
+                      <tr class="hover:bg-zinc-50">
+                        <td class="py-3 px-4 font-bold text-zinc-700">Water Absorption</td>
+                        <td class="py-3 px-4 font-semibold text-zinc-900">{{ ballConstruction.waterAbsorption }}</td>
+                      </tr>
+                    }
+                    @if (ballConstruction.shapeSizeRetention) {
+                      <tr class="hover:bg-zinc-50">
+                        <td class="py-3 px-4 font-bold text-zinc-700">Shape/Size Retention</td>
+                        <td class="py-3 px-4 font-semibold text-zinc-900">{{ ballConstruction.shapeSizeRetention }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          </div>
+
+          <!-- Document Footer -->
+          <div class="border-t border-zinc-300 pt-4 flex justify-between items-center text-[10px] text-zinc-500 font-medium">
+            <div>KORA WORLD Operations • Confidential Technical Document</div>
+            <div>Generated on {{ productHeader.year }}</div>
+          </div>
+        </div>
+
+        <!-- PAGE 4: GRAPHIC / VISUAL SPECIFICATION -->
+        <div class="page-break bg-white text-zinc-900 rounded-2xl shadow-2xl p-8 md:p-12 min-h-[842px] border border-zinc-200 flex flex-col justify-between">
+          <!-- Document Header -->
+          <div class="space-y-6">
+            <div class="flex justify-between items-start border-b-2 border-zinc-900 pb-6">
+              <div>
+                <h1 class="text-3xl font-black tracking-tight text-zinc-900 uppercase">KORA WORLD</h1>
+                <p class="text-xs font-bold tracking-widest text-zinc-500 uppercase mt-0.5">Technical Specification Sheet</p>
+              </div>
+              <div class="text-right">
+                <span class="inline-block bg-zinc-900 text-white text-xs font-bold px-3 py-1 uppercase tracking-wider rounded">
+                  PAGE 4: GRAPHIC SPECS
+                </span>
+              </div>
+            </div>
+
+            <!-- Product Details Banner -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 bg-zinc-50 p-4 rounded-lg border border-zinc-200">
+              @if (productHeader.name) {
+                <div>
+                  <p class="text-[10px] uppercase font-bold text-zinc-400">Product Name</p>
+                  <p class="text-sm font-bold text-zinc-900 truncate">{{ productHeader.name }}</p>
+                </div>
+              }
+              @if (productHeader.articleNumber) {
+                <div>
+                  <p class="text-[10px] uppercase font-bold text-zinc-400">Article Number</p>
+                  <p class="text-sm font-mono font-bold text-zinc-900">{{ productHeader.articleNumber }}</p>
+                </div>
+              }
+              @if (productHeader.category) {
+                <div>
+                  <p class="text-[10px] uppercase font-bold text-zinc-400">Category / Pricepoint</p>
+                  <p class="text-sm font-semibold text-zinc-800 capitalize">{{ productHeader.category }} {{ productHeader.pricepoint ? '• ' + productHeader.pricepoint : '' }}</p>
+                </div>
+              }
+              @if (productHeader.collection || productHeader.year) {
+                <div>
+                  <p class="text-[10px] uppercase font-bold text-zinc-400">Collection / Year</p>
+                  <p class="text-sm font-semibold text-zinc-800">{{ productHeader.collection }} {{ productHeader.year }}</p>
+                </div>
+              }
+            </div>
+
+            <!-- Dynamic Graphic Points Image Rendering -->
+            <div class="pt-2 space-y-6">
+              <h2 class="text-sm font-bold uppercase tracking-wider text-indigo-950 border-b-2 border-indigo-900 pb-2">Graphic & Visual Attachments</h2>
+
+              @if (hasAnyGraphicImage()) {
+                <div class="space-y-6">
+                  @for (pt of graphicPointsList; track pt.title) {
+                    @if (pt.path) {
+                      <div class="border border-zinc-200 rounded-xl p-4 bg-zinc-50/50 space-y-3">
+                        <div class="flex justify-between items-center border-b border-zinc-300 pb-1.5">
+                          <h3 class="text-xs font-bold uppercase tracking-wider text-indigo-950">{{ pt.title }}</h3>
+                          @if (pt.notes) {
+                            <span class="text-[11px] font-semibold text-zinc-700 bg-white px-2 py-0.5 rounded border border-zinc-200">{{ pt.notes }}</span>
+                          }
+                        </div>
+
+                        <div class="flex flex-col md:flex-row items-center gap-4 pt-1">
+                          <div class="max-h-56 max-w-sm overflow-hidden rounded-lg border border-zinc-300 bg-white p-2 flex items-center justify-center shadow-sm">
+                            <img [src]="getPublicUrl(pt.path)" class="max-h-52 object-contain" [alt]="pt.title" />
+                          </div>
+                          <div class="text-xs space-y-1.5">
+                            <p class="font-bold text-zinc-600 uppercase text-[10px]">Specification File:</p>
+                            <a [href]="getPublicUrl(pt.path)" target="_blank" class="text-indigo-600 font-semibold hover:underline inline-flex items-center space-x-1.5 bg-indigo-50 px-3 py-1.5 rounded-lg border border-indigo-100">
+                              <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                              </svg>
+                              <span>{{ pt.name || 'Download Attachment' }}</span>
+                            </a>
+                          </div>
+                        </div>
+                      </div>
+                    }
+                  }
+                </div>
+              }
+            </div>
+          </div>
+
+          <!-- Document Footer -->
+          <div class="border-t border-zinc-300 pt-4 flex justify-between items-center text-[10px] text-zinc-500 font-medium">
+            <div>KORA WORLD Operations • Confidential Technical Document</div>
+            <div>Generated on {{ productHeader.year }}</div>
+          </div>
+        </div>
+
+        <!-- PAGE 5: PACKAGING SPECIFICATION -->
+        <div class="page-break bg-white text-zinc-900 rounded-2xl shadow-2xl p-8 md:p-12 min-h-[842px] border border-zinc-200 flex flex-col justify-between">
+          <!-- Document Header -->
+          <div class="space-y-6">
+            <div class="flex justify-between items-start border-b-2 border-zinc-900 pb-6">
+              <div>
+                <h1 class="text-3xl font-black tracking-tight text-zinc-900 uppercase">KORA WORLD</h1>
+                <p class="text-xs font-bold tracking-widest text-zinc-500 uppercase mt-0.5">Technical Specification Sheet</p>
+              </div>
+              <div class="text-right">
+                <span class="inline-block bg-zinc-900 text-white text-xs font-bold px-3 py-1 uppercase tracking-wider rounded">
+                  PAGE 5: PACKAGING SPECS
+                </span>
+              </div>
+            </div>
+
+            <!-- Product Details Banner -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 bg-zinc-50 p-4 rounded-lg border border-zinc-200">
+              @if (productHeader.name) {
+                <div>
+                  <p class="text-[10px] uppercase font-bold text-zinc-400">Product Name</p>
+                  <p class="text-sm font-bold text-zinc-900 truncate">{{ productHeader.name }}</p>
+                </div>
+              }
+              @if (productHeader.articleNumber) {
+                <div>
+                  <p class="text-[10px] uppercase font-bold text-zinc-400">Article Number</p>
+                  <p class="text-sm font-mono font-bold text-zinc-900">{{ productHeader.articleNumber }}</p>
+                </div>
+              }
+              @if (productHeader.category) {
+                <div>
+                  <p class="text-[10px] uppercase font-bold text-zinc-400">Category / Pricepoint</p>
+                  <p class="text-sm font-semibold text-zinc-800 capitalize">{{ productHeader.category }} {{ productHeader.pricepoint ? '• ' + productHeader.pricepoint : '' }}</p>
+                </div>
+              }
+              @if (productHeader.collection || productHeader.year) {
+                <div>
+                  <p class="text-[10px] uppercase font-bold text-zinc-400">Collection / Year</p>
+                  <p class="text-sm font-semibold text-zinc-800">{{ productHeader.collection }} {{ productHeader.year }}</p>
+                </div>
+              }
+            </div>
+
+            <!-- Packaging Specs Table & Artworks -->
+            @if (hasPackagingSpecs()) {
+              <div class="pt-2 space-y-6">
+                <h2 class="text-sm font-bold uppercase tracking-wider text-indigo-950 border-b-2 border-indigo-900 pb-2">Export & Packaging Specifications</h2>
+
+                <table class="w-full text-xs text-left border-collapse border border-zinc-300 rounded-lg overflow-hidden">
+                  <tbody class="divide-y divide-zinc-200">
+                    @if (packagingSpecs.individualPackaging) {
+                      <tr class="hover:bg-zinc-50">
+                        <td class="py-3 px-4 font-bold text-zinc-700 w-1/3">Individual Packaging</td>
+                        <td class="py-3 px-4 font-semibold text-zinc-900">{{ packagingSpecs.individualPackaging }}</td>
+                      </tr>
+                    }
+                    @if (packagingSpecs.inflationState) {
+                      <tr class="hover:bg-zinc-50">
+                        <td class="py-3 px-4 font-bold text-zinc-700">Inflation State for Shipping</td>
+                        <td class="py-3 px-4 font-semibold text-zinc-900">{{ packagingSpecs.inflationState }}</td>
+                      </tr>
+                    }
+                    @if (packagingSpecs.boxDimensions) {
+                      <tr class="hover:bg-zinc-50">
+                        <td class="py-3 px-4 font-bold text-zinc-700">Export Box Dimensions</td>
+                        <td class="py-3 px-4 font-semibold text-zinc-900">{{ packagingSpecs.boxDimensions }}</td>
+                      </tr>
+                    }
+                    @if (packagingSpecs.unitsPerCarton !== null) {
+                      <tr class="hover:bg-zinc-50">
+                        <td class="py-3 px-4 font-bold text-zinc-700">Units Per Carton</td>
+                        <td class="py-3 px-4 font-semibold text-zinc-900">{{ packagingSpecs.unitsPerCarton }} balls</td>
+                      </tr>
+                    }
+                    @if (packagingSpecs.koraBrandingOnBox) {
+                      <tr class="hover:bg-zinc-50">
+                        <td class="py-3 px-4 font-bold text-zinc-700">Kora Branding on Box</td>
+                        <td class="py-3 px-4 font-semibold text-zinc-900">Yes</td>
+                      </tr>
+                    }
+                    @if (packagingSpecs.barcodeEan) {
+                      <tr class="hover:bg-zinc-50">
+                        <td class="py-3 px-4 font-bold text-zinc-700">Barcode / EAN Requirements</td>
+                        <td class="py-3 px-4 font-semibold text-zinc-900">{{ packagingSpecs.barcodeEan }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+
+                <!-- Artwork Attachments -->
+                @if (packagingSpecs.koraBrandingArtwork.path || packagingSpecs.barcodeEanFile.path) {
+                  <div class="grid grid-cols-2 gap-4 pt-2">
+                    @if (packagingSpecs.koraBrandingArtwork.path) {
+                      <div class="bg-zinc-50 border border-zinc-200 rounded-xl p-4 text-xs space-y-2">
+                        <p class="font-bold text-zinc-700 uppercase tracking-wider text-[10px]">Box Branding Artwork</p>
+                        <div class="flex items-center space-x-2 text-indigo-600 font-semibold truncate">
+                          <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                          </svg>
+                          <a [href]="getPublicUrl(packagingSpecs.koraBrandingArtwork.path)" target="_blank" class="hover:underline truncate">
+                            {{ packagingSpecs.koraBrandingArtwork.name || 'Download Box Artwork' }}
+                          </a>
+                        </div>
+                      </div>
+                    }
+
+                    @if (packagingSpecs.barcodeEanFile.path) {
+                      <div class="bg-zinc-50 border border-zinc-200 rounded-xl p-4 text-xs space-y-2">
+                        <p class="font-bold text-zinc-700 uppercase tracking-wider text-[10px]">Barcode / EAN Attachment</p>
+                        <div class="flex items-center space-x-2 text-indigo-600 font-semibold truncate">
+                          <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                          <a [href]="getPublicUrl(packagingSpecs.barcodeEanFile.path)" target="_blank" class="hover:underline truncate">
+                            {{ packagingSpecs.barcodeEanFile.name || 'Download Barcode File' }}
+                          </a>
+                        </div>
+                      </div>
+                    }
+                  </div>
+                }
+              </div>
+            }
+          </div>
+
+          <!-- Document Footer -->
+          <div class="border-t border-zinc-300 pt-4 flex justify-between items-center text-[10px] text-zinc-500 font-medium">
+            <div>KORA WORLD Operations • Confidential Technical Document</div>
+            <div>Generated on {{ productHeader.year }}</div>
+          </div>
+        </div>
+
+        <!-- PAGE 6: QUALITY CONTROL & TESTING REQUIREMENTS (FINAL PAGE) -->
+        <div class="page-break bg-white text-zinc-900 rounded-2xl shadow-2xl p-8 md:p-12 min-h-[842px] border border-zinc-200 flex flex-col justify-between">
+          <!-- Document Header -->
+          <div class="space-y-6">
+            <div class="flex justify-between items-start border-b-2 border-zinc-900 pb-6">
+              <div>
+                <h1 class="text-3xl font-black tracking-tight text-zinc-900 uppercase">KORA WORLD</h1>
+                <p class="text-xs font-bold tracking-widest text-zinc-500 uppercase mt-0.5">Technical Specification Sheet</p>
+              </div>
+              <div class="text-right">
+                <span class="inline-block bg-zinc-900 text-white text-xs font-bold px-3 py-1 uppercase tracking-wider rounded">
+                  PAGE 6: QUALITY CONTROL
+                </span>
+              </div>
+            </div>
+
+            <!-- Product Details Banner -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 bg-zinc-50 p-4 rounded-lg border border-zinc-200">
+              @if (productHeader.name) {
+                <div>
+                  <p class="text-[10px] uppercase font-bold text-zinc-400">Product Name</p>
+                  <p class="text-sm font-bold text-zinc-900 truncate">{{ productHeader.name }}</p>
+                </div>
+              }
+              @if (productHeader.articleNumber) {
+                <div>
+                  <p class="text-[10px] uppercase font-bold text-zinc-400">Article Number</p>
+                  <p class="text-sm font-mono font-bold text-zinc-900">{{ productHeader.articleNumber }}</p>
+                </div>
+              }
+              @if (productHeader.category) {
+                <div>
+                  <p class="text-[10px] uppercase font-bold text-zinc-400">Category / Pricepoint</p>
+                  <p class="text-sm font-semibold text-zinc-800 capitalize">{{ productHeader.category }} {{ productHeader.pricepoint ? '• ' + productHeader.pricepoint : '' }}</p>
+                </div>
+              }
+              @if (productHeader.collection || productHeader.year) {
+                <div>
+                  <p class="text-[10px] uppercase font-bold text-zinc-400">Collection / Year</p>
+                  <p class="text-sm font-semibold text-zinc-800">{{ productHeader.collection }} {{ productHeader.year }}</p>
+                </div>
+              }
+            </div>
+
+            <!-- Quality Control Specifications Table & Rejection Criteria -->
+            @if (hasQualitySpecs()) {
+              <div class="pt-2 space-y-6">
+                <h2 class="text-sm font-bold uppercase tracking-wider text-indigo-950 border-b-2 border-indigo-900 pb-2">Quality Assurance & Testing Protocol</h2>
+
+                <table class="w-full text-xs text-left border-collapse border border-zinc-300 rounded-lg overflow-hidden">
+                  <tbody class="divide-y divide-zinc-200">
+                    @if (qualitySpecs.preProductionSamples) {
+                      <tr class="hover:bg-zinc-50">
+                        <td class="py-3 px-4 font-bold text-zinc-700 w-1/3">Pre-production Sample Req.</td>
+                        <td class="py-3 px-4 font-semibold text-zinc-900">{{ qualitySpecs.preProductionSamples }}</td>
+                      </tr>
+                    }
+                    @if (qualitySpecs.aqlInspectionLevel) {
+                      <tr class="hover:bg-zinc-50">
+                        <td class="py-3 px-4 font-bold text-zinc-700">AQL Inspection Level</td>
+                        <td class="py-3 px-4 font-semibold text-zinc-900">{{ qualitySpecs.aqlInspectionLevel }}</td>
+                      </tr>
+                    }
+                    @if (qualitySpecs.referenceStandard) {
+                      <tr class="hover:bg-zinc-50">
+                        <td class="py-3 px-4 font-bold text-zinc-700">Reference Standard</td>
+                        <td class="py-3 px-4 font-semibold text-zinc-900">{{ qualitySpecs.referenceStandard }}</td>
+                      </tr>
+                    }
+                    @if (qualitySpecs.thirdPartyTestingLab) {
+                      <tr class="hover:bg-zinc-50">
+                        <td class="py-3 px-4 font-bold text-zinc-700">Third-Party Testing Lab</td>
+                        <td class="py-3 px-4 font-semibold text-zinc-900">{{ qualitySpecs.thirdPartyTestingLab }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+
+                <!-- Rejection Criteria Highlight Box -->
+                @if (qualitySpecs.rejectionCriteria) {
+                  <div class="bg-amber-50/60 border border-amber-200 rounded-xl p-5 space-y-2">
+                    <div class="flex items-center space-x-2 text-amber-900 font-bold text-xs uppercase tracking-wider">
+                      <svg class="w-4 h-4 text-amber-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      <span>Strict Rejection Criteria</span>
+                    </div>
+                    <p class="text-xs text-amber-950 leading-relaxed font-medium">
+                      {{ qualitySpecs.rejectionCriteria }}
+                    </p>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+
+          <!-- Document Footer -->
+          <div class="border-t border-zinc-300 pt-4 flex justify-between items-center text-[10px] text-zinc-500 font-medium">
+            <div>KORA WORLD Operations • Confidential Technical Document</div>
+            <div>Generated on {{ productHeader.year }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

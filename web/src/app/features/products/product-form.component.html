@@ -362,6 +362,287 @@
                   </label>
                 </div>
 
+                <!-- Dimensions & Physical Specs -->
+                <div class="col-span-2 border-t border-zinc-800 pt-4 mt-2">
+                  <h4 class="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-3">Dimensions & Physical Specs</h4>
+                  <div class="grid grid-cols-2 gap-4">
+                    <div>
+                      <label class="block text-xs font-medium text-zinc-400 mb-1.5">Circumference</label>
+                      <input
+                        type="text" [(ngModel)]="ballConstruction.circumference" name="circumference"
+                        placeholder="e.g. 68–70 cm"
+                        class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
+                      />
+                    </div>
+                    <div>
+                      <label class="block text-xs font-medium text-zinc-400 mb-1.5">Weight</label>
+                      <input
+                        type="text" [(ngModel)]="ballConstruction.weight" name="weight"
+                        placeholder="e.g. 410–450 g"
+                        class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
+                      />
+                    </div>
+                    <div>
+                      <label class="block text-xs font-medium text-zinc-400 mb-1.5">Pressure</label>
+                      <input
+                        type="text" [(ngModel)]="ballConstruction.pressure" name="pressure"
+                        placeholder="e.g. 0.6–1.1 bar"
+                        class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
+                      />
+                    </div>
+                    <div>
+                      <label class="block text-xs font-medium text-zinc-400 mb-1.5">Rebound</label>
+                      <input
+                        type="text" [(ngModel)]="ballConstruction.rebound" name="rebound"
+                        placeholder="e.g. 120–165 cm (from 2m drop)"
+                        class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
+                      />
+                    </div>
+                    <div>
+                      <label class="block text-xs font-medium text-zinc-400 mb-1.5">Water Absorption</label>
+                      <input
+                        type="text" [(ngModel)]="ballConstruction.waterAbsorption" name="waterAbsorption"
+                        placeholder="e.g. Max 10% weight gain"
+                        class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
+                      />
+                    </div>
+                    <div>
+                      <label class="block text-xs font-medium text-zinc-400 mb-1.5">Shape/Size Retention</label>
+                      <input
+                        type="text" [(ngModel)]="ballConstruction.shapeSizeRetention" name="shapeSizeRetention"
+                        placeholder="e.g. Must pass FIFA Basic test"
+                        class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Graphic / Visual Specifications -->
+                <div class="col-span-2 border-t border-zinc-800 pt-4 mt-2 space-y-4">
+                  <h4 class="text-xs font-bold uppercase tracking-wider text-zinc-400">Graphic / Visual Specifications (Image Uploads)</h4>
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- 1. Color Callouts -->
+                    <div class="bg-zinc-900/60 p-3.5 rounded-xl border border-zinc-800 space-y-2">
+                      <app-file-upload
+                        label="1. Color Callouts (Pantone Codes)"
+                        [filePath]="graphicPoints.colorCallouts.path || ''"
+                        [fileName]="graphicPoints.colorCallouts.name || ''"
+                        (fileUploaded)="onPointFileUploaded('colorCallouts', $event)"
+                        (fileRemoved)="onPointFileRemoved('colorCallouts')"
+                      ></app-file-upload>
+                      <input type="text" [(ngModel)]="graphicPoints.colorCallouts.notes" name="notesColorCallouts" placeholder="Notes (e.g. PMS 419 C, PMS 186 C)" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-white text-xs focus:outline-none focus:border-zinc-500 placeholder-zinc-600" />
+                    </div>
+
+                    <!-- 2. Logo Placement -->
+                    <div class="bg-zinc-900/60 p-3.5 rounded-xl border border-zinc-800 space-y-2">
+                      <app-file-upload
+                        label="2. Logo Placement & Position"
+                        [filePath]="graphicPoints.logoPlacement.path || ''"
+                        [fileName]="graphicPoints.logoPlacement.name || ''"
+                        (fileUploaded)="onPointFileUploaded('logoPlacement', $event)"
+                        (fileRemoved)="onPointFileRemoved('logoPlacement')"
+                      ></app-file-upload>
+                      <input type="text" [(ngModel)]="graphicPoints.logoPlacement.notes" name="notesLogoPlacement" placeholder="Notes (e.g. Center panel 4, size 5.5cm)" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-white text-xs focus:outline-none focus:border-zinc-500 placeholder-zinc-600" />
+                    </div>
+
+                    <!-- 3. Print Method -->
+                    <div class="bg-zinc-900/60 p-3.5 rounded-xl border border-zinc-800 space-y-2">
+                      <app-file-upload
+                        label="3. Print Method"
+                        [filePath]="graphicPoints.printMethod.path || ''"
+                        [fileName]="graphicPoints.printMethod.name || ''"
+                        (fileUploaded)="onPointFileUploaded('printMethod', $event)"
+                        (fileRemoved)="onPointFileRemoved('printMethod')"
+                      ></app-file-upload>
+                      <input type="text" [(ngModel)]="graphicPoints.printMethod.notes" name="notesPrintMethod" placeholder="Notes (e.g. Screen printing or Sublimation)" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-white text-xs focus:outline-none focus:border-zinc-500 placeholder-zinc-600" />
+                    </div>
+
+                    <!-- 4. Print Colors -->
+                    <div class="bg-zinc-900/60 p-3.5 rounded-xl border border-zinc-800 space-y-2">
+                      <app-file-upload
+                        label="4. Print Colors (CMYK + Pantone)"
+                        [filePath]="graphicPoints.printColors.path || ''"
+                        [fileName]="graphicPoints.printColors.name || ''"
+                        (fileUploaded)="onPointFileUploaded('printColors', $event)"
+                        (fileRemoved)="onPointFileRemoved('printColors')"
+                      ></app-file-upload>
+                      <input type="text" [(ngModel)]="graphicPoints.printColors.notes" name="notesPrintColors" placeholder="Notes (e.g. CMYK + Pantone ref)" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-white text-xs focus:outline-none focus:border-zinc-500 placeholder-zinc-600" />
+                    </div>
+
+                    <!-- 5. Logo File -->
+                    <div class="bg-zinc-900/60 p-3.5 rounded-xl border border-zinc-800 space-y-2">
+                      <app-file-upload
+                        label="5. Logo Vector File (AI, PDF, SVG)"
+                        [filePath]="graphicPoints.logoVector.path || ''"
+                        [fileName]="graphicPoints.logoVector.name || ''"
+                        (fileUploaded)="onPointFileUploaded('logoVector', $event)"
+                        (fileRemoved)="onPointFileRemoved('logoVector')"
+                      ></app-file-upload>
+                      <input type="text" [(ngModel)]="graphicPoints.logoVector.notes" name="notesLogoVector" placeholder="Notes (e.g. Vector AI/PDF min 300 DPI)" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-white text-xs focus:outline-none focus:border-zinc-500 placeholder-zinc-600" />
+                    </div>
+
+                    <!-- 6. Label / Badge -->
+                    <div class="bg-zinc-900/60 p-3.5 rounded-xl border border-zinc-800 space-y-2">
+                      <app-file-upload
+                        label="6. Label / Badge (FIFA/IHF/Quality Mark)"
+                        [filePath]="graphicPoints.labelBadge.path || ''"
+                        [fileName]="graphicPoints.labelBadge.name || ''"
+                        (fileUploaded)="onPointFileUploaded('labelBadge', $event)"
+                        (fileRemoved)="onPointFileRemoved('labelBadge')"
+                      ></app-file-upload>
+                      <input type="text" [(ngModel)]="graphicPoints.labelBadge.notes" name="notesLabelBadge" placeholder="Notes (e.g. FIFA Quality Pro badge)" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-white text-xs focus:outline-none focus:border-zinc-500 placeholder-zinc-600" />
+                    </div>
+
+                    <!-- 7. Ball Color -->
+                    <div class="bg-zinc-900/60 p-3.5 rounded-xl border border-zinc-800 space-y-2">
+                      <app-file-upload
+                        label="7. Ball Color (Background Panel)"
+                        [filePath]="graphicPoints.ballColor.path || ''"
+                        [fileName]="graphicPoints.ballColor.name || ''"
+                        (fileUploaded)="onPointFileUploaded('ballColor', $event)"
+                        (fileRemoved)="onPointFileRemoved('ballColor')"
+                      ></app-file-upload>
+                      <input type="text" [(ngModel)]="graphicPoints.ballColor.notes" name="notesBallColor" placeholder="Notes (e.g. Background panel colors)" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-white text-xs focus:outline-none focus:border-zinc-500 placeholder-zinc-600" />
+                    </div>
+
+                    <!-- 8. Pattern Layout -->
+                    <div class="bg-zinc-900/60 p-3.5 rounded-xl border border-zinc-800 space-y-2">
+                      <app-file-upload
+                        label="8. Pattern & Flat Panel Net Layout"
+                        [filePath]="graphicPoints.patternLayout.path || ''"
+                        [fileName]="graphicPoints.patternLayout.name || ''"
+                        (fileUploaded)="onPointFileUploaded('patternLayout', $event)"
+                        (fileRemoved)="onPointFileRemoved('patternLayout')"
+                      ></app-file-upload>
+                      <input type="text" [(ngModel)]="graphicPoints.patternLayout.notes" name="notesPatternLayout" placeholder="Notes (e.g. Flat panel net diagram)" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-white text-xs focus:outline-none focus:border-zinc-500 placeholder-zinc-600" />
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 5. Packaging Specification -->
+                <div class="col-span-2 border-t border-zinc-800 pt-4 mt-2 space-y-4">
+                  <h4 class="text-xs font-bold uppercase tracking-wider text-zinc-400">Packaging Specification</h4>
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label class="block text-xs font-medium text-zinc-400 mb-1.5">Individual Packaging</label>
+                      <input
+                        type="text" [(ngModel)]="packagingSpecs.individualPackaging" name="individualPackaging"
+                        placeholder="e.g. Poly bag, box, or deflated in mesh bag"
+                        class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
+                      />
+                    </div>
+                    <div>
+                      <label class="block text-xs font-medium text-zinc-400 mb-1.5">Inflation State for Shipping</label>
+                      <input
+                        type="text" [(ngModel)]="packagingSpecs.inflationState" name="inflationState"
+                        placeholder="e.g. Deflated (for air freight efficiency) or inflated"
+                        class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
+                      />
+                    </div>
+                    <div>
+                      <label class="block text-xs font-medium text-zinc-400 mb-1.5">Export Box Dimensions</label>
+                      <input
+                        type="text" [(ngModel)]="packagingSpecs.boxDimensions" name="boxDimensions"
+                        placeholder="e.g. 60 x 40 x 40 cm"
+                        class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
+                      />
+                    </div>
+                    <div>
+                      <label class="block text-xs font-medium text-zinc-400 mb-1.5">Units Per Export Carton</label>
+                      <input
+                        type="number" step="1" [(ngModel)]="packagingSpecs.unitsPerCarton" name="unitsPerCarton"
+                        placeholder="e.g. 12 or 24 balls"
+                        class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
+                      />
+                    </div>
+
+                    <!-- Kora Branding on Box & Artwork Upload -->
+                    <div class="col-span-2 bg-zinc-900/60 p-4 rounded-xl border border-zinc-800 space-y-3">
+                      <div class="flex items-center space-x-3">
+                        <input type="checkbox" id="koraBrandingCheck" [(ngModel)]="packagingSpecs.koraBrandingOnBox" name="koraBrandingOnBox" class="rounded border-zinc-700 text-indigo-600 focus:ring-indigo-500 h-4 w-4" />
+                        <label for="koraBrandingCheck" class="text-sm font-medium text-zinc-300 cursor-pointer select-none">
+                          Kora Branding on Box?
+                        </label>
+                      </div>
+                      @if (packagingSpecs.koraBrandingOnBox) {
+                        <app-file-upload
+                          label="Box Branding Artwork File"
+                          [filePath]="packagingSpecs.koraBrandingArtwork.path || ''"
+                          [fileName]="packagingSpecs.koraBrandingArtwork.name || ''"
+                          (fileUploaded)="onBrandingArtworkUploaded($event)"
+                          (fileRemoved)="onBrandingArtworkRemoved()"
+                        ></app-file-upload>
+                      }
+                    </div>
+
+                    <!-- Barcode / EAN Requirements -->
+                    <div class="col-span-2 bg-zinc-900/60 p-4 rounded-xl border border-zinc-800 space-y-3">
+                      <div>
+                        <label class="block text-xs font-medium text-zinc-400 mb-1.5">Barcode / EAN Requirements</label>
+                        <input
+                          type="text" [(ngModel)]="packagingSpecs.barcodeEan" name="barcodeEan"
+                          placeholder="e.g. EAN-13 code or barcode placement instructions"
+                          class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
+                        />
+                      </div>
+                      <app-file-upload
+                        label="Barcode / EAN Image File (Optional)"
+                        [filePath]="packagingSpecs.barcodeEanFile.path || ''"
+                        [fileName]="packagingSpecs.barcodeEanFile.name || ''"
+                        (fileUploaded)="onBarcodeFileUploaded($event)"
+                        (fileRemoved)="onBarcodeFileRemoved()"
+                      ></app-file-upload>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 6. Quality Control & Testing Requirements -->
+                <div class="col-span-2 border-t border-zinc-800 pt-4 mt-2 space-y-4">
+                  <h4 class="text-xs font-bold uppercase tracking-wider text-zinc-400">Quality Control & Testing Requirements</h4>
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label class="block text-xs font-medium text-zinc-400 mb-1.5">Pre-production Sample Requirement</label>
+                      <input
+                        type="text" [(ngModel)]="qualitySpecs.preProductionSamples" name="preProductionSamples"
+                        placeholder="e.g. 2–3 samples minimum required before bulk"
+                        class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
+                      />
+                    </div>
+                    <div>
+                      <label class="block text-xs font-medium text-zinc-400 mb-1.5">AQL Inspection Level</label>
+                      <input
+                        type="text" [(ngModel)]="qualitySpecs.aqlInspectionLevel" name="aqlInspectionLevel"
+                        placeholder="e.g. AQL 2.5 (<2.5% defect rate acceptable)"
+                        class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
+                      />
+                    </div>
+                    <div>
+                      <label class="block text-xs font-medium text-zinc-400 mb-1.5">Reference Standard</label>
+                      <input
+                        type="text" [(ngModel)]="qualitySpecs.referenceStandard" name="referenceStandard"
+                        placeholder="e.g. FIFA Basic, FIFA Quality, or IHF Approved"
+                        class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
+                      />
+                    </div>
+                    <div>
+                      <label class="block text-xs font-medium text-zinc-400 mb-1.5">Third-Party Testing Lab</label>
+                      <input
+                        type="text" [(ngModel)]="qualitySpecs.thirdPartyTestingLab" name="thirdPartyTestingLab"
+                        placeholder="e.g. SGS, Bureau Veritas"
+                        class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
+                      />
+                    </div>
+                    <div class="col-span-2">
+                      <label class="block text-xs font-medium text-zinc-400 mb-1.5">Rejection Criteria</label>
+                      <input
+                        type="text" [(ngModel)]="qualitySpecs.rejectionCriteria" name="rejectionCriteria"
+                        placeholder="e.g. Stitching irregularities, color deviation >ΔE 2.0, bladder leaks, weight out of range"
+                        class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
+                      />
+                    </div>
+                  </div>
+                </div>
+
               </div>
             </div>
           }

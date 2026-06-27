@@ -42,6 +42,7 @@ export class LayoutComponent {
         { label: 'Sourcing', route: '/sourcing', icon: 'search' },
         { label: 'Products', route: '/products', icon: 'dribbble' },
         { label: 'Samples', route: '/samples', icon: 'flask-conical' },
+        { label: 'Tech Pack Creator', route: '/tech-pack-creator', icon: 'file-text' },
       ],
     },
     {

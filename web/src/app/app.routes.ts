@@ -55,6 +55,11 @@ export const routes: Routes = [
           import('./features/sourcing/sourcing.routes').then((m) => m.routes),
       },
       {
+        path: 'tech-pack-creator',
+        loadComponent: () =>
+          import('./features/tech-pack/tech-pack-creator.component').then((m) => m.TechPackCreatorComponent),
+      },
+      {
         path: 'suppliers/new',
         loadComponent: () =>
           import('./features/suppliers/supplier-form.component').then((m) => m.SupplierFormComponent),

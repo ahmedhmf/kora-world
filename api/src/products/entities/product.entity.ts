@@ -71,6 +71,18 @@ export class Product {
   @Column({ type: 'varchar', name: 'image_name', length: 255, nullable: true })
   imageName?: string | null;
 
+  @Column({ type: 'varchar', name: 'graphic_logo_path', length: 255, nullable: true })
+  graphicLogoPath?: string | null;
+
+  @Column({ type: 'varchar', name: 'graphic_logo_name', length: 255, nullable: true })
+  graphicLogoName?: string | null;
+
+  @Column({ type: 'varchar', name: 'graphic_pattern_path', length: 255, nullable: true })
+  graphicPatternPath?: string | null;
+
+  @Column({ type: 'varchar', name: 'graphic_pattern_name', length: 255, nullable: true })
+  graphicPatternName?: string | null;
+
   @Column({ name: 'collection', length: 10, nullable: true })
   collection?: string;
 

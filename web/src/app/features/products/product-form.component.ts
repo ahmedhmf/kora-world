@@ -55,6 +55,10 @@ export class ProductFormComponent implements OnInit {
     techPackName: '',
     imagePath: '',
     imageName: '',
+    graphicLogoPath: '',
+    graphicLogoName: '',
+    graphicPatternPath: '',
+    graphicPatternName: '',
     collection: '',
     year: new Date().getFullYear(),
     pricepoint: '',
@@ -69,7 +73,43 @@ export class ProductFormComponent implements OnInit {
     bonding: '',
     debossing: false,
     finishes: false,
-    carcass: ''
+    carcass: '',
+    circumference: '',
+    weight: '',
+    pressure: '',
+    rebound: '',
+    waterAbsorption: '',
+    shapeSizeRetention: '',
+  };
+
+  graphicPoints = {
+    colorCallouts: { path: '', name: '', notes: '' },
+    logoPlacement: { path: '', name: '', notes: '' },
+    printMethod: { path: '', name: '', notes: '' },
+    printColors: { path: '', name: '', notes: '' },
+    logoVector: { path: '', name: '', notes: '' },
+    labelBadge: { path: '', name: '', notes: '' },
+    ballColor: { path: '', name: '', notes: '' },
+    patternLayout: { path: '', name: '', notes: '' },
+  };
+
+  packagingSpecs = {
+    individualPackaging: '',
+    inflationState: '',
+    boxDimensions: '',
+    unitsPerCarton: null as number | null,
+    koraBrandingOnBox: false,
+    koraBrandingArtwork: { path: '', name: '' },
+    barcodeEan: '',
+    barcodeEanFile: { path: '', name: '' },
+  };
+
+  qualitySpecs = {
+    preProductionSamples: '',
+    aqlInspectionLevel: '',
+    rejectionCriteria: '',
+    referenceStandard: '',
+    thirdPartyTestingLab: '',
   };
 
   loadConstruction(construction?: Record<string, any>): void {
@@ -83,12 +123,51 @@ export class ProductFormComponent implements OnInit {
       bonding: String(construction['Bonding'] || ''),
       debossing: construction['Debossing'] === 'Yes',
       finishes: construction['Finishes'] === 'Yes',
-      carcass: String(construction['Carcass'] || '')
+      carcass: String(construction['Carcass'] || ''),
+      circumference: String(construction['Circumference'] || ''),
+      weight: String(construction['Weight'] || ''),
+      pressure: String(construction['Pressure'] || ''),
+      rebound: String(construction['Rebound'] || ''),
+      waterAbsorption: String(construction['Water absorption'] || construction['Water Absorption'] || ''),
+      shapeSizeRetention: String(construction['Shape/size retention'] || construction['Shape/Size Retention'] || ''),
+    };
+
+    const g = construction['GraphicPoints'] || {};
+    this.graphicPoints = {
+      colorCallouts: g['colorCallouts'] || { path: '', name: '', notes: '' },
+      logoPlacement: g['logoPlacement'] || { path: '', name: '', notes: '' },
+      printMethod: g['printMethod'] || { path: '', name: '', notes: '' },
+      printColors: g['printColors'] || { path: '', name: '', notes: '' },
+      logoVector: g['logoVector'] || { path: '', name: '', notes: '' },
+      labelBadge: g['labelBadge'] || { path: '', name: '', notes: '' },
+      ballColor: g['ballColor'] || { path: '', name: '', notes: '' },
+      patternLayout: g['patternLayout'] || { path: '', name: '', notes: '' },
+    };
+
+    const p = construction['PackagingSpecs'] || {};
+    this.packagingSpecs = {
+      individualPackaging: String(p['individualPackaging'] || ''),
+      inflationState: String(p['inflationState'] || ''),
+      boxDimensions: String(p['boxDimensions'] || ''),
+      unitsPerCarton: p['unitsPerCarton'] !== undefined && p['unitsPerCarton'] !== null ? Number(p['unitsPerCarton']) : null,
+      koraBrandingOnBox: p['koraBrandingOnBox'] === true || p['koraBrandingOnBox'] === 'Yes',
+      koraBrandingArtwork: p['koraBrandingArtwork'] || { path: '', name: '' },
+      barcodeEan: String(p['barcodeEan'] || ''),
+      barcodeEanFile: p['barcodeEanFile'] || { path: '', name: '' },
+    };
+
+    const q = construction['QualitySpecs'] || {};
+    this.qualitySpecs = {
+      preProductionSamples: String(q['preProductionSamples'] || ''),
+      aqlInspectionLevel: String(q['aqlInspectionLevel'] || ''),
+      rejectionCriteria: String(q['rejectionCriteria'] || ''),
+      referenceStandard: String(q['referenceStandard'] || ''),
+      thirdPartyTestingLab: String(q['thirdPartyTestingLab'] || ''),
     };
   }
 
-  serializeConstruction(): Record<string, string | number> | null {
-    const obj: Record<string, string | number> = {};
+  serializeConstruction(): Record<string, any> | null {
+    const obj: Record<string, any> = {};
     if (this.ballConstruction.backing) obj['Backing'] = this.ballConstruction.backing;
     if (this.ballConstruction.bladder) obj['Bladder'] = this.ballConstruction.bladder;
     if (this.ballConstruction.coverMaterial) obj['Cover Material'] = this.ballConstruction.coverMaterial;
@@ -98,63 +177,76 @@ export class ProductFormComponent implements OnInit {
     obj['Debossing'] = this.ballConstruction.debossing ? 'Yes' : 'No';
     obj['Finishes'] = this.ballConstruction.finishes ? 'Yes' : 'No';
     if (this.ballConstruction.carcass) obj['Carcass'] = this.ballConstruction.carcass;
-
+    if (this.ballConstruction.circumference) obj['Circumference'] = this.ballConstruction.circumference;
+    if (this.ballConstruction.weight) obj['Weight'] = this.ballConstruction.weight;
+    if (this.ballConstruction.pressure) obj['Pressure'] = this.ballConstruction.pressure;
+    if (this.ballConstruction.rebound) obj['Rebound'] = this.ballConstruction.rebound;
+    if (this.ballConstruction.waterAbsorption) obj['Water absorption'] = this.ballConstruction.waterAbsorption;
+    if (this.ballConstruction.shapeSizeRetention) obj['Shape/size retention'] = this.ballConstruction.shapeSizeRetention;
+    
+    obj['GraphicPoints'] = this.graphicPoints;
+    obj['PackagingSpecs'] = this.packagingSpecs;
+    obj['QualitySpecs'] = this.qualitySpecs;
     return Object.keys(obj).length > 0 ? obj : null;
   }
 
   ngOnInit(): void {
-    this.dropdownService.getOptions().subscribe({
-      next: (opts) => {
-        const filterVals = (cat: string) => opts.filter(o => o.category === cat).map(o => o.value);
-        this.currencies.set(filterVals('currency'));
-        this.backings.set(filterVals('backing'));
-        this.bladders.set(filterVals('bladder'));
-        this.coverMaterials.set(filterVals('coverMaterial'));
-        this.bondings.set(filterVals('bonding'));
-        this.pricepoints.set(filterVals('pricepoint'));
-        this.cdr.detectChanges();
-      },
-      error: (err) => console.error('ProductForm: error loading dropdown options:', err)
+    this.route.queryParams.subscribe((params) => {
+      if (params['fromSample']) {
+        this.fromSampleName.set(params['fromSample']);
+      }
     });
 
-    this.route.paramMap.subscribe((params) => {
-      const id = params.get('id');
-      if (id) {
+    this.route.params.subscribe((params) => {
+      if (params['id']) {
         this.isEdit.set(true);
-        this.editId.set(+id);
-        this.fromSampleName.set(null);
+        this.editId.set(+params['id']);
         forkJoin({
           suppliers: this.api.getSuppliers(),
-          product: this.api.getProduct(+id)
+          product: this.api.getProduct(+params['id']),
+          options: this.dropdownService.getOptions()
         }).subscribe({
-          next: ({ suppliers, product }) => {
+          next: ({ suppliers, product, options }) => {
             this.suppliersStore.setSuppliers(suppliers);
-            this.form = {
-              supplierId: product.supplierId,
-              articleNumber: product.articleNumber,
-              name: product.name,
-              category: product.category,
-              description: product.description || '',
-              unitPrice: product.unitPrice,
-              landingPrice: product.landingPrice,
-              onePcPrice: product.onePcPrice,
-              bulkPrice: product.bulkPrice,
-              currency: product.currency || '',
-              moq: product.moq,
-              weightKg: product.weightKg,
-              techPackPath: product.techPackPath || '',
-              techPackName: product.techPackName || '',
-              imagePath: product.imagePath || '',
-              imageName: product.imageName || '',
-              collection: product.collection || '',
-              year: product.year || new Date().getFullYear(),
-              pricepoint: product.pricepoint || '',
-            };
-            // Populate construction details
-            this.loadConstruction(product.construction);
-            this.cdr.detectChanges();
+            const filterVals = (cat: string) => options.filter(o => o.category === cat).map(o => o.value);
+            this.currencies.set(filterVals('currency'));
+            this.backings.set(filterVals('backing'));
+            this.bladders.set(filterVals('bladder'));
+            this.coverMaterials.set(filterVals('coverMaterial'));
+            this.bondings.set(filterVals('bonding'));
+            this.pricepoints.set(filterVals('pricepoint'));
+
+            if (product) {
+              this.form = {
+                supplierId: product.supplierId,
+                articleNumber: product.articleNumber,
+                name: product.name,
+                category: product.category,
+                description: product.description || '',
+                unitPrice: product.unitPrice,
+                landingPrice: product.landingPrice,
+                onePcPrice: product.onePcPrice,
+                bulkPrice: product.bulkPrice,
+                currency: product.currency || '',
+                moq: product.moq,
+                weightKg: product.weightKg,
+                techPackPath: product.techPackPath || '',
+                techPackName: product.techPackName || '',
+                imagePath: product.imagePath || '',
+                imageName: product.imageName || '',
+                graphicLogoPath: product.graphicLogoPath || '',
+                graphicLogoName: product.graphicLogoName || '',
+                graphicPatternPath: product.graphicPatternPath || '',
+                graphicPatternName: product.graphicPatternName || '',
+                collection: product.collection || '',
+                year: product.year || new Date().getFullYear(),
+                pricepoint: product.pricepoint || '',
+              };
+              this.loadConstruction(product.construction);
+              this.cdr.detectChanges();
+            }
           },
-          error: (err) => console.error('ProductForm: error loading data:', err)
+          error: (err) => console.error('ProductForm: error loading edit product:', err)
         });
       } else {
         this.isEdit.set(false);
@@ -176,6 +268,10 @@ export class ProductFormComponent implements OnInit {
           techPackName: '',
           imagePath: '',
           imageName: '',
+          graphicLogoPath: '',
+          graphicLogoName: '',
+          graphicPatternPath: '',
+          graphicPatternName: '',
           collection: '',
           year: new Date().getFullYear(),
           pricepoint: '',
@@ -190,14 +286,56 @@ export class ProductFormComponent implements OnInit {
           bonding: '',
           debossing: false,
           finishes: false,
-          carcass: ''
+          carcass: '',
+          circumference: '',
+          weight: '',
+          pressure: '',
+          rebound: '',
+          waterAbsorption: '',
+          shapeSizeRetention: '',
+        };
+        this.graphicPoints = {
+          colorCallouts: { path: '', name: '', notes: '' },
+          logoPlacement: { path: '', name: '', notes: '' },
+          printMethod: { path: '', name: '', notes: '' },
+          printColors: { path: '', name: '', notes: '' },
+          logoVector: { path: '', name: '', notes: '' },
+          labelBadge: { path: '', name: '', notes: '' },
+          ballColor: { path: '', name: '', notes: '' },
+          patternLayout: { path: '', name: '', notes: '' },
+        };
+        this.packagingSpecs = {
+          individualPackaging: '',
+          inflationState: '',
+          boxDimensions: '',
+          unitsPerCarton: null,
+          koraBrandingOnBox: false,
+          koraBrandingArtwork: { path: '', name: '' },
+          barcodeEan: '',
+          barcodeEanFile: { path: '', name: '' },
+        };
+        this.qualitySpecs = {
+          preProductionSamples: '',
+          aqlInspectionLevel: '',
+          rejectionCriteria: '',
+          referenceStandard: '',
+          thirdPartyTestingLab: '',
         };
 
-        this.api.getSuppliers().subscribe({
-          next: (suppliers) => {
+        forkJoin({
+          suppliers: this.api.getSuppliers(),
+          options: this.dropdownService.getOptions()
+        }).subscribe({
+          next: ({ suppliers, options }) => {
             this.suppliersStore.setSuppliers(suppliers);
+            const filterVals = (cat: string) => options.filter(o => o.category === cat).map(o => o.value);
+            this.currencies.set(filterVals('currency'));
+            this.backings.set(filterVals('backing'));
+            this.bladders.set(filterVals('bladder'));
+            this.coverMaterials.set(filterVals('coverMaterial'));
+            this.bondings.set(filterVals('bonding'));
+            this.pricepoints.set(filterVals('pricepoint'));
 
-             // Check if prefilling from a sample promotion or copyFrom
             const fromSampleId = this.route.snapshot.queryParamMap.get('fromSampleId');
             const copyFromId = this.route.snapshot.queryParamMap.get('copyFrom');
             if (fromSampleId) {
@@ -239,6 +377,10 @@ export class ProductFormComponent implements OnInit {
                   techPackName: product.techPackName || '',
                   imagePath: product.imagePath || '',
                   imageName: product.imageName || '',
+                  graphicLogoPath: product.graphicLogoPath || '',
+                  graphicLogoName: product.graphicLogoName || '',
+                  graphicPatternPath: product.graphicPatternPath || '',
+                  graphicPatternName: product.graphicPatternName || '',
                   collection: product.collection || '',
                   year: product.year || new Date().getFullYear(),
                   pricepoint: product.pricepoint || '',
@@ -285,6 +427,10 @@ export class ProductFormComponent implements OnInit {
     dto.techPackName = this.form.techPackName || null as any;
     dto.imagePath = this.form.imagePath || null as any;
     dto.imageName = this.form.imageName || null as any;
+    dto.graphicLogoPath = this.form.graphicLogoPath || null as any;
+    dto.graphicLogoName = this.form.graphicLogoName || null as any;
+    dto.graphicPatternPath = this.form.graphicPatternPath || null as any;
+    dto.graphicPatternName = this.form.graphicPatternName || null as any;
 
     if (this.form.collection) dto.collection = this.form.collection;
     if (this.form.year) dto.year = this.form.year;
@@ -359,6 +505,66 @@ export class ProductFormComponent implements OnInit {
   onProductPhotoRemoved(): void {
     this.form.imagePath = '';
     this.form.imageName = '';
+    this.cdr.detectChanges();
+  }
+
+  onGraphicLogoUploaded(file: { path: string; name: string }): void {
+    this.form.graphicLogoPath = file.path;
+    this.form.graphicLogoName = file.name;
+    this.cdr.detectChanges();
+  }
+
+  onGraphicLogoRemoved(): void {
+    this.form.graphicLogoPath = '';
+    this.form.graphicLogoName = '';
+    this.cdr.detectChanges();
+  }
+
+  onGraphicPatternUploaded(file: { path: string; name: string }): void {
+    this.form.graphicPatternPath = file.path;
+    this.form.graphicPatternName = file.name;
+    this.cdr.detectChanges();
+  }
+
+  onGraphicPatternRemoved(): void {
+    this.form.graphicPatternPath = '';
+    this.form.graphicPatternName = '';
+    this.cdr.detectChanges();
+  }
+
+  onPointFileUploaded(key: keyof typeof this.graphicPoints, file: { path: string; name: string }): void {
+    this.graphicPoints[key].path = file.path;
+    this.graphicPoints[key].name = file.name;
+    this.cdr.detectChanges();
+  }
+
+  onPointFileRemoved(key: keyof typeof this.graphicPoints): void {
+    this.graphicPoints[key].path = '';
+    this.graphicPoints[key].name = '';
+    this.cdr.detectChanges();
+  }
+
+  onBrandingArtworkUploaded(file: { path: string; name: string }): void {
+    this.packagingSpecs.koraBrandingArtwork.path = file.path;
+    this.packagingSpecs.koraBrandingArtwork.name = file.name;
+    this.cdr.detectChanges();
+  }
+
+  onBrandingArtworkRemoved(): void {
+    this.packagingSpecs.koraBrandingArtwork.path = '';
+    this.packagingSpecs.koraBrandingArtwork.name = '';
+    this.cdr.detectChanges();
+  }
+
+  onBarcodeFileUploaded(file: { path: string; name: string }): void {
+    this.packagingSpecs.barcodeEanFile.path = file.path;
+    this.packagingSpecs.barcodeEanFile.name = file.name;
+    this.cdr.detectChanges();
+  }
+
+  onBarcodeFileRemoved(): void {
+    this.packagingSpecs.barcodeEanFile.path = '';
+    this.packagingSpecs.barcodeEanFile.name = '';
     this.cdr.detectChanges();
   }
 }
