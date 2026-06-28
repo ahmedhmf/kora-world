@@ -55,6 +55,7 @@ export class LayoutComponent {
       route: '/commercial',
       icon: 'briefcase',
       subItems: [
+        { label: 'Forecasts', route: '/forecasts', icon: 'trending-up' },
         { label: 'Purchase Orders', route: '/purchase-orders', icon: 'clipboard-list' },
         { label: 'B2C Requests', route: '/b2c-requests', icon: 'smartphone' },
       ],
@@ -152,14 +153,13 @@ export class LayoutComponent {
   get filteredNavItems(): NavItem[] {
     const role = this.authService.currentUser()?.role;
     if (role === 'supplier') {
-      return this.navItems.filter(
-        (item) =>
-          item.label === 'Dashboard' ||
-          item.label === 'Products' ||
-          item.label === 'Samples' ||
-          item.label === 'Purchase Orders' ||
-          item.label === 'Accounts',
-      );
+      return [
+        { label: 'Dashboard', route: '/dashboard', icon: 'layout-dashboard' },
+        { label: 'Forecasts', route: '/forecasts', icon: 'trending-up' },
+        { label: 'Products', route: '/products', icon: 'dribbble' },
+        { label: 'Samples', route: '/samples', icon: 'flask-conical' },
+        { label: 'Purchase Orders', route: '/purchase-orders', icon: 'clipboard-list' },
+      ];
     }
     return this.navItems.filter((item) => !item.roles || (role && item.roles.includes(role)));
   }

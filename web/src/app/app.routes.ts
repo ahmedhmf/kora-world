@@ -135,6 +135,11 @@ export const routes: Routes = [
           import('./features/purchase-orders/purchase-order-form.component').then((m) => m.PurchaseOrderFormComponent),
       },
       {
+        path: 'forecasts',
+        loadComponent: () =>
+          import('./features/forecasts/forecasts-list.component').then((m) => m.ForecastsListComponent),
+      },
+      {
         path: 'calendar',
         loadComponent: () =>
           import('./features/events/calendar.component').then((m) => m.CalendarComponent),

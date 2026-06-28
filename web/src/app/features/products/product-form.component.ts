@@ -142,6 +142,25 @@ export class ProductFormComponent implements OnInit {
         this.ballConstruction.circumference = '68–70 cm';
         this.ballConstruction.weight = '410–450 g';
       }
+    } else if (this.form.category === 'handball' && this.form.size) {
+      this.ballConstruction.pressure = '0.3–0.9 bar';
+      this.ballConstruction.rebound = '135–145 cm (dropped from 200 cm height)';
+      this.ballConstruction.waterAbsorption = 'No significant moisture absorption (surface must remain grippy)';
+      this.ballConstruction.shapeSizeRetention = 'Retains round shape under play conditions';
+
+      if (this.form.size === '0') {
+        this.ballConstruction.circumference = '47–49 cm';
+        this.ballConstruction.weight = '250–290 g';
+      } else if (this.form.size === '1') {
+        this.ballConstruction.circumference = '50–52 cm';
+        this.ballConstruction.weight = '290–330 g';
+      } else if (this.form.size === '2') {
+        this.ballConstruction.circumference = '54–56 cm';
+        this.ballConstruction.weight = '325–375 g';
+      } else if (this.form.size === '3') {
+        this.ballConstruction.circumference = '58–60 cm';
+        this.ballConstruction.weight = '425–475 g';
+      }
     }
   }
 
