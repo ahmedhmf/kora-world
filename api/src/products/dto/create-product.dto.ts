@@ -8,6 +8,7 @@ import {
   IsPositive,
   Min,
   IsObject,
+  IsArray,
   ValidateIf,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -76,6 +77,11 @@ export class CreateProductDto {
   @IsOptional()
   @ValidateIf((o, v) => v !== null)
   imageName?: string | null;
+
+  @IsArray()
+  @IsOptional()
+  @ValidateIf((o, v) => v !== null)
+  images?: { path: string; name: string }[] | null;
 
   @IsString()
   @IsOptional()

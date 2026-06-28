@@ -63,6 +63,7 @@
             (change)="onFileSelected($event)"
             class="hidden"
             accept=".pdf,.png,.jpg,.jpeg,.zip,.docx,.doc,.xls,.xlsx"
+            [attr.multiple]="allowMultiple ? '' : null"
           />
 
           @if (uploading()) {

@@ -127,41 +127,84 @@
               </div>
             </div>
 
-            <!-- Construction Details (Optional, only for Balls) -->
+            <!-- Construction Details & Physical Specs (Optional, only for Balls) -->
             @if (p.category === 'football' || p.category === 'handball') {
+              <!-- Technical Specifications -->
               <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
                 <h2 class="text-lg font-bold text-white mb-4">Technical Specifications</h2>
-                @if (p.construction && Object.keys(p.construction).length > 0) {
+                @if (getOrderedTechSpecs(p).length > 0) {
                   <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    @for (entry of Object.entries(p.construction); track entry[0]) {
+                    @for (item of getOrderedTechSpecs(p); track item.label) {
                       <div class="bg-zinc-950/40 border border-zinc-800/80 rounded-lg p-3">
-                        <span class="block text-zinc-500 text-xs font-semibold uppercase tracking-wider mb-1">{{ entry[0] }}</span>
-                        <span class="text-white text-sm font-semibold">{{ entry[1] }}</span>
+                        <span class="block text-zinc-500 text-xs font-semibold uppercase tracking-wider mb-1">{{ item.label }}</span>
+                        <span class="text-white text-sm font-semibold">{{ item.value }}</span>
                       </div>
                     }
                   </div>
                 } @else {
                   <div class="text-center py-6 bg-zinc-950/20 border border-dashed border-zinc-800 rounded-lg">
-                    <p class="text-zinc-500 text-xs">No construction specifications defined.</p>
+                    <p class="text-zinc-500 text-xs">No technical specifications defined.</p>
                   </div>
                 }
               </div>
+
+              <!-- Dimensions & Physical Specs Card -->
+              @if (getPhysicalSpecs(p).length > 0) {
+                <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                  <h2 class="text-lg font-bold text-white mb-4">Dimensions & Physical Specs</h2>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    @for (item of getPhysicalSpecs(p); track item.label) {
+                      <div class="bg-zinc-950/40 border border-zinc-800/80 rounded-lg p-3">
+                        <span class="block text-zinc-500 text-xs font-semibold uppercase tracking-wider mb-1">{{ item.label }}</span>
+                        <span class="text-white text-sm font-semibold">{{ item.value }}</span>
+                      </div>
+                    }
+                  </div>
+                </div>
+              }
             }
           </div>
 
           <!-- Sidebar details -->
           <div class="space-y-6">
 
-            <!-- Product Photo -->
-            <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-              <h2 class="text-lg font-bold text-white mb-4">Product Photo</h2>
-              @if (p.imagePath) {
-                <div class="relative rounded-lg overflow-hidden border border-zinc-700 bg-zinc-950 flex items-center justify-center p-2">
-                  <img
-                    [src]="getPublicUrl(p.imagePath)"
-                    class="w-full h-auto object-contain max-h-[300px] hover:scale-105 transition-transform duration-300"
-                    [alt]="p.name"
-                  />
+            <!-- Product Photos Gallery -->
+            <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6 space-y-4">
+              <div class="flex items-center justify-between">
+                <h2 class="text-lg font-bold text-white">Product Photos</h2>
+                @if (getImages(p).length > 0) {
+                  <span class="text-xs font-mono text-zinc-400 bg-zinc-950 px-2.5 py-1 rounded-full border border-zinc-800">
+                    {{ getImages(p).length }} Photos
+                  </span>
+                }
+              </div>
+
+              @if (getImages(p).length > 0) {
+                <div class="space-y-3">
+                  <!-- Main Image Display -->
+                  <div class="relative rounded-xl overflow-hidden border border-zinc-700 bg-zinc-950 flex items-center justify-center p-3 shadow-inner min-h-[240px]">
+                    <img
+                      [src]="getPublicUrl(getImages(p)[selectedImageIndex() < getImages(p).length ? selectedImageIndex() : 0].path)"
+                      class="w-full h-auto object-contain max-h-[320px] transition-all duration-300"
+                      [alt]="p.name"
+                    />
+                  </div>
+
+                  <!-- Thumbnails selector (if more than 1 image) -->
+                  @if (getImages(p).length > 1) {
+                    <div class="grid grid-cols-5 gap-2 pt-1">
+                      @for (img of getImages(p); track $index) {
+                        <button
+                          type="button"
+                          (click)="selectImage($index)"
+                          [class]="selectedImageIndex() === $index ? 'ring-2 ring-indigo-500 border-indigo-500 scale-105' : 'border-zinc-800 hover:border-zinc-600 opacity-70 hover:opacity-100'"
+                          class="aspect-square rounded-lg overflow-hidden border bg-zinc-950 p-1 transition-all duration-200"
+                        >
+                          <img [src]="getPublicUrl(img.path)" class="w-full h-full object-cover rounded" [alt]="img.name" />
+                        </button>
+                      }
+                    </div>
+                  }
                 </div>
               } @else {
                 <div class="flex flex-col items-center justify-center py-12 bg-zinc-950/40 border border-dashed border-zinc-800 rounded-lg select-none text-zinc-500">
@@ -196,6 +239,33 @@
                 </div>
               }
             </div>
+
+            <!-- Barcode / EAN Card -->
+            @if (getBarcodeSpecs(p)) {
+              <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6 space-y-4">
+                <h2 class="text-lg font-bold text-white">Barcode / EAN</h2>
+                @if (getBarcodeSpecs(p)?.barcodeEan) {
+                  <div>
+                    <span class="block text-xs font-medium text-zinc-400 mb-1">Barcode / EAN Code</span>
+                    <p class="text-sm font-mono text-white bg-zinc-950 px-3 py-2 rounded-lg border border-zinc-800 break-all">
+                      {{ getBarcodeSpecs(p)?.barcodeEan }}
+                    </p>
+                  </div>
+                }
+                @if (getBarcodeSpecs(p)?.barcodeEanFile?.path) {
+                  <div>
+                    <span class="block text-xs font-medium text-zinc-400 mb-1.5">Barcode Image File</span>
+                    <div class="relative rounded-lg overflow-hidden border border-zinc-800 bg-zinc-950 p-2 flex items-center justify-center">
+                      <img
+                        [src]="getPublicUrl(getBarcodeSpecs(p)!.barcodeEanFile!.path!)"
+                        class="max-h-36 object-contain rounded"
+                        [alt]="getBarcodeSpecs(p)?.barcodeEanFile?.name || 'Barcode'"
+                      />
+                    </div>
+                  </div>
+                }
+              </div>
+            }
 
           </div>
 

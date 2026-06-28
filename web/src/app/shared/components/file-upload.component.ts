@@ -17,6 +17,8 @@ export class FileUploadComponent {
   @Input() label: string = 'Tech Pack File';
   @Input() filePath: string = '';
   @Input() fileName: string = '';
+  @Input() allowMultiple: boolean = false;
+  @Input() resetOnUpload: boolean = false;
 
   @Output() fileUploaded = new EventEmitter<{ path: string; name: string }>();
   @Output() fileRemoved = new EventEmitter<void>();
@@ -46,7 +48,7 @@ export class FileUploadComponent {
 
     const files = event.dataTransfer?.files;
     if (files && files.length > 0) {
-      this.handleUpload(files[0]);
+      this.handleFiles(Array.from(files));
     }
   }
 
@@ -55,29 +57,45 @@ export class FileUploadComponent {
     const input = event.target as HTMLInputElement;
     const files = input.files;
     if (files && files.length > 0) {
-      this.handleUpload(files[0]);
+      this.handleFiles(Array.from(files));
+      input.value = '';
     }
   }
 
-  private handleUpload(file: File): void {
-    if (file.size > 15 * 1024 * 1024) {
-      this.error.set('File exceeds the 15MB limit.');
-      return;
+  private handleFiles(files: File[]): void {
+    const validFiles = files.filter(f => f.size <= 15 * 1024 * 1024);
+    if (validFiles.length < files.length) {
+      this.error.set('Some files exceed the 15MB limit.');
     }
+    if (validFiles.length === 0) return;
 
     this.uploading.set(true);
-    this.api.uploadFile(file).subscribe({
-      next: (res) => {
-        this.uploading.set(false);
-        this.filePath = res.path;
-        this.fileName = res.name;
-        this.fileUploaded.emit({ path: res.path, name: res.name });
-      },
-      error: (err) => {
-        this.uploading.set(false);
-        this.error.set('Upload failed. Please check server logs.');
-        console.error('File upload error:', err);
-      }
+    let completed = 0;
+    validFiles.forEach((file) => {
+      this.api.uploadFile(file).subscribe({
+        next: (res) => {
+          completed++;
+          if (!this.resetOnUpload && validFiles.length === 1) {
+            this.filePath = res.path;
+            this.fileName = res.name;
+          } else {
+            this.filePath = '';
+            this.fileName = '';
+          }
+          this.fileUploaded.emit({ path: res.path, name: res.name });
+          if (completed === validFiles.length) {
+            this.uploading.set(false);
+          }
+        },
+        error: (err) => {
+          completed++;
+          if (completed === validFiles.length) {
+            this.uploading.set(false);
+          }
+          this.error.set('Upload failed for one or more files.');
+          console.error('File upload error:', err);
+        }
+      });
     });
   }
 

@@ -55,6 +55,7 @@ export class ProductFormComponent implements OnInit {
     techPackName: '',
     imagePath: '',
     imageName: '',
+    images: [] as { path: string; name: string }[],
     graphicLogoPath: '',
     graphicLogoName: '',
     graphicPatternPath: '',
@@ -216,9 +217,12 @@ export class ProductFormComponent implements OnInit {
     if (this.ballConstruction.waterAbsorption) obj['Water absorption'] = this.ballConstruction.waterAbsorption;
     if (this.ballConstruction.shapeSizeRetention) obj['Shape/size retention'] = this.ballConstruction.shapeSizeRetention;
     
-    obj['GraphicPoints'] = this.graphicPoints;
-    obj['PackagingSpecs'] = this.packagingSpecs;
-    obj['QualitySpecs'] = this.qualitySpecs;
+    if (this.packagingSpecs.barcodeEan || this.packagingSpecs.barcodeEanFile?.path) {
+      obj['PackagingSpecs'] = {
+        barcodeEan: this.packagingSpecs.barcodeEan,
+        barcodeEanFile: this.packagingSpecs.barcodeEanFile
+      };
+    }
     return Object.keys(obj).length > 0 ? obj : null;
   }
 
@@ -266,6 +270,9 @@ export class ProductFormComponent implements OnInit {
                 techPackName: product.techPackName || '',
                 imagePath: product.imagePath || '',
                 imageName: product.imageName || '',
+                images: product.images && Array.isArray(product.images) && product.images.length > 0
+                  ? product.images
+                  : (product.imagePath ? [{ path: product.imagePath, name: product.imageName || 'Product Photo' }] : []),
                 graphicLogoPath: product.graphicLogoPath || '',
                 graphicLogoName: product.graphicLogoName || '',
                 graphicPatternPath: product.graphicPatternPath || '',
@@ -301,6 +308,7 @@ export class ProductFormComponent implements OnInit {
           techPackName: '',
           imagePath: '',
           imageName: '',
+          images: [],
           graphicLogoPath: '',
           graphicLogoName: '',
           graphicPatternPath: '',
@@ -412,6 +420,9 @@ export class ProductFormComponent implements OnInit {
                   techPackName: product.techPackName || '',
                   imagePath: product.imagePath || '',
                   imageName: product.imageName || '',
+                  images: product.images && Array.isArray(product.images) && product.images.length > 0
+                    ? product.images
+                    : (product.imagePath ? [{ path: product.imagePath, name: product.imageName || 'Product Photo' }] : []),
                   graphicLogoPath: product.graphicLogoPath || '',
                   graphicLogoName: product.graphicLogoName || '',
                   graphicPatternPath: product.graphicPatternPath || '',
@@ -463,6 +474,7 @@ export class ProductFormComponent implements OnInit {
     dto.techPackName = this.form.techPackName || null as any;
     dto.imagePath = this.form.imagePath || null as any;
     dto.imageName = this.form.imageName || null as any;
+    dto.images = this.form.images.length > 0 ? this.form.images : null as any;
     dto.graphicLogoPath = this.form.graphicLogoPath || null as any;
     dto.graphicLogoName = this.form.graphicLogoName || null as any;
     dto.graphicPatternPath = this.form.graphicPatternPath || null as any;
@@ -534,63 +546,27 @@ export class ProductFormComponent implements OnInit {
   }
 
   onProductPhotoUploaded(file: { path: string; name: string }): void {
-    this.form.imagePath = file.path;
-    this.form.imageName = file.name;
+    if (this.form.images.length < 5) {
+      this.form.images.push({ path: file.path, name: file.name });
+      this.syncMainImage();
+    }
     this.cdr.detectChanges();
   }
 
-  onProductPhotoRemoved(): void {
-    this.form.imagePath = '';
-    this.form.imageName = '';
+  removeProductPhoto(index: number): void {
+    this.form.images.splice(index, 1);
+    this.syncMainImage();
     this.cdr.detectChanges();
   }
 
-  onGraphicLogoUploaded(file: { path: string; name: string }): void {
-    this.form.graphicLogoPath = file.path;
-    this.form.graphicLogoName = file.name;
-    this.cdr.detectChanges();
-  }
-
-  onGraphicLogoRemoved(): void {
-    this.form.graphicLogoPath = '';
-    this.form.graphicLogoName = '';
-    this.cdr.detectChanges();
-  }
-
-  onGraphicPatternUploaded(file: { path: string; name: string }): void {
-    this.form.graphicPatternPath = file.path;
-    this.form.graphicPatternName = file.name;
-    this.cdr.detectChanges();
-  }
-
-  onGraphicPatternRemoved(): void {
-    this.form.graphicPatternPath = '';
-    this.form.graphicPatternName = '';
-    this.cdr.detectChanges();
-  }
-
-  onPointFileUploaded(key: keyof typeof this.graphicPoints, file: { path: string; name: string }): void {
-    this.graphicPoints[key].path = file.path;
-    this.graphicPoints[key].name = file.name;
-    this.cdr.detectChanges();
-  }
-
-  onPointFileRemoved(key: keyof typeof this.graphicPoints): void {
-    this.graphicPoints[key].path = '';
-    this.graphicPoints[key].name = '';
-    this.cdr.detectChanges();
-  }
-
-  onBrandingArtworkUploaded(file: { path: string; name: string }): void {
-    this.packagingSpecs.koraBrandingArtwork.path = file.path;
-    this.packagingSpecs.koraBrandingArtwork.name = file.name;
-    this.cdr.detectChanges();
-  }
-
-  onBrandingArtworkRemoved(): void {
-    this.packagingSpecs.koraBrandingArtwork.path = '';
-    this.packagingSpecs.koraBrandingArtwork.name = '';
-    this.cdr.detectChanges();
+  syncMainImage(): void {
+    if (this.form.images.length > 0) {
+      this.form.imagePath = this.form.images[0].path;
+      this.form.imageName = this.form.images[0].name;
+    } else {
+      this.form.imagePath = '';
+      this.form.imageName = '';
+    }
   }
 
   onBarcodeFileUploaded(file: { path: string; name: string }): void {
@@ -603,5 +579,9 @@ export class ProductFormComponent implements OnInit {
     this.packagingSpecs.barcodeEanFile.path = '';
     this.packagingSpecs.barcodeEanFile.name = '';
     this.cdr.detectChanges();
+  }
+
+  getPublicUrl(path: string): string {
+    return this.api.getPublicImageUrl(path);
   }
 }

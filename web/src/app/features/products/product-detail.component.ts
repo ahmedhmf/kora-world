@@ -25,6 +25,7 @@ export class ProductDetailComponent implements OnInit {
   product = signal<Product | null>(null);
   loading = signal(true);
   error = signal<string | null>(null);
+  selectedImageIndex = signal(0);
 
   readonly Object = Object;
 
@@ -104,5 +105,77 @@ export class ProductDetailComponent implements OnInit {
 
   getPublicUrl(path: string): string {
     return this.api.getPublicImageUrl(path);
+  }
+
+  getImages(p: Product): { path: string; name: string }[] {
+    if (p.images && Array.isArray(p.images) && p.images.length > 0) {
+      return p.images;
+    }
+    if (p.imagePath) {
+      return [{ path: p.imagePath, name: p.imageName || 'Product Photo' }];
+    }
+    return [];
+  }
+
+  selectImage(idx: number): void {
+    this.selectedImageIndex.set(idx);
+    this.cdr.detectChanges();
+  }
+
+  getBarcodeSpecs(p: Product): { barcodeEan?: string; barcodeEanFile?: { path?: string; name?: string } } | null {
+    if (!p.construction) return null;
+    const pkg = p.construction['PackagingSpecs'] as any;
+    if (!pkg) return null;
+    if (pkg.barcodeEan || (pkg.barcodeEanFile && pkg.barcodeEanFile.path)) {
+      return pkg;
+    }
+    return null;
+  }
+
+  getOrderedTechSpecs(p: Product): { label: string; value: string }[] {
+    const constr = p.construction;
+    if (!constr) return [];
+    
+    const fields = [
+      { key: 'Cover Material', label: 'Cover Material' },
+      { key: 'Backing', label: 'Backing' },
+      { key: 'Bladder', label: 'Bladder' },
+      { key: 'Carcass', label: 'Carcass' },
+      { key: 'Bonding', label: 'Bonding' },
+      { key: 'Number of Colors', label: 'Number of Colors' },
+      { key: 'Cutting Die / Panels', label: 'Cutting Die / Panels' },
+      { key: 'Finishes', label: 'Finishes' },
+      { key: 'Debossing', label: 'Debossing' },
+    ];
+
+    const result: { label: string; value: string }[] = [];
+    for (const f of fields) {
+      if (constr[f.key] !== undefined && constr[f.key] !== null && constr[f.key] !== '') {
+        result.push({ label: f.label, value: String(constr[f.key]) });
+      }
+    }
+    return result;
+  }
+
+  getPhysicalSpecs(p: Product): { label: string; value: string }[] {
+    const constr = p.construction;
+    if (!constr) return [];
+    
+    const fields = [
+      { key: 'Circumference', label: 'Circumference' },
+      { key: 'Weight', label: 'Weight' },
+      { key: 'Pressure', label: 'Pressure' },
+      { key: 'Rebound', label: 'Rebound' },
+      { key: 'Water absorption', label: 'Water Absorption' },
+      { key: 'Shape/size retention', label: 'Shape / Size Retention' },
+    ];
+
+    const result: { label: string; value: string }[] = [];
+    for (const f of fields) {
+      if (constr[f.key] !== undefined && constr[f.key] !== null && constr[f.key] !== '') {
+        result.push({ label: f.label, value: String(constr[f.key]) });
+      }
+    }
+    return result;
   }
 }

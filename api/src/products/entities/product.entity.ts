@@ -71,6 +71,9 @@ export class Product {
   @Column({ type: 'varchar', name: 'image_name', length: 255, nullable: true })
   imageName?: string | null;
 
+  @Column({ type: 'jsonb', nullable: true })
+  images?: { path: string; name: string }[] | null;
+
   @Column({ type: 'varchar', name: 'graphic_logo_path', length: 255, nullable: true })
   graphicLogoPath?: string | null;
 

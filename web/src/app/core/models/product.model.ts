@@ -24,6 +24,7 @@ export interface Product {
   techPackName?: string;
   imagePath?: string;
   imageName?: string;
+  images?: { path: string; name: string }[];
   graphicLogoPath?: string;
   graphicLogoName?: string;
   graphicPatternPath?: string;
@@ -53,6 +54,7 @@ export interface CreateProductDto {
   techPackName?: string;
   imagePath?: string;
   imageName?: string;
+  images?: { path: string; name: string }[];
   graphicLogoPath?: string;
   graphicLogoName?: string;
   graphicPatternPath?: string | null;

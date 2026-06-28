@@ -187,8 +187,8 @@ export class TechPackCreatorComponent implements OnInit {
       category: prod.category || 'football',
       pricepoint: prod.pricepoint || '',
       supplierName: prod.supplier?.name || '',
-      imagePath: prod.imagePath || '',
-      imageName: prod.imageName || '',
+      imagePath: (prod.images && Array.isArray(prod.images) && prod.images.length > 0) ? prod.images[0].path : (prod.imagePath || ''),
+      imageName: (prod.images && Array.isArray(prod.images) && prod.images.length > 0) ? prod.images[0].name : (prod.imageName || ''),
     };
 
     // Deserialize construction
