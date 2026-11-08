@@ -47,6 +47,10 @@
 
           <!-- Action Buttons -->
           <div class="flex items-center gap-2 flex-shrink-0">
+            <a [routerLink]="['/accounts', acct.id, 'delivery-notes']"
+              class="px-4 py-2 bg-blue-800 hover:bg-blue-700 text-white text-sm font-medium rounded-lg">
+              Delivery Notes
+            </a>
             <a
               [routerLink]="['/accounts', acct.id, 'edit']"
               class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5"
