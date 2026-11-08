@@ -15,7 +15,7 @@ export class WeeklySalesReport {
   weekEnd: string;
 
   @Column({ type: 'varchar', length: 20, default: 'draft' })
-  status: 'draft' | 'approved';
+  status: 'draft' | 'approved' | 'cancelled';
 
   @Column({ type: 'jsonb' })
   items: Array<{ productId: number; articleNumber: string; productName: string; quantity: number }>;
@@ -31,6 +31,24 @@ export class WeeklySalesReport {
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
+
+  @Column({ name: 'approved_by_id', type: 'int', nullable: true })
+  approvedById?: number | null;
+
+  @Column({ name: 'approved_by_name', type: 'varchar', length: 255, nullable: true })
+  approvedByName?: string | null;
+
+  @Column({ name: 'cancelled_at', type: 'timestamptz', nullable: true })
+  cancelledAt?: Date | null;
+
+  @Column({ name: 'cancelled_by_id', type: 'int', nullable: true })
+  cancelledById?: number | null;
+
+  @Column({ name: 'cancelled_by_name', type: 'varchar', length: 255, nullable: true })
+  cancelledByName?: string | null;
+
+  @Column({ name: 'cancellation_reason', type: 'text', nullable: true })
+  cancellationReason?: string | null;
 
   @Column({ name: 'approved_at', type: 'timestamptz', nullable: true })
   approvedAt?: Date | null;
