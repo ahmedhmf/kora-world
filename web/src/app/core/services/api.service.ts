@@ -209,6 +209,25 @@ export class ApiService {
     return this.http.post<{ success: boolean; poIds: number[] }>(`${this.base}/accounts/${id}/forecasts/${forecastId}/create-pos`, { items: selectedItems });
   }
 
+  getCustomerPricing(accountId: number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.base}/customer-financials/account/${accountId}/pricing`);
+  }
+  addCustomerPricing(accountId: number, dto: any): Observable<any> {
+    return this.http.post<any>(`${this.base}/customer-financials/account/${accountId}/pricing`, dto);
+  }
+  getCustomerFinancialOverview(accountId: number): Observable<any> {
+    return this.http.get<any>(`${this.base}/customer-financials/account/${accountId}/overview`);
+  }
+  previewSalesSettlement(reportId: number): Observable<any> {
+    return this.http.get<any>(`${this.base}/customer-financials/sales/${reportId}/preview`);
+  }
+  recordCustomerPayment(accountId: number, dto: any): Observable<any> {
+    return this.http.post<any>(`${this.base}/customer-financials/account/${accountId}/payments`, dto);
+  }
+  allocateCustomerPayment(accountId: number, dto: any): Observable<any> {
+    return this.http.post<any>(`${this.base}/customer-financials/account/${accountId}/allocations`, dto);
+  }
+
   // Delivery notes
   getDeliveryNotes(accountId: number): Observable<any[]> {
     return this.http.get<any[]>(`${this.base}/delivery-notes/account/${accountId}`);
@@ -227,12 +246,12 @@ export class ApiService {
 
   createWeeklySalesReport(accountId: number, dto: {
     weekStart: string; weekEnd: string; filePath: string; fileName: string;
-    remarks?: string; items: Array<{ productId: number; quantity: number }>;
+    remarks?: string; retailPrices?: Record<string, string>; items: Array<{ productId: number; quantity: number }>;
   }): Observable<any> {
     return this.http.post<any>(`${this.base}/delivery-notes/account/${accountId}/sales`, dto);
   }
 
-  updateWeeklySalesDraft(reportId: number, dto: { items: Array<{ productId: number; quantity: number }>; remarks?: string }): Observable<any> {
+  updateWeeklySalesDraft(reportId: number, dto: { items: Array<{ productId: number; quantity: number }>; remarks?: string; retailPrices?: Record<string, string> }): Observable<any> {
     return this.http.patch<any>(`${this.base}/delivery-notes/sales/${reportId}/draft`, dto);
   }
 
