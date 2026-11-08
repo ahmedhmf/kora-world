@@ -97,6 +97,7 @@ import { DropdownOptionsModule } from './dropdown-options/dropdown-options.modul
           SalesSettlement,
           CustomerPayment,
           PaymentAllocation,
+          CustomerStatement,
         ],
         migrations: [__dirname + '/migrations/*{.ts,.js}'],
         migrationsRun: true,
