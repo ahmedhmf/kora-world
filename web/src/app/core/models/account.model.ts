@@ -22,6 +22,7 @@ export interface B2BAccount {
   shippingZip?: string;
   shippingCountry?: string;
   defaultCurrency: string;
+  paymentModel?: string | null;
   paymentTerms: string;
   creditLimit: number;
   vatNumber?: string;
@@ -59,6 +60,7 @@ export interface CreateAccountDto {
   shippingZip?: string;
   shippingCountry?: string;
   defaultCurrency?: string;
+  paymentModel?: string | null;
   paymentTerms?: string;
   creditLimit?: number;
   vatNumber?: string;
