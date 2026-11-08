@@ -439,7 +439,7 @@
                   <button type="button" [disabled]="statementBusy()" (click)="saveStatement()" class="px-4 py-2 bg-blue-700 text-white rounded-lg text-sm">Save statement snapshot</button>
                 }
                 @if (statementPreview()) {
-                  <button type="button" (click)="printStatement()" class="px-4 py-2 bg-zinc-700 text-white rounded-lg text-sm">Print / Save PDF</button>
+                  <button type="button" (click)="printStatement()" [disabled]="statementBusy()" class="px-4 py-2 bg-zinc-700 text-white rounded-lg text-sm">Download branded PDF</button>
                 }
               </div>
               @if (statementError()) { <p class="text-red-400 text-sm">{{ statementError() }}</p> }
