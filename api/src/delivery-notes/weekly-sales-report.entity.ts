@@ -17,6 +17,9 @@ export class WeeklySalesReport {
   @Column({ type: 'varchar', length: 20, default: 'draft' })
   status: 'draft' | 'approved' | 'cancelled';
 
+  @Column({ name: 'retail_prices', type: 'jsonb', nullable: true })
+  retailPrices?: Record<string, string> | null;
+
   @Column({ type: 'jsonb' })
   items: Array<{ productId: number; articleNumber: string; productName: string; quantity: number }>;
 
