@@ -42,8 +42,36 @@ export class AccountDetailComponent implements OnInit {
   salesSuccess = signal('');
   salesBusy = signal(false);
   salesFile: File | null = null;
-  salesWeekStart = '';
-  salesWeekEnd = '';
+  salesYear = this.currentIsoYear();
+
+  private currentIsoYear(): number {
+    const date = new Date();
+    const utc = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    utc.setUTCDate(utc.getUTCDate() + 4 - (utc.getUTCDay() || 7));
+    return utc.getUTCFullYear();
+  }
+  salesWeek = this.currentIsoWeek();
+
+  private currentIsoWeek(): number {
+    const now = new Date();
+    const date = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+    date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7));
+    const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+    return Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  }
+
+  private isoWeekDates(year: number, week: number): { weekStart: string; weekEnd: string } | null {
+    if (!Number.isInteger(year) || year < 2000 || year > 2100 || !Number.isInteger(week) || week < 1 || week > 53) return null;
+    const jan4 = new Date(Date.UTC(year, 0, 4));
+    const monday = new Date(jan4);
+    monday.setUTCDate(jan4.getUTCDate() - (jan4.getUTCDay() || 7) + 1 + (week - 1) * 7);
+    const thursday = new Date(monday);
+    thursday.setUTCDate(monday.getUTCDate() + 3);
+    if (thursday.getUTCFullYear() !== year) return null;
+    const sunday = new Date(monday);
+    sunday.setUTCDate(monday.getUTCDate() + 6);
+    return { weekStart: monday.toISOString().slice(0, 10), weekEnd: sunday.toISOString().slice(0, 10) };
+  }
   salesRemarks = '';
   salesItems: Array<{ productId: number; quantity: number }> = [{ productId: 0, quantity: 1 }];
 
@@ -60,17 +88,17 @@ export class AccountDetailComponent implements OnInit {
 
   saveSalesDraft(): void {
     const acct = this.account();
-    if (!acct || !this.salesFile || !this.salesWeekStart || !this.salesWeekEnd ||
-      this.salesWeekEnd < this.salesWeekStart || !this.salesItems.length ||
+    const period = this.isoWeekDates(Number(this.salesYear), Number(this.salesWeek));
+    if (!acct || !this.salesFile || !period || !this.salesItems.length ||
       this.salesItems.some(i => !i.productId || !Number.isInteger(Number(i.quantity)) || Number(i.quantity) < 1) ||
       new Set(this.salesItems.map(i => i.productId)).size !== this.salesItems.length) {
-      this.salesError.set('Provide a PDF, valid reporting dates, and unique products with positive quantities.');
+      this.salesError.set('Provide a PDF, valid ISO work week and year, and unique products with positive quantities.');
       return;
     }
     this.salesBusy.set(true); this.salesError.set(''); this.salesSuccess.set('');
     this.api.uploadFile(this.salesFile).subscribe({
       next: uploaded => this.api.createWeeklySalesReport(acct.id, {
-        weekStart: this.salesWeekStart, weekEnd: this.salesWeekEnd,
+        weekStart: period!.weekStart, weekEnd: period!.weekEnd,
         filePath: uploaded.path, fileName: uploaded.name, remarks: this.salesRemarks,
         items: this.salesItems.map(i => ({ productId: Number(i.productId), quantity: Number(i.quantity) })),
       }).subscribe({
