@@ -69,7 +69,7 @@ export class DeliveryNotesService {
   }
 
   async listAdjustments(accountId: number) {
-    if (!await this.accounts.exist({ where: { id: accountId } })) throw new NotFoundException('Account not found');
+    if (!await this.accounts.exists({ where: { id: accountId } })) throw new NotFoundException('Account not found');
     return this.adjustments.find({ where: { accountId }, order: { id: 'DESC' } });
   }
 
@@ -159,7 +159,7 @@ export class DeliveryNotesService {
   }
 
   async listSales(accountId: number) {
-    if (!await this.accounts.exist({ where: { id: accountId } })) throw new NotFoundException('Account not found');
+    if (!await this.accounts.exists({ where: { id: accountId } })) throw new NotFoundException('Account not found');
     return this.sales.find({ where: { accountId }, order: { id: 'DESC' } });
   }
 
@@ -167,7 +167,7 @@ export class DeliveryNotesService {
     weekStart: string; weekEnd: string; filePath: string; fileName: string;
     remarks?: string; items: Array<{ productId: number; quantity: number }>;
   }) {
-    if (!await this.accounts.exist({ where: { id: accountId } })) throw new NotFoundException('Account not found');
+    if (!await this.accounts.exists({ where: { id: accountId } })) throw new NotFoundException('Account not found');
     const validDate = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v || '') &&
       !Number.isNaN(Date.parse(v)) && new Date(v).toISOString().slice(0, 10) === v;
     if (!validDate(dto.weekStart) || !validDate(dto.weekEnd) || dto.weekEnd < dto.weekStart) {
