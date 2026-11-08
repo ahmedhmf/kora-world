@@ -8,6 +8,10 @@ import { B2BAccount } from '../../core/models/account.model';
 import { Product } from '../../core/models/product.model';
 
 interface DeliveryItem { productId: number; quantity: number; }
+interface InventoryRow {
+  productId: number; articleNumber: string; productName: string; quantity: number;
+  deliveries: Array<{ noteId: number; noteNumber: string; deliveryDate: string; quantity: number }>;
+}
 interface DeliveryNote {
   id: number; noteNumber: string; deliveryDate: string; customerName: string;
   deliveryAddress?: string; paymentModel?: string; remarks?: string;
@@ -57,6 +61,35 @@ interface DeliveryNote {
         <button type="button" [disabled]="saving()" (click)="create()" class="bg-white text-zinc-900 font-semibold rounded-lg px-4 py-2 disabled:opacity-50">Save Delivery Note</button>
       </section>
 
+      <section class="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6 space-y-4">
+        <div>
+          <h2 class="font-semibold text-white">Customer Inventory</h2>
+          <p class="text-zinc-400 text-sm">Products received on signed delivery notes only. Quantities update after a signed copy is uploaded.</p>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm text-left">
+            <thead class="text-zinc-400 border-b border-zinc-700">
+              <tr><th class="py-2 pr-3">Article</th><th class="py-2 pr-3">Product</th><th class="py-2 pr-3">Quantity received</th><th class="py-2">Delivery notes</th></tr>
+            </thead>
+            <tbody>
+              @for (row of inventory(); track row.productId) {
+                <tr class="border-b border-zinc-800 text-zinc-200">
+                  <td class="py-3 pr-3 font-mono">{{ row.articleNumber }}</td>
+                  <td class="py-3 pr-3">{{ row.productName }}</td>
+                  <td class="py-3 pr-3 font-semibold">{{ row.quantity }}</td>
+                  <td class="py-3">
+                    @for (delivery of row.deliveries; track delivery.noteId) {
+                      <div class="text-xs text-zinc-400">{{ delivery.noteNumber }} · {{ delivery.deliveryDate }} · +{{ delivery.quantity }}</div>
+                    }
+                  </td>
+                </tr>
+              } @empty {
+                <tr><td colspan="4" class="py-5 text-zinc-500">No signed deliveries yet.</td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
       <section class="space-y-3">
         <h2 class="font-semibold text-white">Saved Delivery Notes</h2>
         @for (note of notes(); track note.id) {
@@ -93,6 +126,7 @@ export class AccountDeliveryNotesComponent implements OnInit {
   account = signal<B2BAccount | null>(null);
   products = signal<Product[]>([]);
   notes = signal<DeliveryNote[]>([]);
+  inventory = signal<InventoryRow[]>([]);
   error = signal('');
   success = signal('');
   saving = signal(false);
@@ -107,6 +141,7 @@ export class AccountDeliveryNotesComponent implements OnInit {
     this.reload();
   }
   reload(): void {
+    this.api.getAccountInventory(this.accountId).subscribe({ next: rows => this.inventory.set(rows), error: () => this.error.set('Could not load customer inventory') });
     this.api.getDeliveryNotes(this.accountId).subscribe({ next: n => this.notes.set(n), error: () => this.error.set('Could not load delivery notes') });
   }
   addItem(): void { this.items.push({ productId: 0, quantity: 1 }); }
