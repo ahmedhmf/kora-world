@@ -20,6 +20,36 @@ export class DeliveryNotesService {
     return this.notes.find({ where: { accountId }, order: { id: 'DESC' } });
   }
 
+  async inventory(accountId: number) {
+    const account = await this.accounts.findOneBy({ id: accountId });
+    if (!account) throw new NotFoundException('Account not found');
+    // Signed notes are the immutable source of inventory receipts. Re-uploading a
+    // signed document cannot add stock a second time.
+    const signed = await this.notes.createQueryBuilder('note')
+      .where('note.accountId = :accountId', { accountId })
+      .andWhere('note.signedFilePath IS NOT NULL')
+      .orderBy('note.id', 'ASC')
+      .getMany();
+    const inventory = new Map<number, {
+      productId: number; articleNumber: string; productName: string;
+      quantity: number; deliveries: Array<{ noteId: number; noteNumber: string; deliveryDate: string; quantity: number }>;
+    }>();
+    for (const note of signed) {
+      for (const item of note.items) {
+        let row = inventory.get(item.productId);
+        if (!row) {
+          row = { productId: item.productId, articleNumber: item.articleNumber,
+            productName: item.productName, quantity: 0, deliveries: [] };
+          inventory.set(item.productId, row);
+        }
+        row.quantity += item.quantity;
+        row.deliveries.push({ noteId: note.id, noteNumber: note.noteNumber,
+          deliveryDate: note.deliveryDate, quantity: item.quantity });
+      }
+    }
+    return [...inventory.values()].sort((a, b) => a.articleNumber.localeCompare(b.articleNumber));
+  }
+
   async get(id: number) {
     const note = await this.notes.findOneBy({ id });
     if (!note) throw new NotFoundException('Delivery note not found');
