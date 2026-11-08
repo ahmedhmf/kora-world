@@ -29,7 +29,7 @@ export class DeliveryNotesController {
   @Post('account/:accountId/sales')
   createSales(@Param('accountId', ParseIntPipe) accountId: number, @Body() dto: {
     weekStart: string; weekEnd: string; filePath: string; fileName: string;
-    remarks?: string; items: Array<{ productId: number; quantity: number }>;
+    remarks?: string; retailPrices?: Record<string, string>; items: Array<{ productId: number; quantity: number }>;
   }) {
     return this.service.createSales(accountId, dto);
   }
@@ -43,7 +43,7 @@ export class DeliveryNotesController {
   @Roles('admin', 'employee')
   @Patch('sales/:id/draft')
   updateSalesDraft(@Param('id', ParseIntPipe) id: number,
-    @Body() dto: { items: Array<{ productId: number; quantity: number }>; remarks?: string }) {
+    @Body() dto: { items: Array<{ productId: number; quantity: number }>; remarks?: string; retailPrices?: Record<string, string> }) {
     return this.service.updateSalesDraft(id, dto);
   }
 
