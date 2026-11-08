@@ -140,6 +140,10 @@ export class AccountFormComponent implements OnInit {
     };
   }
 
+  isHistoricalPaymentModel(): boolean {
+    return !!this.form.paymentModel && !this.paymentModels().some(option => option.value === this.form.paymentModel);
+  }
+
   copyBillingToShipping(): void {
     this.form.shippingStreet = this.form.billingStreet;
     this.form.shippingCity = this.form.billingCity;
