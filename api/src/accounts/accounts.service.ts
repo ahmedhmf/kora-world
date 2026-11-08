@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Account } from './entities/account.entity';
@@ -54,18 +54,57 @@ export class AccountsService {
     return `ACC-${String(nextCounter).padStart(4, '0')}`;
   }
 
+  private validateFinancialTerms(account: Account): void {
+    const model = account.paymentModel;
+    if (!model) return; // Existing accounts may not yet have a payment arrangement.
+    if (!['Full Payment Upfront', 'Split Payment', 'Consignment'].includes(model)) {
+      throw new BadRequestException('Select a supported payment arrangement');
+    }
+    if (model === 'Split Payment') {
+      if (account.upfrontPercent == null || !Number.isFinite(Number(account.upfrontPercent)) || Number(account.upfrontPercent) < 0 || Number(account.upfrontPercent) > 100 || !['Before delivery', 'On delivery', '30 days after delivery', '60 days after delivery'].includes(account.balanceDue || '')) {
+        throw new BadRequestException('Split payment requires an upfront percentage (0–100) and balance due milestone');
+      }
+    }
+    if (model === 'Consignment') {
+      if (!['fixed', 'percentage'].includes(account.consignmentPricingMethod || '') || !Number.isInteger(account.settlementDueDay) || account.settlementDueDay! < 1 || account.settlementDueDay! > 28) {
+        throw new BadRequestException('Consignment requires a pricing method and settlement due day (1–28)');
+      }
+      if (account.consignmentPricingMethod === 'percentage' && (account.consignmentSharePercent == null || !Number.isFinite(Number(account.consignmentSharePercent)) || Number(account.consignmentSharePercent) < 0 || Number(account.consignmentSharePercent) > 100)) {
+        throw new BadRequestException('Percentage consignment requires Kora share between 0 and 100');
+      }
+    }
+  }
+
+  private clearIrrelevantTerms(account: Account): void {
+    if (account.paymentModel !== 'Split Payment') {
+      account.upfrontPercent = null;
+      account.balanceDue = null;
+    }
+    if (account.paymentModel !== 'Consignment') {
+      account.consignmentPricingMethod = null;
+      account.consignmentSharePercent = null;
+      account.settlementDueDay = null;
+    } else if (account.consignmentPricingMethod !== 'percentage') {
+      account.consignmentSharePercent = null;
+    }
+  }
+
   async create(dto: CreateAccountDto): Promise<Account> {
     const accountNumber = await this.generateNextAccountNumber();
     const account = this.accountRepo.create({
       ...dto,
       accountNumber,
     });
+    this.validateFinancialTerms(account);
+    this.clearIrrelevantTerms(account);
     return this.accountRepo.save(account);
   }
 
   async update(id: number, dto: UpdateAccountDto): Promise<Account> {
     const account = await this.findOne(id);
     Object.assign(account, dto);
+    this.validateFinancialTerms(account);
+    this.clearIrrelevantTerms(account);
     return this.accountRepo.save(account);
   }
 
