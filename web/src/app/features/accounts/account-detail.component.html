@@ -412,6 +412,70 @@
               }
             </section>
             <section class="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6 space-y-4">
+              <h2 class="text-lg font-bold text-white">Customer Statements &amp; Settlement Management</h2>
+              <p class="text-sm text-zinc-400">Statements show allocated payments, not unallocated customer credit. Select one currency per statement.</p>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <label class="text-sm text-zinc-300">From
+                  <input type="date" [(ngModel)]="statementFrom" class="block w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white" />
+                </label>
+                <label class="text-sm text-zinc-300">To
+                  <input type="date" [(ngModel)]="statementTo" class="block w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white" />
+                </label>
+                <label class="text-sm text-zinc-300">Currency
+                  <select [(ngModel)]="statementCurrency" class="block w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white">
+                    <option value="">Customer default</option>
+                    @if (financialOverview(); as fin) { <option [value]="fin.currency">{{ fin.currency }}</option> }
+                    @if (statementPreview(); as statement) {
+                      @for (currencyCode of statement.availableCurrencies; track currencyCode) {
+                        <option [value]="currencyCode">{{ currencyCode }}</option>
+                      }
+                    }
+                  </select>
+                </label>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <button type="button" [disabled]="statementBusy()" (click)="previewStatement()" class="px-4 py-2 bg-zinc-700 text-white rounded-lg text-sm">Preview statement</button>
+                @if (canManageInventory()) {
+                  <button type="button" [disabled]="statementBusy()" (click)="saveStatement()" class="px-4 py-2 bg-blue-700 text-white rounded-lg text-sm">Save statement snapshot</button>
+                }
+                @if (statementPreview()) {
+                  <button type="button" (click)="printStatement()" class="px-4 py-2 bg-zinc-700 text-white rounded-lg text-sm">Print / Save PDF</button>
+                }
+              </div>
+              @if (statementError()) { <p class="text-red-400 text-sm">{{ statementError() }}</p> }
+              @if (statementPreview(); as statement) {
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                  <div><p class="text-zinc-400">Opening</p><p class="text-white font-bold">{{ +statement.openingBalance | currency:statement.currency }}</p></div>
+                  <div><p class="text-zinc-400">Charges</p><p class="text-white font-bold">{{ +statement.charges | currency:statement.currency }}</p></div>
+                  <div><p class="text-zinc-400">Credits</p><p class="text-white font-bold">{{ +statement.credits | currency:statement.currency }}</p></div>
+                  <div><p class="text-zinc-400">Closing</p><p class="text-amber-400 font-bold">{{ +statement.closingBalance | currency:statement.currency }}</p></div>
+                </div>
+                <div class="overflow-x-auto">
+                  <table class="w-full text-left text-sm text-zinc-200">
+                    <thead class="border-b border-zinc-700 text-zinc-400"><tr><th class="py-2">Date</th><th>Reference</th><th>Type</th><th class="text-right">Amount</th><th class="text-right">Balance</th></tr></thead>
+                    <tbody>
+                      @for (entry of statement.transactions; track entry.id) {
+                        <tr class="border-b border-zinc-800"><td class="py-2">{{ entry.date }}</td><td>{{ entry.reference }}</td><td>{{ entry.type }}</td><td class="text-right">{{ +entry.amount | currency:statement.currency }}</td><td class="text-right">{{ +entry.runningBalance | currency:statement.currency }}</td></tr>
+                      } @empty { <tr><td colspan="5" class="py-4 text-zinc-500">No transactions in this period.</td></tr> }
+                    </tbody>
+                  </table>
+                </div>
+                <h3 class="text-white font-semibold">Overdue settlements</h3>
+                @for (item of statement.overdue; track item.settlementId) {
+                  <p class="text-sm text-amber-400">{{ item.reference }} · Due {{ item.dueDate }} · {{ item.daysOverdue }} days overdue · {{ +item.outstanding | currency:statement.currency }}</p>
+                } @empty { <p class="text-sm text-zinc-500">No overdue settlements with a configured due date.</p> }
+                <p class="text-xs text-zinc-500">{{ statement.dueDatePolicy }}</p>
+                <p class="text-xs text-zinc-500">{{ statement.paymentPolicy }}</p>
+              }
+              <h3 class="text-white font-semibold">Saved statement history</h3>
+              @for (saved of statementHistory(); track saved.id) {
+                <div class="flex items-center justify-between gap-3 border-t border-zinc-800 py-2 text-sm text-zinc-300">
+                  <span>#{{ saved.id }} · {{ saved.periodFrom }} to {{ saved.periodTo }} · {{ saved.currency }}</span>
+                  <button type="button" (click)="viewSavedStatement(saved.id)" class="text-blue-400">Open snapshot</button>
+                </div>
+              } @empty { <p class="text-sm text-zinc-500">No saved statements yet.</p> }
+            </section>
+            <section class="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6 space-y-4">
               <h2 class="text-lg font-bold text-white">Product Pricing Agreements</h2>
               <p class="text-sm text-zinc-400">Set one non-overlapping agreement per product and effective date. Actual retail pricing requires a retail amount in the weekly sales report.</p>
               @if (canManageInventory()) {
