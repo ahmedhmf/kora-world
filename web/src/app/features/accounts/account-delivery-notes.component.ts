@@ -127,21 +127,58 @@ export class AccountDeliveryNotesComponent implements OnInit {
     const consignment = note.paymentModel === 'Consignment' || note.paymentModel === 'Consignment (Monthly Settlement)';
     const popup = window.open('', '_blank');
     if (!popup) { this.error.set('Allow popups to print delivery notes'); return; }
-    popup.document.write(`<!doctype html><html><head><title>${escape(note.noteNumber)} — Kora World Delivery Note</title><style>
-      body{font:14px Arial,sans-serif;color:#151515;margin:40px;line-height:1.5}h1{font-size:26px;margin:0}header{display:flex;justify-content:space-between;border-bottom:3px solid #111;padding-bottom:20px;margin-bottom:24px}
-      table{width:100%;border-collapse:collapse;margin:28px 0}th,td{padding:11px;border-bottom:1px solid #ccc;text-align:left}th{background:#eee}
-      .signatures{display:flex;gap:50px;margin-top:70px}.signature{flex:1;border-top:1px solid #333;padding-top:10px}.muted{color:#555}.note{border:1px solid #aaa;padding:12px;margin-top:24px}
-      @media print{body{margin:12mm}@page{size:A4;margin:12mm}}
-    </style></head><body>
-      <header><div><h1>KORA WORLD</h1><strong>DELIVERY NOTE / PROOF OF DELIVERY</strong></div><div><strong>${escape(note.noteNumber)}</strong><br>Delivery date: ${escape(note.deliveryDate)}</div></header>
-      <p><strong>Delivered to:</strong> ${escape(note.customerName)}<br><strong>Delivery address:</strong> ${escape(note.deliveryAddress || 'Not specified')}</p>
-      <table><thead><tr><th>#</th><th>Article</th><th>Product</th><th>Quantity delivered</th></tr></thead><tbody>${rows}</tbody></table>
-      ${note.remarks ? `<p><strong>Remarks:</strong> ${escape(note.remarks)}</p>` : ''}
-      <div class="note">I acknowledge receipt of the products and quantities listed above. Any shortages or visible damage should be recorded at delivery.
-      ${consignment ? '<p><strong>Consignment:</strong> Receipt does not constitute payment or transfer of ownership. Commercial terms are governed by the parties\' agreement.</p>' : '<p>Signature confirms receipt only, not payment.</p>'}</div>
-      <div class="signatures"><div class="signature">Received by (print name):<br><br>Signature:<br><br>Date:</div><div class="signature">Delivered by (print name):<br><br>Signature:<br><br>Date:</div></div>
-      <script>window.onload=function(){window.print()}<\/script>
-    </body></html>`);
+    popup.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${escape(note.noteNumber)} — Kora Delivery Note</title><style>
+      *{box-sizing:border-box}
+      @page{size:A4 portrait;margin:0}
+      html,body{margin:0;padding:0;width:210mm;min-height:297mm;color:#171717;font-family:Arial,Helvetica,sans-serif;font-size:10pt;line-height:1.4;background:#fff}
+      .sheet{position:relative;width:210mm;min-height:297mm;padding-top:11mm;padding-bottom:15mm}
+      .top-logo{position:absolute;top:4.8mm;right:19mm;font-size:15pt;font-weight:900;font-style:italic;letter-spacing:-1px;line-height:1}
+      .frame{position:relative;margin:0 14mm 0 14mm;border:0.5mm solid #252525;min-height:261mm;padding:13mm 11mm 14mm}
+      h1{font-size:18pt;letter-spacing:0.5px;margin:0 0 2mm}
+      .meta{display:flex;justify-content:space-between;gap:8mm;padding-bottom:6mm;border-bottom:1px solid #bbb}
+      .meta-right{text-align:right;white-space:nowrap}
+      .customer{margin-top:7mm;line-height:1.7}
+      table{width:100%;border-collapse:collapse;margin-top:8mm;table-layout:fixed}
+      th,td{border-bottom:1px solid #bbb;padding:3mm 2mm;text-align:left;vertical-align:top;overflow-wrap:anywhere}
+      th{background:#f1f1f1;font-size:9pt}
+      th:first-child,td:first-child{width:8%}
+      th:nth-child(2),td:nth-child(2){width:26%}
+      th:last-child,td:last-child{width:20%;text-align:right}
+      tr{break-inside:avoid}
+      .remarks{margin-top:7mm;overflow-wrap:anywhere}
+      .ack{margin-top:9mm;border:1px solid #aaa;padding:4mm;font-size:9pt;break-inside:avoid}
+      .ack p{margin:2mm 0 0}
+      .signatures{display:flex;gap:9mm;margin-top:15mm;break-inside:avoid}
+      .signature{width:50%;font-size:9pt}
+      .signature-line{border-bottom:1px solid #555;height:12mm;margin-bottom:2mm}
+      .signature p{margin:0 0 5mm}
+      .footer{position:absolute;left:14mm;right:14mm;bottom:5.5mm;height:7mm;background:#201d1e;color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 4mm;font-size:5.5pt}
+      .footer-brand{font-size:12pt;font-style:italic;font-weight:900;letter-spacing:-1px}
+      .footer-center{font-size:10pt}
+      @media print{
+        html,body{print-color-adjust:exact;-webkit-print-color-adjust:exact}
+        .sheet{break-after:page}
+        .frame{break-inside:auto}
+      }
+    </style></head><body><div class="sheet">
+      <div class="top-logo">KORA</div>
+      <main class="frame">
+        <div class="meta"><div><h1>DELIVERY NOTE</h1><div>Proof of Delivery</div></div>
+          <div class="meta-right"><strong>${escape(note.noteNumber)}</strong><div>Delivery date: ${escape(note.deliveryDate)}</div></div>
+        </div>
+        <div class="customer"><strong>Delivered to:</strong> ${escape(note.customerName)}<br><strong>Delivery address:</strong> ${escape(note.deliveryAddress || 'Not specified')}</div>
+        <table><thead><tr><th>#</th><th>Article</th><th>Product</th><th>Qty.</th></tr></thead><tbody>${rows}</tbody></table>
+        ${note.remarks ? `<div class="remarks"><strong>Remarks:</strong> ${escape(note.remarks)}</div>` : ''}
+        <div class="ack">I acknowledge receipt of the products and quantities listed above. Any shortages or visible damage should be noted upon delivery.
+          ${consignment ? '<p><strong>Consignment:</strong> Receipt does not constitute payment or transfer of ownership. Commercial terms are governed by the parties\' agreement.</p>' : '<p>Signature confirms receipt only, not payment.</p>'}
+        </div>
+        <div class="signatures">
+          <div class="signature"><strong>Received by (Customer)</strong><div class="signature-line"></div><p>Name:</p><div class="signature-line"></div><p>Signature:</p><div class="signature-line"></div><p>Date:</p></div>
+          <div class="signature"><strong>Delivered by (Kora)</strong><div class="signature-line"></div><p>Name:</p><div class="signature-line"></div><p>Signature:</p><div class="signature-line"></div><p>Date:</p></div>
+        </div>
+      </main>
+      <div class="footer"><span class="footer-brand">KORA</span><span class="footer-center">◆</span><span>Made in Egypt. Engineered in Germany.</span></div>
+    </div><script>window.onload=function(){window.print()}<\/script></body></html>`);
     popup.document.close();
   }
   uploadSigned(note: DeliveryNote, event: Event): void {
