@@ -37,6 +37,81 @@ export class AccountDetailComponent implements OnInit {
     deliveries: Array<{ noteId: number; noteNumber: string; deliveryDate: string; quantity: number }>;
   }>>([]);
   inventoryError = signal('');
+  statementFrom = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toLocaleDateString('en-CA');
+  statementTo = new Date().toLocaleDateString('en-CA');
+  statementCurrency = '';
+  statementPreview = signal<any | null>(null);
+  statementHistory = signal<any[]>([]);
+  statementError = signal('');
+  statementBusy = signal(false);
+
+  loadStatements(): void {
+    const acct = this.account();
+    if (!acct) return;
+    this.api.getCustomerStatements(acct.id).subscribe({
+      next: rows => this.statementHistory.set(rows),
+      error: () => this.statementError.set('Could not load saved statements'),
+    });
+  }
+
+  previewStatement(): void {
+    const acct = this.account();
+    if (!acct) return;
+    this.statementBusy.set(true); this.statementError.set('');
+    this.api.previewCustomerStatement(acct.id, this.statementFrom, this.statementTo, this.statementCurrency || undefined).subscribe({
+      next: result => { this.statementPreview.set(result); this.statementBusy.set(false); },
+      error: err => { this.statementError.set(err.error?.message || 'Statement preview failed'); this.statementBusy.set(false); },
+    });
+  }
+
+  saveStatement(): void {
+    const acct = this.account();
+    if (!acct) return;
+    this.statementBusy.set(true); this.statementError.set('');
+    this.api.saveCustomerStatement(acct.id, {
+      from: this.statementFrom, to: this.statementTo, currency: this.statementCurrency || undefined,
+    }).subscribe({
+      next: saved => { this.statementPreview.set(saved.snapshot); this.statementBusy.set(false); this.loadStatements(); },
+      error: err => { this.statementError.set(err.error?.message || 'Could not save statement'); this.statementBusy.set(false); },
+    });
+  }
+
+  viewSavedStatement(id: number): void {
+    const acct = this.account();
+    if (!acct) return;
+    this.api.getSavedCustomerStatement(acct.id, id).subscribe({
+      next: saved => this.statementPreview.set(saved.snapshot),
+      error: () => this.statementError.set('Could not open saved statement'),
+    });
+  }
+
+  printStatement(): void {
+    const data = this.statementPreview();
+    if (!data) return;
+    const esc = (v: unknown) => String(v ?? '').replace(/[&<>"']/g, c =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] || c);
+    const rows = data.transactions.map((t: any) =>
+      '<tr><td>' + esc(t.date) + '</td><td>' + esc(t.reference) + '</td><td>' + esc(t.type) +
+      '</td><td style="text-align:right">' + esc(t.amount) + '</td><td style="text-align:right">' +
+      esc(t.runningBalance) + '</td></tr>').join('');
+    const html = '<!doctype html><html><head><meta charset="utf-8"><title>KORA Customer Statement</title>' +
+      '<style>body{font:14px Arial,sans-serif;color:#17202a;padding:36px}h1{margin-bottom:4px}table{width:100%;border-collapse:collapse;margin-top:20px}td,th{padding:9px;border-bottom:1px solid #ddd;text-align:left}th{background:#eee}.totals{margin-top:24px;font-weight:bold}small{color:#555}</style></head><body>' +
+      '<h1>KORA WORLD</h1><h2>Customer Account Statement</h2><p>' + esc(data.customer.companyName) +
+      ' · ' + esc(data.customer.accountNumber) + '</p><p>' + esc(data.customer.billingStreet) + ' ' +
+      esc(data.customer.billingZip) + ' ' + esc(data.customer.billingCity) + ' ' + esc(data.customer.billingCountry) +
+      '</p><p>Period: ' + esc(data.periodFrom) + ' to ' + esc(data.periodTo) + ' · Currency: ' +
+      esc(data.currency) + '</p><p>Opening balance: ' + esc(data.openingBalance) + '</p>' +
+      '<table><thead><tr><th>Date</th><th>Reference</th><th>Type</th><th>Amount</th><th>Running balance</th></tr></thead><tbody>' +
+      rows + '</tbody></table><p class="totals">Charges: ' + esc(data.charges) + ' · Credits: ' +
+      esc(data.credits) + ' · Closing balance: ' + esc(data.closingBalance) + ' ' + esc(data.currency) +
+      '</p><small>' + esc(data.paymentPolicy) + '</small></body></html>';
+    const popup = window.open('', '_blank');
+    if (!popup) { this.statementError.set('Allow pop-ups to print or save this statement as PDF'); return; }
+    popup.document.open(); popup.document.write(html); popup.document.close();
+    popup.focus();
+    popup.print();
+  }
+
   pricingRules = signal<any[]>([]);
   financialOverview = signal<any | null>(null);
   financialError = signal('');
@@ -60,7 +135,7 @@ export class AccountDetailComponent implements OnInit {
   editingRetailPrices: Record<string, string> = {};
   settlementPreview = signal<any | null>(null);
 
-  showFinancials(): void { this.activeTab.set('financials'); this.loadFinancials(); }
+  showFinancials(): void { this.activeTab.set('financials'); this.loadFinancials(); this.loadStatements(); }
   loadFinancials(): void {
     const acct = this.account();
     if (!acct) return;
