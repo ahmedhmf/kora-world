@@ -249,56 +249,80 @@
             </svg>
             Financial Terms
           </h2>
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-
-            <!-- Sales / Payment Model -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
-              <label class="block text-xs font-medium text-zinc-400 mb-1.5">Sales / Payment Model</label>
+              <label class="block text-xs font-medium text-zinc-400 mb-1.5">Payment Arrangement</label>
               <select [(ngModel)]="form.paymentModel" name="paymentModel"
-                class="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-zinc-500">
-                <option [ngValue]="undefined">Select payment model...</option>
+                class="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-4 py-2.5 text-white text-sm">
+                <option [ngValue]="undefined">Select payment arrangement...</option>
+                <option value="Full Payment Upfront">Full Payment Upfront</option>
+                <option value="Split Payment">Split Payment</option>
+                <option value="Consignment">Consignment</option>
                 @if (isHistoricalPaymentModel()) {
-                  <option [value]="form.paymentModel">{{ form.paymentModel }} (no longer available)</option>
-                }
-                @for (option of paymentModels(); track option.id) {
-                  <option [value]="option.value">{{ option.value }}</option>
+                  <option [value]="form.paymentModel">{{ form.paymentModel }} (existing arrangement)</option>
                 }
               </select>
             </div>
-
-            <!-- Default Currency -->
             <div>
               <label class="block text-xs font-medium text-zinc-400 mb-1.5">Default Currency</label>
-              <select
-                [(ngModel)]="form.defaultCurrency" name="defaultCurrency"
-                class="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-zinc-500 transition-colors appearance-none"
-              >
+              <select [(ngModel)]="form.defaultCurrency" name="defaultCurrency"
+                class="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-4 py-2.5 text-white text-sm">
                 @for (curr of currencies; track curr.code) {
-                  <option [value]="curr.code" class="bg-zinc-900">{{ curr.code }} – {{ curr.name }}</option>
+                  <option [value]="curr.code">{{ curr.code }} – {{ curr.name }}</option>
                 }
               </select>
             </div>
-
-            <!-- Credit Limit -->
-            <div>
-              <label class="block text-xs font-medium text-zinc-400 mb-1.5">Credit Limit</label>
-              <input
-                [(ngModel)]="form.creditLimit" name="creditLimit" type="number" min="0" step="100"
-                class="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600 transition-colors"
-                placeholder="0"
-              />
-            </div>
-
-            <!-- Payment Terms -->
-            <div>
-              <label class="block text-xs font-medium text-zinc-400 mb-1.5">Payment Terms</label>
-              <input
-                [(ngModel)]="form.paymentTerms" name="paymentTerms"
-                class="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-zinc-500 placeholder-zinc-600 transition-colors"
-                placeholder="e.g. Net 30, COD"
-              />
-            </div>
-
+            @if (form.paymentModel === 'Full Payment Upfront') {
+              <p class="md:col-span-2 text-sm text-zinc-400">100% payment is due before delivery.</p>
+            }
+            @if (form.paymentModel === 'Split Payment') {
+              <div>
+                <label class="block text-xs font-medium text-zinc-400 mb-1.5">Upfront Payment (%)</label>
+                <input type="number" min="0" max="100" step="1" required [(ngModel)]="form.upfrontPercent" name="upfrontPercent"
+                  class="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-4 py-2.5 text-white text-sm" />
+                <p class="text-xs text-zinc-500 mt-1">Remaining balance: {{ 100 - (form.upfrontPercent || 0) }}%</p>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-zinc-400 mb-1.5">Remaining Balance Due</label>
+                <select [(ngModel)]="form.balanceDue" name="balanceDue" required
+                  class="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-4 py-2.5 text-white text-sm">
+                  <option value="Before delivery">Before delivery</option>
+                  <option value="On delivery">On delivery</option>
+                  <option value="30 days after delivery">30 days after delivery</option>
+                  <option value="60 days after delivery">60 days after delivery</option>
+                </select>
+              </div>
+            }
+            @if (isConsignment()) {
+              <div>
+                <label class="block text-xs font-medium text-zinc-400 mb-1.5">Consignment Pricing Method</label>
+                <select [(ngModel)]="form.consignmentPricingMethod" name="consignmentPricingMethod" required
+                  class="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-4 py-2.5 text-white text-sm">
+                  <option value="fixed">Fixed Wholesale Price (per product)</option>
+                  <option value="percentage">Percentage of Selling Price</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-zinc-400 mb-1.5">Monthly Settlement Due Day</label>
+                <select [(ngModel)]="form.settlementDueDay" name="settlementDueDay" required
+                  class="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-4 py-2.5 text-white text-sm">
+                  <option [ngValue]="1">1st of each month</option>
+                  <option [ngValue]="5">5th of each month</option>
+                  <option [ngValue]="10">10th of each month</option>
+                  <option [ngValue]="15">15th of each month</option>
+                  <option [ngValue]="28">28th of each month</option>
+                </select>
+              </div>
+              @if (form.consignmentPricingMethod === 'percentage') {
+                <div>
+                  <label class="block text-xs font-medium text-zinc-400 mb-1.5">Kora Share of Sales (%)</label>
+                  <input type="number" min="0" max="100" step="0.01" required [(ngModel)]="form.consignmentSharePercent" name="consignmentSharePercent"
+                    class="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-4 py-2.5 text-white text-sm" />
+                </div>
+              } @else {
+                <p class="text-sm text-zinc-400">Wholesale prices are agreed separately for each product. No single account-wide price is required.</p>
+              }
+            }
           </div>
         </div>
 
