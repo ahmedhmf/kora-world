@@ -220,7 +220,7 @@
               <div class="border border-zinc-800 rounded-lg p-4 space-y-2">
                 <div class="flex items-center justify-between flex-wrap gap-3">
                   <div>
-                    <p class="text-white font-semibold">{{ report.weekStart | date:'yyyy' }} · {{ report.weekStart }} – {{ report.weekEnd }}</p>
+                    <p class="text-white font-semibold">{{ reportWeekLabel(report.weekStart) }}</p>
                     <p class="text-xs text-zinc-400">{{ report.fileName }} · {{ report.status }}</p>
                   </div>
                   <div class="flex gap-3 items-center">
