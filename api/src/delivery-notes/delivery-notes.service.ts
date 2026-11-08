@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
+import { CustomerFinancialsService } from './customer-financials.service';
 import { InventoryAdjustment } from './inventory-adjustment.entity';
 import { ActiveUser } from '../auth/interfaces/authenticated-request.interface';
 import { WeeklySalesReport } from './weekly-sales-report.entity';
@@ -20,6 +21,7 @@ export class DeliveryNotesService {
     @InjectRepository(WeeklySalesReport) private readonly sales: Repository<WeeklySalesReport>,
     @InjectRepository(InventoryAdjustment) private readonly adjustments: Repository<InventoryAdjustment>,
     private readonly dataSource: DataSource,
+    private readonly financials: CustomerFinancialsService,
   ) {}
 
   list(accountId: number) {
@@ -114,7 +116,7 @@ export class DeliveryNotesService {
     return balance;
   }
 
-  async updateSalesDraft(id: number, dto: { items: Array<{ productId: number; quantity: number }>; remarks?: string }) {
+  async updateSalesDraft(id: number, dto: { items: Array<{ productId: number; quantity: number }>; remarks?: string; retailPrices?: Record<string, string> }) {
     return this.dataSource.transaction(async manager => {
     const initial = await manager.findOne(WeeklySalesReport, { where: { id } });
     if (!initial) throw new NotFoundException('Report not found');
@@ -135,6 +137,7 @@ export class DeliveryNotesService {
       items.push({ productId: product.id, articleNumber: product.articleNumber, productName: product.name, quantity: item.quantity });
     }
     report.items = items;
+    report.retailPrices = dto.retailPrices || {};
     report.remarks = dto.remarks?.slice(0, 2000);
     return manager.save(WeeklySalesReport, report);
     });
@@ -149,6 +152,7 @@ export class DeliveryNotesService {
       if (!account) throw new NotFoundException('Account not found');
       const report = await manager.findOne(WeeklySalesReport, { where: { id } });
       if (!report || report.status === 'cancelled') throw new BadRequestException('Report already cancelled');
+      await this.financials.reverseSettlement(manager, report.id);
       report.status = 'cancelled';
       report.cancelledAt = new Date();
       report.cancelledById = user.sub;
@@ -165,7 +169,7 @@ export class DeliveryNotesService {
 
   async createSales(accountId: number, dto: {
     weekStart: string; weekEnd: string; filePath: string; fileName: string;
-    remarks?: string; items: Array<{ productId: number; quantity: number }>;
+    remarks?: string; retailPrices?: Record<string, string>; items: Array<{ productId: number; quantity: number }>;
   }) {
     if (!await this.accounts.exists({ where: { id: accountId } })) throw new NotFoundException('Account not found');
     const validDate = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v || '') &&
@@ -197,7 +201,7 @@ export class DeliveryNotesService {
     return this.sales.save(this.sales.create({
       accountId, weekStart: dto.weekStart, weekEnd: dto.weekEnd,
       filePath: dto.filePath, fileName: dto.fileName, remarks: dto.remarks?.slice(0, 2000),
-      status: 'draft', items,
+      status: 'draft', items, retailPrices: dto.retailPrices || {},
     }));
   }
 
@@ -220,6 +224,7 @@ export class DeliveryNotesService {
           throw new BadRequestException('Insufficient remaining inventory for ' + item.articleNumber);
         }
       }
+      await this.financials.createSettlement(manager, current);
       current.status = 'approved';
       current.approvedAt = new Date();
       current.approvedById = user.sub;
