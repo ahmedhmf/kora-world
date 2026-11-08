@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, UseGuards, Req } from '@nestjs/common';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
-import { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
+import type { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
 import { AuthGuard } from '../auth/auth.guard';
 import { DeliveryNotesService } from './delivery-notes.service';
 
