@@ -214,6 +214,13 @@ export class ApiService {
     return this.http.get<any[]>(`${this.base}/delivery-notes/account/${accountId}`);
   }
 
+  getAccountInventory(accountId: number): Observable<Array<{
+    productId: number; articleNumber: string; productName: string; quantity: number;
+    deliveries: Array<{ noteId: number; noteNumber: string; deliveryDate: string; quantity: number }>;
+  }>> {
+    return this.http.get<any[]>(`${this.base}/delivery-notes/account/${accountId}/inventory`);
+  }
+
   createDeliveryNote(accountId: number, dto: { deliveryDate: string; remarks?: string; items: Array<{ productId: number; quantity: number }> }): Observable<any> {
     return this.http.post<any>(`${this.base}/delivery-notes/account/${accountId}`, dto);
   }
