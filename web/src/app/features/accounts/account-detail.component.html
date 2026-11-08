@@ -182,6 +182,7 @@
             </div>
             @if (salesError()) { <p class="text-red-400 text-sm">{{ salesError() }}</p> }
             @if (salesSuccess()) { <p class="text-emerald-400 text-sm">{{ salesSuccess() }}</p> }
+            @if (canManageInventory()) {
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <label class="text-sm text-zinc-300">Work week number (ISO, Monday–Sunday)
                 <input type="number" min="1" max="53" step="1" [(ngModel)]="salesWeek" class="block w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white" />
@@ -213,6 +214,7 @@
               <textarea [(ngModel)]="salesRemarks" rows="2" maxlength="2000" class="block w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white"></textarea>
             </label>
             <button type="button" [disabled]="salesBusy()" (click)="saveSalesDraft()" class="bg-white text-zinc-900 font-semibold rounded-lg px-4 py-2 disabled:opacity-50">Save Draft</button>
+            }
           </section>
           <section class="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6 mb-8 space-y-4">
             <h2 class="text-lg font-bold text-white">Sales Report History</h2>
@@ -225,11 +227,42 @@
                   </div>
                   <div class="flex gap-3 items-center">
                     <button type="button" (click)="viewSalesPdf(report)" class="text-blue-400 text-sm">View PDF</button>
-                    @if (report.status === 'draft') {
+                    @if (canManageInventory() && report.status === 'draft') {
+                      <button type="button" [disabled]="salesBusy()" (click)="startEditReport(report)" class="text-blue-400 text-sm">Edit Draft</button>
                       <button type="button" [disabled]="salesBusy()" (click)="approveSalesReport(report)" class="bg-emerald-700 text-white rounded-lg px-3 py-2 text-sm disabled:opacity-50">Approve &amp; Deduct</button>
+                    }
+                    @if (canManageInventory() && report.status !== 'cancelled') {
+                      <button type="button" [disabled]="salesBusy()" (click)="cancelReport(report)" class="text-red-400 text-sm">Cancel</button>
                     }
                   </div>
                 </div>
+                @if (report.approvedByName) {
+                  <p class="text-xs text-zinc-500">Approved by {{ report.approvedByName }} · {{ report.approvedAt | date:'medium' }}</p>
+                }
+                @if (report.cancelledByName) {
+                  <p class="text-xs text-red-400">Cancelled by {{ report.cancelledByName }} · {{ report.cancelledAt | date:'medium' }} — {{ report.cancellationReason }}</p>
+                }
+                @if (editingReportId === report.id) {
+                  <div class="bg-zinc-950 rounded-lg p-3 space-y-3">
+                    @for (line of editingItems; track $index; let i = $index) {
+                      <div class="flex gap-2 flex-wrap">
+                        <select [(ngModel)]="line.productId" class="flex-1 bg-zinc-900 text-white border border-zinc-700 p-2 rounded-lg">
+                          @for (product of inventory(); track product.productId) {
+                            <option [ngValue]="product.productId">{{ product.articleNumber }} — {{ product.productName }}</option>
+                          }
+                        </select>
+                        <input type="number" min="1" [(ngModel)]="line.quantity" class="w-24 bg-zinc-900 text-white border border-zinc-700 p-2 rounded-lg" />
+                        <button type="button" (click)="editingItems.splice(i, 1)" class="text-red-400 text-sm">Remove</button>
+                      </div>
+                    }
+                    <button type="button" (click)="editingItems.push({productId: 0, quantity: 1})" class="text-blue-400 text-sm">+ Add line</button>
+                    <textarea [(ngModel)]="editingRemarks" placeholder="Remarks" class="block w-full bg-zinc-900 text-white border border-zinc-700 p-2 rounded-lg"></textarea>
+                    <div class="flex gap-3">
+                      <button type="button" [disabled]="salesBusy()" (click)="saveEditedReport()" class="bg-emerald-700 text-white rounded-lg px-3 py-2 text-sm">Save changes</button>
+                      <button type="button" (click)="editingReportId = null" class="text-zinc-400 text-sm">Discard</button>
+                    </div>
+                  </div>
+                }
                 @for (item of report.items; track item.productId) {
                   <p class="text-sm text-zinc-400">{{ item.articleNumber }} — {{ item.productName }}: {{ item.quantity }} sold</p>
                 }
@@ -237,6 +270,46 @@
             } @empty {
               <p class="text-zinc-500 text-sm">No weekly sales reports yet.</p>
             }
+          </section>
+          <section class="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6 mb-8 space-y-4">
+            <h2 class="text-lg font-bold text-white">Stock Corrections &amp; Returns</h2>
+            <p class="text-sm text-zinc-400">Use a negative quantity to remove damaged, missing, or incorrectly counted stock. Use a positive quantity to restore stock. Every adjustment is recorded.</p>
+            @if (canManageInventory()) {
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <label class="text-sm text-zinc-300">Product
+                  <select [(ngModel)]="correctionProductId" class="block w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white">
+                    <option [ngValue]="0">Select product</option>
+                    @for (item of inventory(); track item.productId) {
+                      <option [ngValue]="item.productId">{{ item.articleNumber }} — {{ item.productName }}</option>
+                    }
+                  </select>
+                </label>
+                <label class="text-sm text-zinc-300">Stock change (+ or −)
+                  <input type="number" step="1" [(ngModel)]="correctionQuantity" class="block w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white" />
+                </label>
+                <label class="text-sm text-zinc-300">Reason
+                  <select [(ngModel)]="correctionReason" class="block w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white">
+                    <option value="return">Return</option>
+                    <option value="damage">Damage</option>
+                    <option value="loss">Loss</option>
+                    <option value="stocktake">Stock count correction</option>
+                    <option value="other">Other</option>
+                  </select>
+                </label>
+                <label class="text-sm text-zinc-300">Explanation
+                  <textarea [(ngModel)]="correctionNotes" rows="2" maxlength="2000" class="block w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white"></textarea>
+                </label>
+              </div>
+              <button type="button" [disabled]="salesBusy()" (click)="saveCorrection()" class="bg-white text-zinc-900 font-semibold rounded-lg px-4 py-2 disabled:opacity-50">Record Stock Correction</button>
+            }
+            <h3 class="text-sm font-semibold text-white">Correction History</h3>
+            @for (change of adjustments(); track change.id) {
+              <div class="border-t border-zinc-800 pt-3 text-sm text-zinc-300">
+                <p><strong>{{ change.articleNumber }}</strong> — {{ change.quantity > 0 ? '+' : '' }}{{ change.quantity }} · {{ change.reason }}</p>
+                <p class="text-zinc-400">{{ change.notes }}</p>
+                <p class="text-xs text-zinc-500">{{ change.createdByName }} · {{ change.createdAt | date:'medium' }}</p>
+              </div>
+            } @empty { <p class="text-zinc-500 text-sm">No corrections recorded.</p> }
           </section>
         } @else if (activeTab() === 'details') {
           <!-- ── Detail Sections ──────────────────────────────── -->
