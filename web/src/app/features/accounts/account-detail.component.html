@@ -81,14 +81,26 @@
             <p class="text-white text-xl font-bold">{{ acct.defaultCurrency }}</p>
           </div>
           <div class="bg-zinc-900/40 border border-zinc-800 rounded-xl p-4">
-            <p class="text-zinc-500 text-xs font-medium uppercase tracking-wider mb-1">Payment Terms</p>
-            <p class="text-white text-lg font-semibold">{{ acct.paymentTerms || '—' }}</p>
+            <p class="text-zinc-500 text-xs font-medium uppercase tracking-wider mb-1">Payment Arrangement</p>
+            <p class="text-white text-lg font-semibold">{{ acct.paymentModel || 'Not set' }}</p>
           </div>
           <div class="bg-zinc-900/40 border border-zinc-800 rounded-xl p-4">
             <p class="text-zinc-500 text-xs font-medium uppercase tracking-wider mb-1">Member Since</p>
             <p class="text-white text-lg font-semibold">{{ acct.createdAt | date:'MMM yyyy' }}</p>
           </div>
         </div>
+
+        @if (acct.paymentModel === 'Split Payment' || acct.paymentModel === 'Consignment') {
+          <div class="bg-zinc-900/40 border border-zinc-800 rounded-xl p-4 mb-6 text-sm text-zinc-300">
+            @if (acct.paymentModel === 'Split Payment') {
+              <strong>Split Payment:</strong> {{ acct.upfrontPercent }}% upfront, {{ 100 - (acct.upfrontPercent || 0) }}% {{ acct.balanceDue }}
+            } @else {
+              <strong>Consignment:</strong> {{ acct.consignmentPricingMethod === 'percentage' ? 'Percentage of sales' : 'Fixed wholesale price per product' }}
+              @if (acct.consignmentPricingMethod === 'percentage') { — Kora share: {{ acct.consignmentSharePercent }}% }
+              — settlement due on day {{ acct.settlementDueDay }} of each month
+            }
+          </div>
+        }
 
         <!-- ── Navigation Tabs ─────────────────────────────── -->
         <div class="flex border-b border-zinc-850 mb-6">
