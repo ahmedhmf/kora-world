@@ -53,6 +53,7 @@ export class CustomerStatementsService {
     if (!/^[A-Z]{3}$/.test(selectedCurrency)) throw new BadRequestException('Invalid currency');
     const entries: Entry[] = [];
     const today = new Date().toISOString().slice(0, 10);
+    const asOf = to < today ? to : today;
     const aging: Array<{ settlementId: number; reference: string; dueDate: string | null; outstanding: string; daysOverdue: number }> = [];
     for (const s of settlements.filter(s => s.currency === selectedCurrency)) {
       const report = reportById.get(s.reportId);
@@ -60,11 +61,12 @@ export class CustomerStatementsService {
       entries.push({ id: 'settlement-' + s.id, date, type: 'settlement', reference: 'Sales report #' + s.reportId, amountCents: Number(s.totalCents), settlementId: s.id, paymentId: null });
       if (s.reversedAt) entries.push({ id: 'reversal-' + s.id, date: new Date(s.reversedAt).toISOString().slice(0, 10),
         type: 'reversal', reference: 'Reversal of sales report #' + s.reportId, amountCents: -Number(s.totalCents), settlementId: s.id, paymentId: null });
-      const allocated = allocations.filter(a => a.settlementId === s.id).reduce((n, a) => n + Number(a.amountCents), 0);
-      const outstanding = s.status === 'active' ? Number(s.totalCents) - allocated : 0;
+      const allocated = allocations.filter(a => a.settlementId === s.id && new Date(a.createdAt).toISOString().slice(0, 10) <= to).reduce((n, a) => n + Number(a.amountCents), 0);
+      const reversedByEnd = !!s.reversedAt && new Date(s.reversedAt).toISOString().slice(0, 10) <= to;
+      const outstanding = !reversedByEnd && date <= to ? Number(s.totalCents) - allocated : 0;
       const due = report ? this.dueDate(report.weekEnd, account.settlementDueDay) : null;
       if (outstanding > 0 && date <= to) {
-        const days = due && due < today ? Math.floor((Date.parse(today) - Date.parse(due)) / 86400000) : 0;
+        const days = due && due < asOf ? Math.floor((Date.parse(asOf) - Date.parse(due)) / 86400000) : 0;
         aging.push({ settlementId: s.id, reference: 'Sales report #' + s.reportId, dueDate: due,
           outstanding: money(outstanding), daysOverdue: days });
       }
