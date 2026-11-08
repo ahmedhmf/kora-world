@@ -22,6 +22,7 @@ export class DropdownSettingsComponent implements OnInit {
   private readonly cdr = inject(ChangeDetectorRef);
 
   readonly categories: CategoryConfig[] = [
+    { key: 'accountPaymentModel', label: 'Account Payment Models', description: 'How B2B accounts purchase or settle products.', placeholder: 'e.g. Direct Purchase' },
     { key: 'currency', label: 'Currency', description: 'Product base currencies (e.g. USD, EUR, EGP).', placeholder: 'e.g. GBP' },
     { key: 'backing', label: 'Backing', description: 'Ball construction backing layers.', placeholder: 'e.g. 4 layers poly-cotton' },
     { key: 'bladder', label: 'Bladder', description: 'Ball construction bladders.', placeholder: 'e.g. Latex bladder' },
