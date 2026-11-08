@@ -316,9 +316,75 @@ export class AccountDetailComponent implements OnInit {
       error: () => this.inventoryError.set('Could not load customer inventory'),
     });
   }
+  inventoryMovements = signal<any[]>([]);
+  inventoryMovementBalances = signal<Array<{ productId: number; quantity: number }>>([]);
+  movementNotice = signal('');
+  movementError = signal('');
+  movementProductId = 0;
+  movementType = '';
+  movementFrom = '';
+  movementTo = '';
+  movementLoading = signal(false);
+
+  loadMovements(): void {
+    const acct = this.account();
+    if (!acct) return;
+    this.movementLoading.set(true);
+    this.movementError.set('');
+    this.api.getInventoryMovements(acct.id, {
+      productId: this.movementProductId || undefined,
+      type: this.movementType || undefined,
+      from: this.movementFrom || undefined,
+      to: this.movementTo || undefined,
+    }).subscribe({
+      next: result => {
+        this.inventoryMovements.set(result.movements);
+        this.inventoryMovementBalances.set(result.currentBalances);
+        this.movementNotice.set(result.timestampNotice || '');
+        this.movementLoading.set(false);
+      },
+      error: err => {
+        this.movementError.set(err.error?.message || 'Could not load movement history');
+        this.movementLoading.set(false);
+      },
+    });
+  }
+
+  inventoryReconciliation(): Array<{ productId: number; articleNumber: string; stock: number; ledger: number; matches: boolean }> {
+    const balances = new Map(this.inventoryMovementBalances().map(row => [row.productId, row.quantity]));
+    return this.inventory().map(row => ({
+      productId: row.productId, articleNumber: row.articleNumber, stock: row.quantity,
+      ledger: balances.get(row.productId) ?? 0, matches: row.quantity === (balances.get(row.productId) ?? 0),
+    }));
+  }
+
+  exportMovementsCsv(): void {
+    const headers = ['Timestamp', 'Document date', 'Article', 'Product', 'Type', 'Reference',
+      'Quantity change', 'Balance before', 'Balance after', 'Performed by', 'Reason', 'Notes', 'Timestamp estimated'];
+    const escapeCell = (value: unknown): string => {
+      let text = String(value ?? '');
+      // Prevent spreadsheet formula execution when the CSV is opened in Excel.
+      if (/^[\\s]*[=+@-]/.test(text)) text = "'" + text;
+      return '"' + text.replace(/"/g, '""') + '"';
+    };
+    const rows = this.inventoryMovements().map(m => [
+      m.timestamp, m.documentDate, m.articleNumber, m.productName, m.type, m.reference,
+      m.quantityChange, m.balanceBefore, m.balanceAfter, m.performedBy, m.reason, m.notes, m.timestampEstimated,
+    ]);
+    const csv = '\\uFEFF' + [headers, ...rows].map(row => row.map(escapeCell).join(',')).join('\\r\\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'kora-inventory-movements-' + this.account()?.id + '.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   showInventory(): void {
     this.activeTab.set('inventory');
     this.loadInventory();
+    this.loadMovements();
   }
 
   // Forecast-related state
