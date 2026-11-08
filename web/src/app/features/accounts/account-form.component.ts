@@ -60,6 +60,10 @@ export class AccountFormComponent implements OnInit {
     shippingCountry: '',
     defaultCurrency: 'USD',
     paymentModel: undefined,
+    consignmentPricingMethod: 'fixed',
+    settlementDueDay: 5,
+    upfrontPercent: 30,
+    balanceDue: 'Before delivery',
     paymentTerms: '',
     creditLimit: 0,
     vatNumber: '',
@@ -96,6 +100,11 @@ export class AccountFormComponent implements OnInit {
               shippingCountry: account.shippingCountry || '',
               defaultCurrency: account.defaultCurrency || 'USD',
               paymentModel: account.paymentModel || undefined,
+              consignmentPricingMethod: account.consignmentPricingMethod || 'fixed',
+              consignmentSharePercent: account.consignmentSharePercent ?? undefined,
+              settlementDueDay: account.settlementDueDay ?? 5,
+              upfrontPercent: account.upfrontPercent ?? 30,
+              balanceDue: account.balanceDue || 'Before delivery',
               paymentTerms: account.paymentTerms || '',
               creditLimit: account.creditLimit || 0,
               vatNumber: account.vatNumber || '',
@@ -133,6 +142,10 @@ export class AccountFormComponent implements OnInit {
       shippingZip: '',
       shippingCountry: '',
       defaultCurrency: 'USD',
+      consignmentPricingMethod: 'fixed',
+      settlementDueDay: 5,
+      upfrontPercent: 30,
+      balanceDue: 'Before delivery',
       paymentTerms: '',
       creditLimit: 0,
       vatNumber: '',
@@ -140,8 +153,12 @@ export class AccountFormComponent implements OnInit {
     };
   }
 
+  isConsignment(): boolean {
+    return this.form.paymentModel === 'Consignment' || this.form.paymentModel === 'Consignment (Monthly Settlement)';
+  }
+
   isHistoricalPaymentModel(): boolean {
-    return !!this.form.paymentModel && !this.paymentModels().some(option => option.value === this.form.paymentModel);
+    return !!this.form.paymentModel && !['Full Payment Upfront', 'Split Payment', 'Consignment'].includes(this.form.paymentModel) && !this.paymentModels().some(option => option.value === this.form.paymentModel);
   }
 
   copyBillingToShipping(): void {
@@ -172,6 +189,11 @@ export class AccountFormComponent implements OnInit {
       shippingCountry: this.form.shippingCountry || undefined,
       defaultCurrency: this.form.defaultCurrency || 'USD',
       paymentModel: this.form.paymentModel || undefined,
+      consignmentPricingMethod: this.isConsignment() ? this.form.consignmentPricingMethod || 'fixed' : undefined,
+      consignmentSharePercent: this.isConsignment() && this.form.consignmentPricingMethod === 'percentage' ? Number(this.form.consignmentSharePercent) : undefined,
+      settlementDueDay: this.isConsignment() ? Number(this.form.settlementDueDay) : undefined,
+      upfrontPercent: this.form.paymentModel === 'Split Payment' ? Number(this.form.upfrontPercent) : undefined,
+      balanceDue: this.form.paymentModel === 'Split Payment' ? this.form.balanceDue : undefined,
       paymentTerms: this.form.paymentTerms || undefined,
       creditLimit: this.form.creditLimit ? +this.form.creditLimit : 0,
       vatNumber: this.form.vatNumber || undefined,
