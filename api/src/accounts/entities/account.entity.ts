@@ -65,7 +65,7 @@ export class Account {
   @Column({ name: 'default_currency', length: 10, default: 'USD' })
   defaultCurrency: string;
 
-  @Column({ name: 'payment_model', length: 150, nullable: true })
+  @Column({ name: 'payment_model', type: 'varchar', length: 150, nullable: true })
   paymentModel?: string | null;
 
   @Column({ name: 'payment_terms', length: 50, default: 'Cash in Advance' })
