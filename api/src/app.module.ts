@@ -45,6 +45,7 @@ import { InvoicesModule } from './invoices/invoices.module';
 import { PaymentsModule } from './payments/payments.module';
 import { SourcingModule } from './sourcing/sourcing.module';
 import { DeliveryNote } from './delivery-notes/delivery-note.entity';
+import { InventoryAdjustment } from './delivery-notes/inventory-adjustment.entity';
 import { WeeklySalesReport } from './delivery-notes/weekly-sales-report.entity';
 import { DeliveryNotesModule } from './delivery-notes/delivery-notes.module';
 import { DropdownOption } from './dropdown-options/entities/dropdown-option.entity';
@@ -86,6 +87,7 @@ import { DropdownOptionsModule } from './dropdown-options/dropdown-options.modul
           DropdownOption,
           DeliveryNote,
           WeeklySalesReport,
+          InventoryAdjustment,
         ],
         migrations: [__dirname + '/migrations/*{.ts,.js}'],
         migrationsRun: true,
