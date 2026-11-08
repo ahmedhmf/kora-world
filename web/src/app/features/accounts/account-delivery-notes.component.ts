@@ -69,7 +69,7 @@ interface DeliveryNote {
               </p>
             </div>
             <div class="flex items-center gap-3 flex-wrap">
-              <button type="button" (click)="print(note)" class="bg-zinc-700 text-white px-3 py-2 rounded-lg text-sm">Print / Save PDF</button>
+              <button type="button" (click)="print(note)" class="bg-zinc-700 text-white px-3 py-2 rounded-lg text-sm">Download Official PDF</button>
               @if (note.signedFilePath) {
                 <button type="button" (click)="downloadSigned(note)" class="text-blue-400 text-sm">View signed copy</button>
               }
