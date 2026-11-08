@@ -1,0 +1,46 @@
+name: Kora World production preflight
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kora-world-production
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: Check VPS deployment readiness
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 10
+    steps:
+      - name: Configure restricted deployment SSH key
+        env:
+          DEPLOY_KEY: ${{ secrets.KORA_DEPLOY_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$DEPLOY_KEY"
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_KEY" > "$HOME/.ssh/kora_deploy"
+          chmod 600 "$HOME/.ssh/kora_deploy"
+
+      - name: Verify IONOS SSH host fingerprint
+        run: |
+          set -euo pipefail
+          ssh-keyscan -T 15 -t ed25519 213.165.83.149 > "$HOME/.ssh/known_hosts"
+          actual="$(ssh-keygen -lf "$HOME/.ssh/known_hosts" | awk '{print $2}')"
+          expected='SHA256:Y2JoPf23w6iytAXoTFKns8MYtPNLQZQtY2uTb4HimKM'
+          if [[ "$actual" != "$expected" ]]; then
+            echo 'VPS host key fingerprint mismatch; refusing connection.' >&2
+            exit 1
+          fi
+
+      - name: Run non-destructive VPS preflight
+        run: |
+          ssh -T -o BatchMode=yes -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -i "$HOME/.ssh/kora_deploy" \
+            root@213.165.83.149 check
