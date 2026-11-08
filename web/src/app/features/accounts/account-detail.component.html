@@ -139,6 +139,7 @@
             [class.text-zinc-400]="activeTab() !== 'inventory'"
             [class.hover:text-zinc-200]="activeTab() !== 'inventory'"
           >Inventory</button>
+          <button type="button" (click)="showFinancials()" class="px-4 py-2 text-sm font-semibold border-b-2 transition-colors" [class.border-white]="activeTab() === 'financials'" [class.text-white]="activeTab() === 'financials'" [class.border-transparent]="activeTab() !== 'financials'" [class.text-zinc-400]="activeTab() !== 'financials'">Financials</button>
         </div>
 
         @if (activeTab() === 'inventory') {
@@ -205,6 +206,7 @@
                     }
                   </select>
                   <input type="number" min="1" step="1" [(ngModel)]="item.quantity" aria-label="Quantity sold" class="w-24 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white" />
+                  <input type="text" inputmode="decimal" [(ngModel)]="salesRetailPrices[item.productId]" placeholder="Actual retail/unit (if applicable)" aria-label="Actual retail price per unit" class="w-48 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white" />
                   <button type="button" (click)="removeSalesItem(i)" class="text-red-400 text-sm">Remove</button>
                 </div>
               }
@@ -229,6 +231,7 @@
                     <button type="button" (click)="viewSalesPdf(report)" class="text-blue-400 text-sm">View PDF</button>
                     @if (canManageInventory() && report.status === 'draft') {
                       <button type="button" [disabled]="salesBusy()" (click)="startEditReport(report)" class="text-blue-400 text-sm">Edit Draft</button>
+                      <button type="button" [disabled]="salesBusy()" (click)="previewReport(report)" class="text-amber-400 text-sm">Preview amount owed</button>
                       <button type="button" [disabled]="salesBusy()" (click)="approveSalesReport(report)" class="bg-emerald-700 text-white rounded-lg px-3 py-2 text-sm disabled:opacity-50">Approve &amp; Deduct</button>
                     }
                     @if (canManageInventory() && report.status !== 'cancelled') {
@@ -236,6 +239,12 @@
                     }
                   </div>
                 </div>
+                @if (settlementPreview()?.reportId === report.id) {
+                  <div class="bg-zinc-950 rounded-lg p-3 text-sm text-emerald-400">
+                    KORA owed: {{ (+settlementPreview().totalCents / 100) | currency:settlementPreview().currency }}
+                    <div class="text-xs text-zinc-400">Preview only. Approval locks this amount and deducts inventory.</div>
+                  </div>
+                }
                 @if (report.approvedByName) {
                   <p class="text-xs text-zinc-500">Approved by {{ report.approvedByName }} · {{ report.approvedAt | date:'medium' }}</p>
                 }
@@ -252,6 +261,7 @@
                           }
                         </select>
                         <input type="number" min="1" [(ngModel)]="line.quantity" class="w-24 bg-zinc-900 text-white border border-zinc-700 p-2 rounded-lg" />
+                        <input type="text" [(ngModel)]="editingRetailPrices[line.productId]" placeholder="Actual retail/unit" class="w-40 bg-zinc-900 text-white border border-zinc-700 p-2 rounded-lg" />
                         <button type="button" (click)="editingItems.splice(i, 1)" class="text-red-400 text-sm">Remove</button>
                       </div>
                     }
@@ -311,6 +321,126 @@
               </div>
             } @empty { <p class="text-zinc-500 text-sm">No corrections recorded.</p> }
           </section>
+        } @else if (activeTab() === 'financials') {
+          <div class="space-y-6">
+            @if (financialError()) { <p class="text-red-400 text-sm">{{ financialError() }}</p> }
+            @if (financialSuccess()) { <p class="text-emerald-400 text-sm">{{ financialSuccess() }}</p> }
+            <section class="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6 space-y-4">
+              <div class="flex justify-between items-center">
+                <h2 class="text-lg font-bold text-white">Customer Financials</h2>
+                <button type="button" (click)="loadFinancials()" class="text-sm text-blue-400">Refresh</button>
+              </div>
+              @if (financialOverview(); as fin) {
+                <div class="grid grid-cols-2 gap-4">
+                  <div><p class="text-zinc-400 text-sm">Approved sales owed</p><p class="text-xl font-bold text-white">{{ +fin.totalOwed | currency:fin.currency }}</p></div>
+                  <div><p class="text-zinc-400 text-sm">Outstanding balance</p><p class="text-xl font-bold text-amber-400">{{ +fin.outstanding | currency:fin.currency }}</p></div>
+                </div>
+                <h3 class="font-semibold text-white">Settlements</h3>
+                @for (settlement of fin.settlements; track settlement.id) {
+                  <div class="border-t border-zinc-800 py-3 text-sm text-zinc-300">
+                    Report #{{ settlement.reportId }} · {{ settlement.status }} ·
+                    Total {{ +settlement.total | currency:fin.currency }} ·
+                    Paid {{ +settlement.paid | currency:fin.currency }} ·
+                    Outstanding {{ +settlement.outstanding | currency:fin.currency }}
+                  </div>
+                } @empty { <p class="text-sm text-zinc-500">No priced settlements yet.</p> }
+              }
+            </section>
+            <section class="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6 space-y-4">
+              <h2 class="text-lg font-bold text-white">Product Pricing Agreements</h2>
+              <p class="text-sm text-zinc-400">Set one non-overlapping agreement per product and effective date. Actual retail pricing requires a retail amount in the weekly sales report.</p>
+              @if (canManageInventory()) {
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <label class="text-sm text-zinc-300">Product
+                    <select [(ngModel)]="pricingProductId" class="block w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white">
+                      <option [ngValue]="0">Select product</option>
+                      @for (product of allProducts(); track product.id) { <option [ngValue]="product.id">{{ product.articleNumber }} — {{ product.name }}</option> }
+                    </select>
+                  </label>
+                  <label class="text-sm text-zinc-300">Pricing model
+                    <select [(ngModel)]="pricingKind" class="block w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white">
+                      <option value="fixed">Fixed wholesale</option>
+                      <option value="customer_fixed">Customer-specific fixed</option>
+                      <option value="commission_actual">Commission — actual retail</option>
+                      <option value="commission_agreed">Commission — agreed retail</option>
+                    </select>
+                  </label>
+                  @if (pricingKind === 'fixed' || pricingKind === 'customer_fixed') {
+                    <label class="text-sm text-zinc-300">KORA unit price ({{ acct.defaultCurrency }})
+                      <input [(ngModel)]="pricingUnitPrice" placeholder="30.00" class="block w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white" />
+                    </label>
+                  } @else {
+                    <label class="text-sm text-zinc-300">Customer commission %
+                      <input [(ngModel)]="pricingCommission" placeholder="20" class="block w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white" />
+                    </label>
+                    @if (pricingKind === 'commission_agreed') {
+                      <label class="text-sm text-zinc-300">Agreed retail unit price ({{ acct.defaultCurrency }})
+                        <input [(ngModel)]="pricingRetailPrice" placeholder="80.00" class="block w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white" />
+                      </label>
+                    }
+                  }
+                  <label class="text-sm text-zinc-300">Effective from
+                    <input type="date" [(ngModel)]="pricingEffectiveFrom" class="block w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white" />
+                  </label>
+                  <label class="text-sm text-zinc-300">Effective to (optional)
+                    <input type="date" [(ngModel)]="pricingEffectiveTo" class="block w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white" />
+                  </label>
+                </div>
+                <button type="button" [disabled]="financialBusy()" (click)="addPricingRule()" class="bg-white text-zinc-900 rounded-lg px-4 py-2 font-semibold">Save Pricing Agreement</button>
+              }
+              @for (rule of pricingRules(); track rule.id) {
+                <p class="text-sm text-zinc-300 border-t border-zinc-800 pt-2">
+                  Product #{{ rule.productId }} · {{ rule.kind }} ·
+                  @if (rule.unitPrice) { {{ +rule.unitPrice | currency:rule.currency }} / unit }
+                  @if (rule.commissionPercent) { {{ rule.commissionPercent }}% commission }
+                  @if (rule.agreedRetailPrice) { · retail {{ +rule.agreedRetailPrice | currency:rule.currency }} }
+                  · {{ rule.effectiveFrom }} to {{ rule.effectiveTo || 'ongoing' }}
+                </p>
+              } @empty { <p class="text-sm text-zinc-500">No pricing agreements configured.</p> }
+            </section>
+            <section class="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6 space-y-4">
+              <h2 class="text-lg font-bold text-white">Payments &amp; Reconciliation</h2>
+              @if (canManageInventory()) {
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <input [(ngModel)]="paymentAmount" placeholder="Amount received" aria-label="Payment amount" class="bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white" />
+                  <input type="date" [(ngModel)]="paymentDate" aria-label="Payment date" class="bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white" />
+                  <input [(ngModel)]="paymentReference" placeholder="Bank/payment reference" aria-label="Payment reference" class="bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white" />
+                  <select [(ngModel)]="paymentMethod" aria-label="Payment method" class="bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white">
+                    <option value="bank_transfer">Bank transfer</option><option value="cash">Cash</option><option value="card">Card</option><option value="other">Other</option>
+                  </select>
+                </div>
+                <button type="button" [disabled]="financialBusy()" (click)="recordPayment()" class="bg-white text-zinc-900 rounded-lg px-4 py-2 font-semibold">Record Payment</button>
+              }
+              @if (financialOverview(); as fin) {
+                <h3 class="font-semibold text-white">Received payments</h3>
+                @for (payment of fin.payments; track payment.id) {
+                  <p class="text-sm text-zinc-300 border-t border-zinc-800 pt-2">
+                    #{{ payment.id }} · {{ payment.paymentDate }} · {{ payment.reference }} ·
+                    {{ +payment.amount | currency:fin.currency }} received · {{ +payment.unallocated | currency:fin.currency }} unallocated
+                  </p>
+                } @empty { <p class="text-sm text-zinc-500">No payments recorded.</p> }
+                @if (canManageInventory()) {
+                  <h3 class="font-semibold text-white">Allocate payment to settlement</h3>
+                  <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <select [(ngModel)]="allocationPaymentId" aria-label="Payment to allocate" class="bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white">
+                      <option [ngValue]="0">Select payment</option>
+                      @for (payment of fin.payments; track payment.id) {
+                        @if (+payment.unallocated > 0) { <option [ngValue]="payment.id">#{{ payment.id }} · {{ payment.reference }} ({{ +payment.unallocated | currency:fin.currency }})</option> }
+                      }
+                    </select>
+                    <select [(ngModel)]="allocationSettlementId" aria-label="Settlement to pay" class="bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white">
+                      <option [ngValue]="0">Select settlement</option>
+                      @for (settlement of fin.settlements; track settlement.id) {
+                        @if (settlement.status === 'active' && +settlement.outstanding > 0) { <option [ngValue]="settlement.id">Report #{{ settlement.reportId }} ({{ +settlement.outstanding | currency:fin.currency }})</option> }
+                      }
+                    </select>
+                    <input [(ngModel)]="allocationAmount" placeholder="Amount to allocate" aria-label="Allocation amount" class="bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white" />
+                  </div>
+                  <button type="button" [disabled]="financialBusy()" (click)="allocatePayment()" class="bg-emerald-700 text-white rounded-lg px-4 py-2 font-semibold">Allocate Payment</button>
+                }
+              }
+            </section>
+          </div>
         } @else if (activeTab() === 'details') {
           <!-- ── Detail Sections ──────────────────────────────── -->
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
