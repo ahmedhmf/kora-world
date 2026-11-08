@@ -183,11 +183,11 @@
             @if (salesError()) { <p class="text-red-400 text-sm">{{ salesError() }}</p> }
             @if (salesSuccess()) { <p class="text-emerald-400 text-sm">{{ salesSuccess() }}</p> }
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <label class="text-sm text-zinc-300">Week start
-                <input type="date" [(ngModel)]="salesWeekStart" class="block w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white" />
+              <label class="text-sm text-zinc-300">Work week number (ISO, Monday–Sunday)
+                <input type="number" min="1" max="53" step="1" [(ngModel)]="salesWeek" class="block w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white" />
               </label>
-              <label class="text-sm text-zinc-300">Week end
-                <input type="date" [(ngModel)]="salesWeekEnd" class="block w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white" />
+              <label class="text-sm text-zinc-300">Year
+                <input type="number" min="2000" max="2100" step="1" [(ngModel)]="salesYear" class="block w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white" />
               </label>
             </div>
             <label class="block text-sm text-zinc-300">Customer sales report (PDF, max 15 MB)
@@ -220,7 +220,7 @@
               <div class="border border-zinc-800 rounded-lg p-4 space-y-2">
                 <div class="flex items-center justify-between flex-wrap gap-3">
                   <div>
-                    <p class="text-white font-semibold">{{ report.weekStart }} – {{ report.weekEnd }}</p>
+                    <p class="text-white font-semibold">{{ report.weekStart | date:'yyyy' }} · {{ report.weekStart }} – {{ report.weekEnd }}</p>
                     <p class="text-xs text-zinc-400">{{ report.fileName }} · {{ report.status }}</p>
                   </div>
                   <div class="flex gap-3 items-center">
