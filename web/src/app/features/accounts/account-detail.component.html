@@ -400,6 +400,26 @@
                   <div><p class="text-zinc-400 text-sm">Approved sales owed</p><p class="text-xl font-bold text-white">{{ +fin.totalOwed | currency:fin.currency }}</p></div>
                   <div><p class="text-zinc-400 text-sm">Outstanding balance</p><p class="text-xl font-bold text-amber-400">{{ +fin.outstanding | currency:fin.currency }}</p></div>
                 </div>
+                <div class="grid grid-cols-2 gap-4">
+                  <div><p class="text-zinc-400 text-sm">Unallocated customer credit</p><p class="text-xl font-bold text-emerald-400">{{ +fin.unallocatedCredit | currency:fin.currency }}</p></div>
+                  <div><p class="text-zinc-400 text-sm">Net exposure (after credit)</p><p class="text-xl font-bold text-white">{{ +fin.netExposure | currency:fin.currency }}</p></div>
+                </div>
+                <p class="text-xs text-zinc-500">Customer credit is not applied to a settlement until allocated. Net exposure is informational, not a posted accounting entry.</p>
+                @if (fin.byCurrency.length > 1) {
+                  <h3 class="font-semibold text-white">Balances by currency</h3>
+                  @for (group of fin.byCurrency; track group.currency) {
+                    <p class="text-sm text-zinc-300">{{ group.currency }} · Outstanding {{ +group.outstanding | currency:group.currency }} · Unallocated {{ +group.unallocatedCredit | currency:group.currency }} · Net {{ +group.netExposure | currency:group.currency }}</p>
+                  }
+                }
+                <h3 class="font-semibold text-white">Unallocated payments / advances</h3>
+                @for (payment of fin.payments; track payment.id) {
+                  @if (+payment.unallocated > 0) {
+                    <div class="flex flex-wrap justify-between gap-2 border-t border-zinc-800 py-2 text-sm text-zinc-300">
+                      <span>{{ payment.paymentDate }} · {{ payment.reference }} · {{ payment.method }}</span>
+                      <span class="text-emerald-400">Available: {{ +payment.unallocated | currency:payment.currency }}</span>
+                    </div>
+                  }
+                }
                 <h3 class="font-semibold text-white">Settlements</h3>
                 @for (settlement of fin.settlements; track settlement.id) {
                   <div class="border-t border-zinc-800 py-3 text-sm text-zinc-300">
@@ -460,6 +480,7 @@
                     </tbody>
                   </table>
                 </div>
+                <p class="text-sm text-zinc-300">Unallocated customer credit: <strong>{{ +statement.unallocatedCredit | currency:statement.currency }}</strong> · Net exposure after credit: <strong>{{ +statement.netExposure | currency:statement.currency }}</strong></p>
                 <h3 class="text-white font-semibold">Overdue settlements</h3>
                 @for (item of statement.overdue; track item.settlementId) {
                   <p class="text-sm text-amber-400">{{ item.reference }} · Due {{ item.dueDate }} · {{ item.daysOverdue }} days overdue · {{ +item.outstanding | currency:statement.currency }}</p>
