@@ -91,6 +91,10 @@ export class CreateAccountDto {
 
   @IsString()
   @IsOptional()
+  paymentModel?: string;
+
+  @IsString()
+  @IsOptional()
   paymentTerms?: string;
 
   @IsNumber()
