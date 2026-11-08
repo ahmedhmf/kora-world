@@ -4,6 +4,8 @@ import { FormsModule } from '@angular/forms';
 import { AccountsStore } from '../../store/accounts.store';
 import { ApiService } from '../../core/services/api.service';
 import { CreateAccountDto, AccountStatus, CustomerType } from '../../core/models/account.model';
+import { DropdownOptionsService } from '../../core/services/dropdown-options.service';
+import { DropdownOption } from '../../core/models/dropdown-option.model';
 import { DialogService } from '../../core/services/dialog.service';
 
 @Component({
@@ -19,6 +21,8 @@ export class AccountFormComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly dialogService = inject(DialogService);
+  private readonly dropdownOptions = inject(DropdownOptionsService);
+  readonly paymentModels = signal<DropdownOption[]>([]);
 
   readonly isEdit = signal(false);
   private editId = signal<number | null>(null);
@@ -55,6 +59,7 @@ export class AccountFormComponent implements OnInit {
     shippingZip: '',
     shippingCountry: '',
     defaultCurrency: 'USD',
+    paymentModel: undefined,
     paymentTerms: '',
     creditLimit: 0,
     vatNumber: '',
@@ -62,6 +67,10 @@ export class AccountFormComponent implements OnInit {
   };
 
   ngOnInit(): void {
+    this.dropdownOptions.getOptions('accountPaymentModel').subscribe({
+      next: options => { this.paymentModels.set(options); this.cdr.detectChanges(); },
+      error: err => console.error('Could not load account payment models', err),
+    });
     this.route.paramMap.subscribe((params) => {
       const id = params.get('id');
       if (id) {
@@ -86,6 +95,7 @@ export class AccountFormComponent implements OnInit {
               shippingZip: account.shippingZip || '',
               shippingCountry: account.shippingCountry || '',
               defaultCurrency: account.defaultCurrency || 'USD',
+              paymentModel: account.paymentModel || undefined,
               paymentTerms: account.paymentTerms || '',
               creditLimit: account.creditLimit || 0,
               vatNumber: account.vatNumber || '',
@@ -157,6 +167,7 @@ export class AccountFormComponent implements OnInit {
       shippingZip: this.form.shippingZip || undefined,
       shippingCountry: this.form.shippingCountry || undefined,
       defaultCurrency: this.form.defaultCurrency || 'USD',
+      paymentModel: this.form.paymentModel || undefined,
       paymentTerms: this.form.paymentTerms || undefined,
       creditLimit: this.form.creditLimit ? +this.form.creditLimit : 0,
       vatNumber: this.form.vatNumber || undefined,
