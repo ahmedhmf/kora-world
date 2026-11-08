@@ -321,6 +321,71 @@
               </div>
             } @empty { <p class="text-zinc-500 text-sm">No corrections recorded.</p> }
           </section>
+          <section class="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6 mb-8 space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 class="text-lg font-bold text-white">Inventory Movement History</h2>
+                <p class="text-sm text-zinc-400">Signed deliveries, approved sales, cancellations and stock corrections in one running ledger.</p>
+              </div>
+              <div class="flex gap-2">
+                <button type="button" (click)="loadMovements()" class="px-3 py-2 bg-zinc-800 text-white rounded-lg text-sm">Refresh</button>
+                <button type="button" (click)="exportMovementsCsv()" class="px-3 py-2 bg-blue-800 text-white rounded-lg text-sm">Export CSV</button>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <label class="text-sm text-zinc-300">Product
+                <select [(ngModel)]="movementProductId" (ngModelChange)="loadMovements()" class="block w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white">
+                  <option [ngValue]="0">All products</option>
+                  @for (item of inventory(); track item.productId) {
+                    <option [ngValue]="item.productId">{{ item.articleNumber }} — {{ item.productName }}</option>
+                  }
+                </select>
+              </label>
+              <label class="text-sm text-zinc-300">Movement type
+                <select [(ngModel)]="movementType" (ngModelChange)="loadMovements()" class="block w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white">
+                  <option value="">All types</option><option value="delivery">Signed delivery</option>
+                  <option value="sale">Approved sale</option><option value="cancellation">Cancellation</option>
+                  <option value="adjustment">Stock correction / return</option>
+                </select>
+              </label>
+              <label class="text-sm text-zinc-300">From date
+                <input type="date" [(ngModel)]="movementFrom" (change)="loadMovements()" class="block w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white" />
+              </label>
+              <label class="text-sm text-zinc-300">To date
+                <input type="date" [(ngModel)]="movementTo" (change)="loadMovements()" class="block w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white" />
+              </label>
+            </div>
+            @if (movementError()) { <p class="text-red-400 text-sm">{{ movementError() }}</p> }
+            @if (movementLoading()) { <p class="text-zinc-400 text-sm">Loading movements...</p> }
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-sm">
+                <thead class="border-b border-zinc-700 text-zinc-400">
+                  <tr><th class="py-2 pr-3">Recorded at</th><th class="py-2 pr-3">Product</th><th class="py-2 pr-3">Movement</th><th class="py-2 pr-3">Reference</th><th class="py-2 pr-3 text-right">Change</th><th class="py-2 pr-3 text-right">Before</th><th class="py-2 pr-3 text-right">After</th><th class="py-2">By / Reason</th></tr>
+                </thead>
+                <tbody>
+                  @for (m of inventoryMovements(); track m.id) {
+                    <tr class="border-b border-zinc-800 text-zinc-200">
+                      <td class="py-3 pr-3 whitespace-nowrap">{{ m.timestamp | date:'short' }} @if (m.timestampEstimated) { <span class="text-amber-400" title="Historical delivery signing time was not recorded">~</span> }</td>
+                      <td class="py-3 pr-3">{{ m.articleNumber }}<div class="text-xs text-zinc-500">{{ m.productName }}</div></td>
+                      <td class="py-3 pr-3">{{ m.type }}</td>
+                      <td class="py-3 pr-3">{{ m.reference }} @if (m.documentDate) { <div class="text-xs text-zinc-500">Document: {{ m.documentDate }}</div> }</td>
+                      <td class="py-3 pr-3 text-right font-semibold" [class.text-emerald-400]="m.quantityChange > 0" [class.text-red-400]="m.quantityChange < 0">{{ m.quantityChange > 0 ? '+' : '' }}{{ m.quantityChange }}</td>
+                      <td class="py-3 pr-3 text-right">{{ m.balanceBefore }}</td>
+                      <td class="py-3 pr-3 text-right">{{ m.balanceAfter }}</td>
+                      <td class="py-3">{{ m.performedBy || 'Not recorded' }}<div class="text-xs text-zinc-400">{{ m.reason }} @if (m.notes) { — {{ m.notes }} }</div></td>
+                    </tr>
+                  } @empty { <tr><td colspan="8" class="py-6 text-zinc-500">No movements match the selected filters.</td></tr> }
+                </tbody>
+              </table>
+            </div>
+            <p class="text-xs text-zinc-500">{{ movementNotice() }}</p>
+            <h3 class="text-sm font-semibold text-white">Inventory reconciliation (all-time)</h3>
+            @for (row of inventoryReconciliation(); track row.productId) {
+              <p class="text-sm" [class.text-emerald-400]="row.matches" [class.text-red-400]="!row.matches">
+                {{ row.articleNumber }} — Stock: {{ row.stock }} · Ledger: {{ row.ledger }} · {{ row.matches ? 'Matched' : 'Mismatch — investigate' }}
+              </p>
+            } @empty { <p class="text-sm text-zinc-500">No inventory to reconcile.</p> }
+          </section>
         } @else if (activeTab() === 'financials') {
           <div class="space-y-6">
             @if (financialError()) { <p class="text-red-400 text-sm">{{ financialError() }}</p> }
