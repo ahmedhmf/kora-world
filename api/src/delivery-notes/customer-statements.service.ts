@@ -82,23 +82,32 @@ export class CustomerStatementsService {
         amountCents: -Number(a.amountCents), settlementId: settlement.id, paymentId: payment.id });
     }
     entries.sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
-    let running = 0;
-    const transactions = entries.map(e => {
+    const openingCents = entries.filter(e => e.date < from).reduce((n, e) => n + e.amountCents, 0);
+    let running = openingCents;
+    const period = entries.filter(e => e.date >= from && e.date <= to).map(e => {
       running += e.amountCents;
       return { ...e, amount: money(e.amountCents), runningBalance: money(running) };
     });
-    const openingCents = entries.filter(e => e.date < from).reduce((n, e) => n + e.amountCents, 0);
-    const period = transactions.filter(e => e.date >= from && e.date <= to);
-    const closingCents = openingCents + period.reduce((n, e) => n + e.amountCents, 0);
+    const closingCents = running;
     const debitCents = period.filter(e => e.amountCents > 0).reduce((n, e) => n + e.amountCents, 0);
     const creditCents = -period.filter(e => e.amountCents < 0).reduce((n, e) => n + e.amountCents, 0);
+    // Unallocated receipts are customer credit, not a settlement allocation.
+    // They must be shown separately to avoid silently netting customer receivables.
+    const creditPayments = payments.filter(p => p.currency === selectedCurrency && p.paymentDate <= to);
+    const unallocatedCents = creditPayments.reduce((n, p) => {
+      const applied = allocations.filter(a => a.paymentId === p.id &&
+        new Date(a.createdAt).toISOString().slice(0, 10) <= to)
+        .reduce((sum, a) => sum + Number(a.amountCents), 0);
+      return n + Number(p.amountCents) - applied;
+    }, 0);
     return {
       accountId, customer: { companyName: account.companyName, accountNumber: account.accountNumber,
         billingStreet: account.billingStreet, billingCity: account.billingCity, billingZip: account.billingZip,
         billingCountry: account.billingCountry },
       currency: selectedCurrency, availableCurrencies: currencies, periodFrom: from, periodTo: to,
       openingBalance: money(openingCents), charges: money(debitCents), credits: money(creditCents),
-      closingBalance: money(closingCents), transactions: period,
+      closingBalance: money(closingCents), unallocatedCredit: money(unallocatedCents),
+      netExposure: money(closingCents - unallocatedCents), transactions: period,
       overdue: aging.filter(a => a.daysOverdue > 0 && a.dueDate && a.dueDate <= to),
       aging: aging.filter(a => a.dueDate && a.dueDate <= to),
       dueDatePolicy: 'Settlement due day is interpreted as the day of the month after the sales week ends; dates past month-end are clamped. No due date is shown when the agreement has no valid due day.',
