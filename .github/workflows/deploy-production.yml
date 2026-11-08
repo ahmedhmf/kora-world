@@ -1,0 +1,108 @@
+name: Deploy Kora World to production
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Confirm a production deployment'
+        required: true
+        type: choice
+        options:
+          - CANCEL
+          - DEPLOY
+        default: CANCEL
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kora-world-production
+  cancel-in-progress: false
+
+jobs:
+  approval:
+    name: Confirm manual deployment
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require main and explicit confirmation
+        env:
+          BRANCH: ${{ github.ref }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          test "$BRANCH" = 'refs/heads/main'
+          test "$CONFIRMATION" = 'DEPLOY'
+
+  api:
+    name: Validate API
+    needs: approval
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npm test -- --runInBand --passWithNoTests
+
+  web:
+    name: Validate frontend
+    needs: approval
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci --legacy-peer-deps
+      - run: npx ng build --configuration production
+
+  deploy:
+    name: Deploy via restricted SSH key
+    needs: [api, web]
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 60
+    steps:
+      - name: Configure deployment SSH key
+        env:
+          DEPLOY_KEY: ${{ secrets.KORA_DEPLOY_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$DEPLOY_KEY"
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_KEY" > "$HOME/.ssh/kora_deploy"
+          chmod 600 "$HOME/.ssh/kora_deploy"
+
+      - name: Pin VPS SSH host identity
+        run: |
+          set -euo pipefail
+          ssh-keyscan -T 15 -t ed25519 213.165.83.149 > "$HOME/.ssh/known_hosts"
+          actual="$(ssh-keygen -lf "$HOME/.ssh/known_hosts" | awk '{print $2}')"
+          expected='SHA256:Y2JoPf23w6iytAXoTFKns8MYtPNLQZQtY2uTb4HimKM'
+          if [[ "$actual" != "$expected" ]]; then
+            echo 'VPS host key fingerprint mismatch; refusing deployment.' >&2
+            exit 1
+          fi
+
+      - name: Verify deployment prerequisites
+        run: |
+          ssh -T -o BatchMode=yes -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -i "$HOME/.ssh/kora_deploy" root@213.165.83.149 check
+
+      - name: Run approved production deployment
+        run: |
+          ssh -T -o BatchMode=yes -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -i "$HOME/.ssh/kora_deploy" root@213.165.83.149 deploy
