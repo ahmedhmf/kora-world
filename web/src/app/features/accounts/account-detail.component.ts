@@ -205,6 +205,12 @@ export class AccountDetailComponent implements OnInit {
       y -= 18;
       draw('CLOSING BALANCE', left, y, 11, true);
       rightText(data.closingBalance + ' ' + data.currency, right, y, 11, true);
+      y -= 21;
+      draw('Unallocated customer credit', left, y, 9);
+      rightText((data.unallocatedCredit || '0.00') + ' ' + data.currency, right, y, 9);
+      y -= 17;
+      draw('Net exposure after credit', left, y, 9, true);
+      rightText((data.netExposure || data.closingBalance) + ' ' + data.currency, right, y, 9, true);
       y -= 28;
       if (data.overdue?.length) {
         await ensureSpace(40);
