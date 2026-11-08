@@ -1,18 +1,26 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, UseGuards, Req } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, UseGuards, Req, Query } from '@nestjs/common';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import type { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
 import { AuthGuard } from '../auth/auth.guard';
+import { InventoryLedgerService } from './inventory-ledger.service';
 import { DeliveryNotesService } from './delivery-notes.service';
 
 @Controller('delivery-notes')
 @UseGuards(AuthGuard, RolesGuard)
 export class DeliveryNotesController {
-  constructor(private readonly service: DeliveryNotesService) {}
+  constructor(private readonly service: DeliveryNotesService, private readonly ledger: InventoryLedgerService) {}
 
   @Get('account/:accountId')
   list(@Param('accountId', ParseIntPipe) accountId: number) {
     return this.service.list(accountId);
+  }
+
+  @Get('account/:accountId/movements')
+  movements(@Param('accountId', ParseIntPipe) accountId: number,
+    @Query('productId') productId?: string, @Query('type') type?: string,
+    @Query('from') from?: string, @Query('to') to?: string) {
+    return this.ledger.getLedger(accountId, { productId, type, from, to });
   }
 
   @Get('account/:accountId/inventory')
