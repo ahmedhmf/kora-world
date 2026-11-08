@@ -37,10 +37,85 @@ export class AccountDetailComponent implements OnInit {
     deliveries: Array<{ noteId: number; noteNumber: string; deliveryDate: string; quantity: number }>;
   }>>([]);
   inventoryError = signal('');
+  salesReports = signal<any[]>([]);
+  salesError = signal('');
+  salesSuccess = signal('');
+  salesBusy = signal(false);
+  salesFile: File | null = null;
+  salesWeekStart = '';
+  salesWeekEnd = '';
+  salesRemarks = '';
+  salesItems: Array<{ productId: number; quantity: number }> = [{ productId: 0, quantity: 1 }];
+
+  selectSalesPdf(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0] || null;
+    this.salesFile = file && file.type === 'application/pdf' && file.size <= 15 * 1024 * 1024 ? file : null;
+    if (file && !this.salesFile) this.salesError.set('Choose a PDF under 15 MB');
+    else this.salesError.set('');
+  }
+
+  addSalesItem(): void { this.salesItems.push({ productId: 0, quantity: 1 }); }
+  removeSalesItem(index: number): void { this.salesItems.splice(index, 1); }
+
+  saveSalesDraft(): void {
+    const acct = this.account();
+    if (!acct || !this.salesFile || !this.salesWeekStart || !this.salesWeekEnd ||
+      this.salesWeekEnd < this.salesWeekStart || !this.salesItems.length ||
+      this.salesItems.some(i => !i.productId || !Number.isInteger(Number(i.quantity)) || Number(i.quantity) < 1) ||
+      new Set(this.salesItems.map(i => i.productId)).size !== this.salesItems.length) {
+      this.salesError.set('Provide a PDF, valid reporting dates, and unique products with positive quantities.');
+      return;
+    }
+    this.salesBusy.set(true); this.salesError.set(''); this.salesSuccess.set('');
+    this.api.uploadFile(this.salesFile).subscribe({
+      next: uploaded => this.api.createWeeklySalesReport(acct.id, {
+        weekStart: this.salesWeekStart, weekEnd: this.salesWeekEnd,
+        filePath: uploaded.path, fileName: uploaded.name, remarks: this.salesRemarks,
+        items: this.salesItems.map(i => ({ productId: Number(i.productId), quantity: Number(i.quantity) })),
+      }).subscribe({
+        next: () => {
+          this.salesBusy.set(false);
+          this.salesFile = null; this.salesRemarks = ''; this.salesItems = [{ productId: 0, quantity: 1 }];
+          this.salesSuccess.set('Draft saved. Review and approve it to deduct inventory.');
+          this.loadInventory();
+        },
+        error: err => { this.salesBusy.set(false); this.salesError.set(err.error?.message || 'Could not save sales report'); },
+      }),
+      error: () => { this.salesBusy.set(false); this.salesError.set('PDF upload failed'); },
+    });
+  }
+
+  async approveSalesReport(report: any): Promise<void> {
+    if (this.salesBusy()) return;
+    const ok = await this.dialogService.confirm('Approve weekly sales',
+      'Approve this report and deduct its sold quantities from customer inventory? This action cannot be undone.');
+    if (!ok) return;
+    this.salesBusy.set(true); this.salesError.set(''); this.salesSuccess.set('');
+    this.api.approveWeeklySalesReport(report.id).subscribe({
+      next: () => { this.salesBusy.set(false); this.salesSuccess.set('Report approved and inventory updated.'); this.loadInventory(); },
+      error: err => { this.salesBusy.set(false); this.salesError.set(err.error?.message || 'Could not approve report'); },
+    });
+  }
+
+  viewSalesPdf(report: any): void {
+    this.api.downloadFile(report.filePath).subscribe({
+      next: blob => {
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+      },
+      error: () => this.salesError.set('Could not open report PDF'),
+    });
+  }
   loadInventory(): void {
     const acct = this.account();
     if (!acct) return;
     this.inventoryError.set('');
+    this.api.getWeeklySalesReports(acct.id).subscribe({
+      next: reports => this.salesReports.set(reports),
+      error: () => this.salesError.set('Could not load weekly sales reports'),
+    });
     this.api.getAccountInventory(acct.id).subscribe({
       next: rows => this.inventory.set(rows),
       error: () => this.inventoryError.set('Could not load customer inventory'),
