@@ -233,6 +233,18 @@ export class ApiService {
     return this.http.get<any[]>(`${this.base}/delivery-notes/account/${accountId}`);
   }
 
+  getInventoryMovements(accountId: number, filters: {
+    productId?: number; type?: string; from?: string; to?: string;
+  } = {}): Observable<any> {
+    const params = new URLSearchParams();
+    if (filters.productId) params.set('productId', String(filters.productId));
+    if (filters.type) params.set('type', filters.type);
+    if (filters.from) params.set('from', filters.from);
+    if (filters.to) params.set('to', filters.to);
+    const query = params.toString();
+    return this.http.get<any>(`${this.base}/delivery-notes/account/${accountId}/movements${query ? '?' + query : ''}`);
+  }
+
   getAccountInventory(accountId: number): Observable<Array<{
     productId: number; articleNumber: string; productName: string; quantity: number;
     deliveries: Array<{ noteId: number; noteNumber: string; deliveryDate: string; quantity: number }>;
