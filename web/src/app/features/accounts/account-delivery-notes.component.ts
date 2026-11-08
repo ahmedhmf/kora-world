@@ -1,6 +1,7 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { PDFDocument, StandardFonts, rgb, PDFFont, PDFPage } from 'pdf-lib';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ApiService } from '../../core/services/api.service';
 import { B2BAccount } from '../../core/models/account.model';
@@ -121,65 +122,112 @@ export class AccountDeliveryNotesComponent implements OnInit {
       error: err => { this.saving.set(false); this.error.set(err.error?.message || 'Could not create delivery note'); },
     });
   }
-  print(note: DeliveryNote): void {
-    const escape = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] || c);
-    const rows = note.items.map((i, idx) => `<tr><td>${idx + 1}</td><td>${escape(i.articleNumber)}</td><td>${escape(i.productName)}</td><td style="text-align:right">${i.quantity}</td></tr>`).join('');
-    const consignment = note.paymentModel === 'Consignment' || note.paymentModel === 'Consignment (Monthly Settlement)';
-    const popup = window.open('', '_blank');
-    if (!popup) { this.error.set('Allow popups to print delivery notes'); return; }
-    popup.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${escape(note.noteNumber)} — Kora Delivery Note</title><style>
-      *{box-sizing:border-box}
-      @page{size:A4 portrait;margin:0}
-      html,body{margin:0;padding:0;width:210mm;min-height:297mm;color:#171717;font-family:Arial,Helvetica,sans-serif;font-size:10pt;line-height:1.4;background:#fff}
-      .sheet{position:relative;width:210mm;min-height:297mm;padding-top:11mm;padding-bottom:15mm}
-      .top-logo{position:absolute;top:4.8mm;right:19mm;font-size:15pt;font-weight:900;font-style:italic;letter-spacing:-1px;line-height:1}
-      .frame{position:relative;margin:0 14mm 0 14mm;border:0.5mm solid #252525;min-height:261mm;padding:13mm 11mm 14mm}
-      h1{font-size:18pt;letter-spacing:0.5px;margin:0 0 2mm}
-      .meta{display:flex;justify-content:space-between;gap:8mm;padding-bottom:6mm;border-bottom:1px solid #bbb}
-      .meta-right{text-align:right;white-space:nowrap}
-      .customer{margin-top:7mm;line-height:1.7}
-      table{width:100%;border-collapse:collapse;margin-top:8mm;table-layout:fixed}
-      th,td{border-bottom:1px solid #bbb;padding:3mm 2mm;text-align:left;vertical-align:top;overflow-wrap:anywhere}
-      th{background:#f1f1f1;font-size:9pt}
-      th:first-child,td:first-child{width:8%}
-      th:nth-child(2),td:nth-child(2){width:26%}
-      th:last-child,td:last-child{width:20%;text-align:right}
-      tr{break-inside:avoid}
-      .remarks{margin-top:7mm;overflow-wrap:anywhere}
-      .ack{margin-top:9mm;border:1px solid #aaa;padding:4mm;font-size:9pt;break-inside:avoid}
-      .ack p{margin:2mm 0 0}
-      .signatures{display:flex;gap:9mm;margin-top:15mm;break-inside:avoid}
-      .signature{width:50%;font-size:9pt}
-      .signature-line{border-bottom:1px solid #555;height:12mm;margin-bottom:2mm}
-      .signature p{margin:0 0 5mm}
-      .footer{position:absolute;left:14mm;right:14mm;bottom:5.5mm;height:7mm;background:#201d1e;color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 4mm;font-size:5.5pt}
-      .footer-brand{font-size:12pt;font-style:italic;font-weight:900;letter-spacing:-1px}
-      .footer-center{font-size:10pt}
-      @media print{
-        html,body{print-color-adjust:exact;-webkit-print-color-adjust:exact}
-        .sheet{break-after:page}
-        .frame{break-inside:auto}
+  async print(note: DeliveryNote): Promise<void> {
+    this.error.set('');
+    try {
+      const response = await fetch('/assets/kora-stationery.pdf');
+      if (!response.ok) throw new Error('Official stationery PDF missing from web/public/assets/kora-stationery.pdf');
+      const template = await PDFDocument.load(await response.arrayBuffer());
+      const output = await PDFDocument.create();
+      const regular = await output.embedFont(StandardFonts.Helvetica);
+      const bold = await output.embedFont(StandardFonts.HelveticaBold);
+      const black = rgb(0.10, 0.10, 0.10);
+      const gray = rgb(0.42, 0.42, 0.42);
+      const left = 76, right = 516;
+      const safe = (value: unknown) => String(value ?? '').replace(/[^\x20-\x7E]/g, c => c === '–' ? '-' : c === '—' ? '-' : '?');
+      const text = (page: PDFPage, value: unknown, x: number, y: number, size = 10, font: PDFFont = regular) =>
+        page.drawText(safe(value), { x, y, size, font, color: black });
+      const wrapped = (value: unknown, font: PDFFont, size: number, width: number): string[] => {
+        const words = safe(value).split(/\s+/).filter(Boolean);
+        const lines: string[] = [];
+        let line = '';
+        for (const word of words) {
+          const candidate = line ? line + ' ' + word : word;
+          if (font.widthOfTextAtSize(candidate, size) <= width) { line = candidate; continue; }
+          if (line) { lines.push(line); line = ''; }
+          let chunk = '';
+          for (const char of word) {
+            if (font.widthOfTextAtSize(chunk + char, size) > width && chunk) { lines.push(chunk); chunk = ''; }
+            chunk += char;
+          }
+          line = chunk;
+        }
+        if (line) lines.push(line);
+        return lines.length ? lines : [''];
+      };
+      const newPage = async (index: number): Promise<{ page: PDFPage; y: number }> => {
+        const [page] = await output.copyPages(template, [0]);
+        output.addPage(page);
+        text(page, 'DELIVERY NOTE / PROOF OF DELIVERY', left, 755, 16, bold);
+        text(page, note.noteNumber, left, 731, 10, bold);
+        text(page, 'Delivery date: ' + note.deliveryDate, 365, 731, 9);
+        if (index > 0) text(page, 'Continued - page ' + (index + 1), left, 712, 9, regular);
+        return { page, y: index === 0 ? 708 : 688 };
+      };
+      let pageIndex = 0;
+      let state = await newPage(pageIndex);
+      const customerLines = wrapped('Delivered to: ' + note.customerName, regular, 10, right - left);
+      for (const line of customerLines) { text(state.page, line, left, state.y); state.y -= 15; }
+      const addressLines = wrapped('Delivery address: ' + (note.deliveryAddress || 'Not specified'), regular, 10, right - left);
+      for (const line of addressLines) { text(state.page, line, left, state.y); state.y -= 15; }
+      state.y -= 12;
+      const header = (page: PDFPage, y: number) => {
+        page.drawRectangle({ x: left, y: y - 8, width: right - left, height: 23, color: rgb(.93,.93,.93) });
+        text(page, '#', left + 5, y, 9, bold);
+        text(page, 'Article', left + 32, y, 9, bold);
+        text(page, 'Product', left + 135, y, 9, bold);
+        text(page, 'Qty', right - 35, y, 9, bold);
+        return y - 25;
+      };
+      state.y = header(state.page, state.y);
+      for (let i = 0; i < note.items.length; i++) {
+        const item = note.items[i];
+        const nameLines = wrapped(item.productName, regular, 9, 215);
+        const articleLines = wrapped(item.articleNumber, regular, 9, 98);
+        const height = Math.max(nameLines.length, articleLines.length) * 13 + 8;
+        if (state.y - height < 240) {
+          state = await newPage(++pageIndex);
+          state.y = header(state.page, state.y);
+        }
+        text(state.page, i + 1, left + 5, state.y, 9);
+        articleLines.forEach((line, j) => text(state.page, line, left + 32, state.y - j * 13, 9));
+        nameLines.forEach((line, j) => text(state.page, line, left + 135, state.y - j * 13, 9));
+        text(state.page, item.quantity, right - 35, state.y, 9);
+        state.y -= height;
+        state.page.drawLine({ start: { x: left, y: state.y + 4 }, end: { x: right, y: state.y + 4 }, thickness: .5, color: gray });
       }
-    </style></head><body><div class="sheet">
-      <div class="top-logo">KORA</div>
-      <main class="frame">
-        <div class="meta"><div><h1>DELIVERY NOTE</h1><div>Proof of Delivery</div></div>
-          <div class="meta-right"><strong>${escape(note.noteNumber)}</strong><div>Delivery date: ${escape(note.deliveryDate)}</div></div>
-        </div>
-        <div class="customer"><strong>Delivered to:</strong> ${escape(note.customerName)}<br><strong>Delivery address:</strong> ${escape(note.deliveryAddress || 'Not specified')}</div>
-        <table><thead><tr><th>#</th><th>Article</th><th>Product</th><th>Qty.</th></tr></thead><tbody>${rows}</tbody></table>
-        ${note.remarks ? `<div class="remarks"><strong>Remarks:</strong> ${escape(note.remarks)}</div>` : ''}
-        <div class="ack">I acknowledge receipt of the products and quantities listed above. Any shortages or visible damage should be noted upon delivery.
-          ${consignment ? '<p><strong>Consignment:</strong> Receipt does not constitute payment or transfer of ownership. Commercial terms are governed by the parties\' agreement.</p>' : '<p>Signature confirms receipt only, not payment.</p>'}
-        </div>
-        <div class="signatures">
-          <div class="signature"><strong>Received by (Customer)</strong><div class="signature-line"></div><p>Name:</p><div class="signature-line"></div><p>Signature:</p><div class="signature-line"></div><p>Date:</p></div>
-          <div class="signature"><strong>Delivered by (Kora)</strong><div class="signature-line"></div><p>Name:</p><div class="signature-line"></div><p>Signature:</p><div class="signature-line"></div><p>Date:</p></div>
-        </div>
-      </main>
-      <div class="footer"><span class="footer-brand">KORA</span><span class="footer-center">◆</span><span>Made in Egypt. Engineered in Germany.</span></div>
-    </div><script>window.onload=function(){window.print()}<\/script></body></html>`);
-    popup.document.close();
+      const consignment = note.paymentModel === 'Consignment' || note.paymentModel === 'Consignment (Monthly Settlement)';
+      const ack = consignment
+        ? 'Receipt confirms quantities delivered only. Consignment receipt is not payment or transfer of ownership. Commercial terms are governed by the parties agreement.'
+        : 'I acknowledge receipt of the products and quantities listed. Signature confirms receipt only, not payment.';
+      const remarks = note.remarks ? wrapped('Remarks: ' + note.remarks, regular, 9, right - left) : [];
+      const ackLines = wrapped(ack, regular, 9, right - left);
+      const needed = (remarks.length + ackLines.length) * 13 + 133;
+      if (state.y - needed < 96) state = await newPage(++pageIndex);
+      state.y -= 14;
+      for (const line of remarks) { text(state.page, line, left, state.y, 9); state.y -= 13; }
+      state.y -= 8;
+      for (const line of ackLines) { text(state.page, line, left, state.y, 9); state.y -= 13; }
+      state.y -= 32;
+      text(state.page, 'RECEIVED BY (CUSTOMER)', left, state.y, 9, bold);
+      text(state.page, 'DELIVERED BY (KORA)', 308, state.y, 9, bold);
+      for (const [i, label] of ['Name', 'Signature', 'Date'].entries()) {
+        const y = state.y - 24 - i * 28;
+        text(state.page, label + ':', left, y, 9);
+        text(state.page, label + ':', 308, y, 9);
+        state.page.drawLine({ start: { x: left + 66, y: y - 2 }, end: { x: 276, y: y - 2 }, thickness: .5, color: gray });
+        state.page.drawLine({ start: { x: 374, y: y - 2 }, end: { x: right, y: y - 2 }, thickness: .5, color: gray });
+      }
+      const blob = new Blob([new Uint8Array(await output.save())], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = note.noteNumber + '.pdf';
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Could not generate delivery note PDF');
+    }
   }
   uploadSigned(note: DeliveryNote, event: Event): void {
     const input = event.target as HTMLInputElement;
