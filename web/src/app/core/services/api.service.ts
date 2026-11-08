@@ -209,6 +209,19 @@ export class ApiService {
     return this.http.post<{ success: boolean; poIds: number[] }>(`${this.base}/accounts/${id}/forecasts/${forecastId}/create-pos`, { items: selectedItems });
   }
 
+  // Delivery notes
+  getDeliveryNotes(accountId: number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.base}/delivery-notes/account/${accountId}`);
+  }
+
+  createDeliveryNote(accountId: number, dto: { deliveryDate: string; remarks?: string; items: Array<{ productId: number; quantity: number }> }): Observable<any> {
+    return this.http.post<any>(`${this.base}/delivery-notes/account/${accountId}`, dto);
+  }
+
+  attachDeliveryNoteSignedCopy(noteId: number, file: { path: string; name: string }): Observable<any> {
+    return this.http.patch<any>(`${this.base}/delivery-notes/${noteId}/signed-copy`, file);
+  }
+
   // Receipts
   getReceipts(): Observable<Receipt[]> {
     return this.http.get<Receipt[]>(`${this.base}/receipts`);
