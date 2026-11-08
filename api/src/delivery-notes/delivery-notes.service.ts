@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
+import { WeeklySalesReport } from './weekly-sales-report.entity';
 import { DeliveryNote } from './delivery-note.entity';
 import { Account } from '../accounts/entities/account.entity';
 import { Product } from '../products/entities/product.entity';
@@ -14,6 +15,8 @@ export class DeliveryNotesService {
     @InjectRepository(DeliveryNote) private readonly notes: Repository<DeliveryNote>,
     @InjectRepository(Account) private readonly accounts: Repository<Account>,
     @InjectRepository(Product) private readonly products: Repository<Product>,
+    @InjectRepository(WeeklySalesReport) private readonly sales: Repository<WeeklySalesReport>,
+    private readonly dataSource: DataSource,
   ) {}
 
   list(accountId: number) {
@@ -47,7 +50,86 @@ export class DeliveryNotesService {
           deliveryDate: note.deliveryDate, quantity: item.quantity });
       }
     }
+    const approved = await this.sales.find({ where: { accountId, status: 'approved' } });
+    for (const report of approved) {
+      for (const item of report.items) {
+        const row = inventory.get(item.productId);
+        if (row) row.quantity -= item.quantity;
+      }
+    }
     return [...inventory.values()].sort((a, b) => a.articleNumber.localeCompare(b.articleNumber));
+  }
+
+  async listSales(accountId: number) {
+    if (!await this.accounts.exist({ where: { id: accountId } })) throw new NotFoundException('Account not found');
+    return this.sales.find({ where: { accountId }, order: { id: 'DESC' } });
+  }
+
+  async createSales(accountId: number, dto: {
+    weekStart: string; weekEnd: string; filePath: string; fileName: string;
+    remarks?: string; items: Array<{ productId: number; quantity: number }>;
+  }) {
+    if (!await this.accounts.exist({ where: { id: accountId } })) throw new NotFoundException('Account not found');
+    const validDate = (v: string) => /^\\d{4}-\\d{2}-\\d{2}$/.test(v || '') &&
+      !Number.isNaN(Date.parse(v)) && new Date(v).toISOString().slice(0, 10) === v;
+    if (!validDate(dto.weekStart) || !validDate(dto.weekEnd) || dto.weekEnd < dto.weekStart) {
+      throw new BadRequestException('Enter a valid reporting period');
+    }
+    if (!/^\\d+-\\d+\\.pdf$/i.test(dto.filePath || '') || !fs.existsSync(path.join(process.cwd(), 'uploads', dto.filePath))) {
+      throw new BadRequestException('Upload the weekly sales PDF first');
+    }
+    if (!dto.fileName || dto.fileName.length > 255) throw new BadRequestException('Invalid PDF file name');
+    if (!Array.isArray(dto.items) || !dto.items.length || dto.items.length > 100) {
+      throw new BadRequestException('Enter between 1 and 100 sold product lines');
+    }
+    const seen = new Set<number>();
+    const items: WeeklySalesReport['items'] = [];
+    for (const item of dto.items) {
+      if (!Number.isInteger(item.productId) || !Number.isInteger(item.quantity) ||
+        item.quantity < 1 || item.quantity > 100000 || seen.has(item.productId)) {
+        throw new BadRequestException('Products must be unique with positive whole-number quantities');
+      }
+      seen.add(item.productId);
+      const product = await this.products.findOneBy({ id: item.productId });
+      if (!product) throw new BadRequestException('Unknown product');
+      items.push({ productId: product.id, articleNumber: product.articleNumber, productName: product.name, quantity: item.quantity });
+    }
+    return this.sales.save(this.sales.create({
+      accountId, weekStart: dto.weekStart, weekEnd: dto.weekEnd,
+      filePath: dto.filePath, fileName: dto.fileName, remarks: dto.remarks?.slice(0, 2000),
+      status: 'draft', items,
+    }));
+  }
+
+  async approveSales(id: number) {
+    return this.dataSource.transaction(async manager => {
+      const report = await manager.findOne(WeeklySalesReport, { where: { id } });
+      if (!report) throw new NotFoundException('Weekly sales report not found');
+      // Serialize approvals for this account, preventing two concurrent reports
+      // from independently passing the same remaining-stock check.
+      await manager.findOne(Account, { where: { id: report.accountId }, lock: { mode: 'pessimistic_write' } });
+      const current = await manager.findOne(WeeklySalesReport, { where: { id } });
+      if (!current || current.status !== 'draft') throw new BadRequestException('Report already approved');
+      const notes = await manager.createQueryBuilder(DeliveryNote, 'note')
+        .where('note.accountId = :accountId', { accountId: report.accountId })
+        .andWhere('note.signedFilePath IS NOT NULL').getMany();
+      const remaining = new Map<number, number>();
+      for (const note of notes) for (const item of note.items) {
+        remaining.set(item.productId, (remaining.get(item.productId) || 0) + item.quantity);
+      }
+      const approved = await manager.find(WeeklySalesReport, { where: { accountId: report.accountId, status: 'approved' } });
+      for (const prior of approved) for (const item of prior.items) {
+        remaining.set(item.productId, (remaining.get(item.productId) || 0) - item.quantity);
+      }
+      for (const item of current.items) {
+        if (item.quantity > (remaining.get(item.productId) || 0)) {
+          throw new BadRequestException('Insufficient remaining inventory for ' + item.articleNumber);
+        }
+      }
+      current.status = 'approved';
+      current.approvedAt = new Date();
+      return manager.save(WeeklySalesReport, current);
+    });
   }
 
   async get(id: number) {
