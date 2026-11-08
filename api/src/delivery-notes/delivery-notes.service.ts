@@ -168,12 +168,12 @@ export class DeliveryNotesService {
     remarks?: string; items: Array<{ productId: number; quantity: number }>;
   }) {
     if (!await this.accounts.exist({ where: { id: accountId } })) throw new NotFoundException('Account not found');
-    const validDate = (v: string) => /^\\d{4}-\\d{2}-\\d{2}$/.test(v || '') &&
+    const validDate = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v || '') &&
       !Number.isNaN(Date.parse(v)) && new Date(v).toISOString().slice(0, 10) === v;
     if (!validDate(dto.weekStart) || !validDate(dto.weekEnd) || dto.weekEnd < dto.weekStart) {
       throw new BadRequestException('Enter a valid reporting period');
     }
-    if (!/^\\d+-\\d+\\.pdf$/i.test(dto.filePath || '') || !fs.existsSync(path.join(process.cwd(), 'uploads', dto.filePath))) {
+    if (!/^\d+-\d+\.pdf$/i.test(dto.filePath || '') || !fs.existsSync(path.join(process.cwd(), 'uploads', dto.filePath))) {
       throw new BadRequestException('Upload the weekly sales PDF first');
     }
     if (!dto.fileName || dto.fileName.length > 255) throw new BadRequestException('Invalid PDF file name');
