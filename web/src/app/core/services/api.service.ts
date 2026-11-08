@@ -209,6 +209,21 @@ export class ApiService {
     return this.http.post<{ success: boolean; poIds: number[] }>(`${this.base}/accounts/${id}/forecasts/${forecastId}/create-pos`, { items: selectedItems });
   }
 
+  previewCustomerStatement(accountId: number, from: string, to: string, currency?: string): Observable<any> {
+    const params = new URLSearchParams({ from, to });
+    if (currency) params.set('currency', currency);
+    return this.http.get<any>(`${this.base}/customer-financials/account/${accountId}/statements/preview?${params.toString()}`);
+  }
+  getCustomerStatements(accountId: number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.base}/customer-financials/account/${accountId}/statements`);
+  }
+  saveCustomerStatement(accountId: number, dto: { from: string; to: string; currency?: string }): Observable<any> {
+    return this.http.post<any>(`${this.base}/customer-financials/account/${accountId}/statements`, dto);
+  }
+  getSavedCustomerStatement(accountId: number, statementId: number): Observable<any> {
+    return this.http.get<any>(`${this.base}/customer-financials/account/${accountId}/statements/${statementId}`);
+  }
+
   getCustomerPricing(accountId: number): Observable<any[]> {
     return this.http.get<any[]>(`${this.base}/customer-financials/account/${accountId}/pricing`);
   }
