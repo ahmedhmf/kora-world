@@ -68,6 +68,21 @@ export class Account {
   @Column({ name: 'payment_model', type: 'varchar', length: 150, nullable: true })
   paymentModel?: string | null;
 
+  @Column({ name: 'consignment_pricing_method', type: 'varchar', length: 20, nullable: true })
+  consignmentPricingMethod?: string | null;
+
+  @Column({ name: 'consignment_share_percent', type: 'numeric', precision: 5, scale: 2, nullable: true, transformer: { to: (v: number | null) => v, from: (v: string | null) => v == null ? null : Number(v) } })
+  consignmentSharePercent?: number | null;
+
+  @Column({ name: 'settlement_due_day', type: 'int', nullable: true })
+  settlementDueDay?: number | null;
+
+  @Column({ name: 'upfront_percent', type: 'numeric', precision: 5, scale: 2, nullable: true, transformer: { to: (v: number | null) => v, from: (v: string | null) => v == null ? null : Number(v) } })
+  upfrontPercent?: number | null;
+
+  @Column({ name: 'balance_due', type: 'varchar', length: 40, nullable: true })
+  balanceDue?: string | null;
+
   @Column({ name: 'payment_terms', length: 50, default: 'Cash in Advance' })
   paymentTerms: string;
 
