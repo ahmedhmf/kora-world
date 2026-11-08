@@ -232,6 +232,22 @@ export class ApiService {
     return this.http.post<any>(`${this.base}/delivery-notes/account/${accountId}/sales`, dto);
   }
 
+  updateWeeklySalesDraft(reportId: number, dto: { items: Array<{ productId: number; quantity: number }>; remarks?: string }): Observable<any> {
+    return this.http.patch<any>(`${this.base}/delivery-notes/sales/${reportId}/draft`, dto);
+  }
+
+  cancelWeeklySalesReport(reportId: number, reason: string): Observable<any> {
+    return this.http.post<any>(`${this.base}/delivery-notes/sales/${reportId}/cancel`, { reason });
+  }
+
+  getInventoryAdjustments(accountId: number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.base}/delivery-notes/account/${accountId}/adjustments`);
+  }
+
+  createInventoryAdjustment(accountId: number, dto: { productId: number; quantity: number; reason: string; notes: string }): Observable<any> {
+    return this.http.post<any>(`${this.base}/delivery-notes/account/${accountId}/adjustments`, dto);
+  }
+
   approveWeeklySalesReport(reportId: number): Observable<any> {
     return this.http.post<any>(`${this.base}/delivery-notes/sales/${reportId}/approve`, {});
   }
