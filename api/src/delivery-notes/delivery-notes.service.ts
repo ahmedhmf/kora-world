@@ -5,6 +5,7 @@ import { DeliveryNote } from './delivery-note.entity';
 import { Account } from '../accounts/entities/account.entity';
 import { Product } from '../products/entities/product.entity';
 import * as fs from 'fs';
+import { randomUUID } from 'crypto';
 import * as path from 'path';
 
 @Injectable()
@@ -47,7 +48,7 @@ export class DeliveryNotesService {
     }
     // A database sequence-backed ID ensures uniqueness even when users create notes concurrently.
     const note = await this.notes.save(this.notes.create({
-      accountId, noteNumber: 'PENDING', deliveryDate: dto.deliveryDate,
+      accountId, noteNumber: 'TMP-' + randomUUID(), deliveryDate: dto.deliveryDate,
       customerName: account.companyName,
       deliveryAddress: [account.shippingStreet, account.shippingZip, account.shippingCity, account.shippingCountry].filter(Boolean).join(', '),
       paymentModel: account.paymentModel, items, remarks: dto.remarks?.slice(0, 2000),
