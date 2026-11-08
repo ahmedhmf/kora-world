@@ -251,6 +251,18 @@
           </h2>
           <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
 
+            <!-- Sales / Payment Model -->
+            <div>
+              <label class="block text-xs font-medium text-zinc-400 mb-1.5">Sales / Payment Model</label>
+              <select [(ngModel)]="form.paymentModel" name="paymentModel"
+                class="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-zinc-500">
+                <option [ngValue]="undefined">Select payment model...</option>
+                @for (option of paymentModels(); track option.id) {
+                  <option [value]="option.value">{{ option.value }}</option>
+                }
+              </select>
+            </div>
+
             <!-- Default Currency -->
             <div>
               <label class="block text-xs font-medium text-zinc-400 mb-1.5">Default Currency</label>
