@@ -6,6 +6,8 @@ import {
   IsNumber,
   Min,
   IsInt,
+  IsIn,
+  Max,
 } from 'class-validator';
 
 export enum AccountStatus {
@@ -92,6 +94,32 @@ export class CreateAccountDto {
   @IsString()
   @IsOptional()
   paymentModel?: string;
+
+  @IsIn(['fixed', 'percentage'])
+  @IsOptional()
+  consignmentPricingMethod?: 'fixed' | 'percentage';
+
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  @IsOptional()
+  consignmentSharePercent?: number;
+
+  @IsInt()
+  @Min(1)
+  @Max(28)
+  @IsOptional()
+  settlementDueDay?: number;
+
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  @IsOptional()
+  upfrontPercent?: number;
+
+  @IsIn(['Before delivery', 'On delivery', '30 days after delivery', '60 days after delivery'])
+  @IsOptional()
+  balanceDue?: string;
 
   @IsString()
   @IsOptional()
