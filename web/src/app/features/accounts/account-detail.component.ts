@@ -31,7 +31,25 @@ export class AccountDetailComponent implements OnInit {
   loading = signal(false);
   error = signal<string | null>(null);
 
-  activeTab = signal<'details' | 'forecasts'>('details');
+  activeTab = signal<'details' | 'forecasts' | 'inventory'>('details');
+  inventory = signal<Array<{
+    productId: number; articleNumber: string; productName: string; quantity: number;
+    deliveries: Array<{ noteId: number; noteNumber: string; deliveryDate: string; quantity: number }>;
+  }>>([]);
+  inventoryError = signal('');
+  loadInventory(): void {
+    const acct = this.account();
+    if (!acct) return;
+    this.inventoryError.set('');
+    this.api.getAccountInventory(acct.id).subscribe({
+      next: rows => this.inventory.set(rows),
+      error: () => this.inventoryError.set('Could not load customer inventory'),
+    });
+  }
+  showInventory(): void {
+    this.activeTab.set('inventory');
+    this.loadInventory();
+  }
 
   // Forecast-related state
   isModalOpen = signal(false);
