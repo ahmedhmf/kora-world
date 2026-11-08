@@ -12,6 +12,11 @@ export class DeliveryNotesController {
     return this.service.list(accountId);
   }
 
+  @Get('account/:accountId/inventory')
+  inventory(@Param('accountId', ParseIntPipe) accountId: number) {
+    return this.service.inventory(accountId);
+  }
+
   @Get(':id')
   get(@Param('id', ParseIntPipe) id: number) {
     return this.service.get(id);
