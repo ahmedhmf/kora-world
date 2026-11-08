@@ -17,6 +17,24 @@ export class DeliveryNotesController {
     return this.service.inventory(accountId);
   }
 
+  @Get('account/:accountId/sales')
+  listSales(@Param('accountId', ParseIntPipe) accountId: number) {
+    return this.service.listSales(accountId);
+  }
+
+  @Post('account/:accountId/sales')
+  createSales(@Param('accountId', ParseIntPipe) accountId: number, @Body() dto: {
+    weekStart: string; weekEnd: string; filePath: string; fileName: string;
+    remarks?: string; items: Array<{ productId: number; quantity: number }>;
+  }) {
+    return this.service.createSales(accountId, dto);
+  }
+
+  @Post('sales/:id/approve')
+  approveSales(@Param('id', ParseIntPipe) id: number) {
+    return this.service.approveSales(id);
+  }
+
   @Get(':id')
   get(@Param('id', ParseIntPipe) id: number) {
     return this.service.get(id);
