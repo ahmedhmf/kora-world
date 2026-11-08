@@ -31,12 +31,95 @@ export class AccountDetailComponent implements OnInit {
   loading = signal(false);
   error = signal<string | null>(null);
 
-  activeTab = signal<'details' | 'forecasts' | 'inventory'>('details');
+  activeTab = signal<'details' | 'forecasts' | 'inventory' | 'financials'>('details');
   inventory = signal<Array<{
     productId: number; articleNumber: string; productName: string; quantity: number;
     deliveries: Array<{ noteId: number; noteNumber: string; deliveryDate: string; quantity: number }>;
   }>>([]);
   inventoryError = signal('');
+  pricingRules = signal<any[]>([]);
+  financialOverview = signal<any | null>(null);
+  financialError = signal('');
+  financialSuccess = signal('');
+  financialBusy = signal(false);
+  pricingProductId = 0;
+  pricingKind = 'customer_fixed';
+  pricingUnitPrice = '';
+  pricingCommission = '20';
+  pricingRetailPrice = '';
+  pricingEffectiveFrom = new Date().toISOString().slice(0, 10);
+  pricingEffectiveTo = '';
+  paymentAmount = '';
+  paymentDate = new Date().toISOString().slice(0, 10);
+  paymentReference = '';
+  paymentMethod = 'bank_transfer';
+  allocationPaymentId = 0;
+  allocationSettlementId = 0;
+  allocationAmount = '';
+  salesRetailPrices: Record<string, string> = {};
+  editingRetailPrices: Record<string, string> = {};
+  settlementPreview = signal<any | null>(null);
+
+  showFinancials(): void { this.activeTab.set('financials'); this.loadFinancials(); }
+  loadFinancials(): void {
+    const acct = this.account();
+    if (!acct) return;
+    this.financialError.set('');
+    this.api.getCustomerPricing(acct.id).subscribe({
+      next: rows => this.pricingRules.set(rows),
+      error: () => this.financialError.set('Could not load pricing agreements'),
+    });
+    this.api.getCustomerFinancialOverview(acct.id).subscribe({
+      next: data => this.financialOverview.set(data),
+      error: () => this.financialError.set('Could not load financial balances'),
+    });
+  }
+  addPricingRule(): void {
+    const acct = this.account();
+    if (!acct || !this.pricingProductId) { this.financialError.set('Select a product'); return; }
+    this.financialBusy.set(true); this.financialError.set('');
+    this.api.addCustomerPricing(acct.id, {
+      productId: Number(this.pricingProductId), kind: this.pricingKind,
+      unitPrice: this.pricingUnitPrice, commissionPercent: this.pricingCommission,
+      agreedRetailPrice: this.pricingRetailPrice, effectiveFrom: this.pricingEffectiveFrom,
+      effectiveTo: this.pricingEffectiveTo || undefined,
+    }).subscribe({
+      next: () => { this.financialBusy.set(false); this.financialSuccess.set('Pricing agreement saved'); this.loadFinancials(); },
+      error: err => { this.financialBusy.set(false); this.financialError.set(err.error?.message || 'Could not save pricing agreement'); },
+    });
+  }
+  recordPayment(): void {
+    const acct = this.account();
+    if (!acct) return;
+    this.financialBusy.set(true); this.financialError.set('');
+    this.api.recordCustomerPayment(acct.id, {
+      amount: this.paymentAmount, paymentDate: this.paymentDate,
+      reference: this.paymentReference, method: this.paymentMethod,
+    }).subscribe({
+      next: () => { this.financialBusy.set(false); this.paymentAmount = ''; this.paymentReference = ''; this.financialSuccess.set('Payment recorded; allocate it to a settlement below'); this.loadFinancials(); },
+      error: err => { this.financialBusy.set(false); this.financialError.set(err.error?.message || 'Could not record payment'); },
+    });
+  }
+  allocatePayment(): void {
+    const acct = this.account();
+    if (!acct) return;
+    this.financialBusy.set(true); this.financialError.set('');
+    this.api.allocateCustomerPayment(acct.id, {
+      paymentId: Number(this.allocationPaymentId), settlementId: Number(this.allocationSettlementId),
+      amount: this.allocationAmount,
+    }).subscribe({
+      next: () => { this.financialBusy.set(false); this.allocationAmount = ''; this.financialSuccess.set('Payment allocated'); this.loadFinancials(); },
+      error: err => { this.financialBusy.set(false); this.financialError.set(err.error?.message || 'Could not allocate payment'); },
+    });
+  }
+  previewReport(report: any): void {
+    this.salesError.set('');
+    this.api.previewSalesSettlement(report.id).subscribe({
+      next: result => this.settlementPreview.set({ reportId: report.id, ...result }),
+      error: err => this.salesError.set(err.error?.message || 'Cannot calculate settlement; check pricing agreements and retail prices'),
+    });
+  }
+
   salesReports = signal<any[]>([]);
   adjustments = signal<any[]>([]);
   correctionProductId = 0;
@@ -54,6 +137,7 @@ export class AccountDetailComponent implements OnInit {
     this.editingReportId = report.id;
     this.editingItems = report.items.map((item: any) => ({ productId: item.productId, quantity: item.quantity }));
     this.editingRemarks = report.remarks || '';
+    this.editingRetailPrices = { ...(report.retailPrices || {}) };
   }
 
   saveEditedReport(): void {
@@ -66,7 +150,7 @@ export class AccountDetailComponent implements OnInit {
     this.salesBusy.set(true); this.salesError.set('');
     this.api.updateWeeklySalesDraft(this.editingReportId, {
       items: this.editingItems.map(i => ({ productId: Number(i.productId), quantity: Number(i.quantity) })),
-      remarks: this.editingRemarks,
+      remarks: this.editingRemarks, retailPrices: this.editingRetailPrices,
     }).subscribe({
       next: () => { this.salesBusy.set(false); this.editingReportId = null; this.salesSuccess.set('Draft updated'); this.loadInventory(); },
       error: err => { this.salesBusy.set(false); this.salesError.set(err.error?.message || 'Could not update draft'); },
@@ -176,11 +260,12 @@ export class AccountDetailComponent implements OnInit {
     this.api.uploadFile(this.salesFile).subscribe({
       next: uploaded => this.api.createWeeklySalesReport(acct.id, {
         weekStart: period!.weekStart, weekEnd: period!.weekEnd,
-        filePath: uploaded.path, fileName: uploaded.name, remarks: this.salesRemarks,
+        filePath: uploaded.path, fileName: uploaded.name, remarks: this.salesRemarks, retailPrices: this.salesRetailPrices,
         items: this.salesItems.map(i => ({ productId: Number(i.productId), quantity: Number(i.quantity) })),
       }).subscribe({
         next: () => {
           this.salesBusy.set(false);
+          this.salesRetailPrices = {};
           this.salesFile = null; this.salesRemarks = ''; this.salesItems = [{ productId: 0, quantity: 1 }];
           this.salesSuccess.set('Draft saved. Review and approve it to deduct inventory.');
           this.loadInventory();
@@ -197,6 +282,7 @@ export class AccountDetailComponent implements OnInit {
       'Approve this report and deduct its sold quantities from customer inventory? This action cannot be undone.');
     if (!ok) return;
     this.salesBusy.set(true); this.salesError.set(''); this.salesSuccess.set('');
+    this.settlementPreview.set(null);
     this.api.approveWeeklySalesReport(report.id).subscribe({
       next: () => { this.salesBusy.set(false); this.salesSuccess.set('Report approved and inventory updated.'); this.loadInventory(); },
       error: err => { this.salesBusy.set(false); this.salesError.set(err.error?.message || 'Could not approve report'); },
