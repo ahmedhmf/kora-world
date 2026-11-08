@@ -85,31 +85,154 @@ export class AccountDetailComponent implements OnInit {
     });
   }
 
-  printStatement(): void {
+  async printStatement(): Promise<void> {
     const data = this.statementPreview();
     if (!data) return;
-    const esc = (v: unknown) => String(v ?? '').replace(/[&<>"']/g, c =>
-      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] || c);
-    const rows = data.transactions.map((t: any) =>
-      '<tr><td>' + esc(t.date) + '</td><td>' + esc(t.reference) + '</td><td>' + esc(t.type) +
-      '</td><td style="text-align:right">' + esc(t.amount) + '</td><td style="text-align:right">' +
-      esc(t.runningBalance) + '</td></tr>').join('');
-    const html = '<!doctype html><html><head><meta charset="utf-8"><title>KORA Customer Statement</title>' +
-      '<style>body{font:14px Arial,sans-serif;color:#17202a;padding:36px}h1{margin-bottom:4px}table{width:100%;border-collapse:collapse;margin-top:20px}td,th{padding:9px;border-bottom:1px solid #ddd;text-align:left}th{background:#eee}.totals{margin-top:24px;font-weight:bold}small{color:#555}</style></head><body>' +
-      '<h1>KORA WORLD</h1><h2>Customer Account Statement</h2><p>' + esc(data.customer.companyName) +
-      ' · ' + esc(data.customer.accountNumber) + '</p><p>' + esc(data.customer.billingStreet) + ' ' +
-      esc(data.customer.billingZip) + ' ' + esc(data.customer.billingCity) + ' ' + esc(data.customer.billingCountry) +
-      '</p><p>Period: ' + esc(data.periodFrom) + ' to ' + esc(data.periodTo) + ' · Currency: ' +
-      esc(data.currency) + '</p><p>Opening balance: ' + esc(data.openingBalance) + '</p>' +
-      '<table><thead><tr><th>Date</th><th>Reference</th><th>Type</th><th>Amount</th><th>Running balance</th></tr></thead><tbody>' +
-      rows + '</tbody></table><p class="totals">Charges: ' + esc(data.charges) + ' · Credits: ' +
-      esc(data.credits) + ' · Closing balance: ' + esc(data.closingBalance) + ' ' + esc(data.currency) +
-      '</p><small>' + esc(data.paymentPolicy) + '</small></body></html>';
-    const popup = window.open('', '_blank');
-    if (!popup) { this.statementError.set('Allow pop-ups to print or save this statement as PDF'); return; }
-    popup.document.open(); popup.document.write(html); popup.document.close();
-    popup.focus();
-    popup.print();
+    this.statementBusy.set(true);
+    this.statementError.set('');
+    try {
+      const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib');
+      // Angular copies web/public verbatim to the site's root.
+      const response = await fetch('/assets/kora-stationery.pdf');
+      if (!response.ok) throw new Error('KORA stationery not found at /assets/kora-stationery.pdf');
+      const templateBytes = await response.arrayBuffer();
+      const template = await PDFDocument.load(templateBytes);
+      if (template.getPageCount() < 1) throw new Error('KORA stationery PDF has no pages');
+      const output = await PDFDocument.create();
+      const regular = await output.embedFont(StandardFonts.Helvetica);
+      const bold = await output.embedFont(StandardFonts.HelveticaBold);
+      const black = rgb(0.12, 0.12, 0.12);
+      const grey = rgb(0.37, 0.37, 0.37);
+      const [templatePage] = await output.copyPages(template, [0]);
+      const pageWidth = templatePage.getWidth();
+      const pageHeight = templatePage.getHeight();
+      // Margins are proportional to the original branded page so the KORA
+      // border, top logo and black footer remain unobstructed.
+      const left = pageWidth * 0.095;
+      const right = pageWidth * 0.905;
+      const top = pageHeight * 0.915;
+      const bottom = pageHeight * 0.095;
+      const available = right - left;
+      let page = templatePage;
+      output.addPage(page);
+      let y = top;
+      let pageNumber = 1;
+
+      // Helvetica's built-in encoding is WinAnsi; replace unsupported glyphs
+      // rather than silently producing a corrupt PDF for customer text.
+      const safe = (v: unknown): string => String(v ?? '').replace(/[^\\x20-\\x7E\\xA0-\\xFF]/g, '?');
+      const width = (v: string, size: number, isBold = false) =>
+        (isBold ? bold : regular).widthOfTextAtSize(safe(v), size);
+      const fit = (v: unknown, max: number, size = 9, isBold = false): string => {
+        let value = safe(v);
+        if (width(value, size, isBold) <= max) return value;
+        while (value.length && width(value + '...', size, isBold) > max) value = value.slice(0, -1);
+        return value + '...';
+      };
+      const draw = (v: unknown, x: number, atY: number, size = 9, isBold = false, color = black) => {
+        page.drawText(safe(v), { x, y: atY, size, font: isBold ? bold : regular, color });
+      };
+      const rightText = (v: unknown, x: number, atY: number, size = 9, isBold = false) => {
+        const value = safe(v);
+        draw(value, x - width(value, size, isBold), atY, size, isBold);
+      };
+      const newPage = async () => {
+        const [copied] = await output.copyPages(template, [0]);
+        page = copied;
+        output.addPage(page);
+        pageNumber++;
+        y = top;
+        draw('CUSTOMER ACCOUNT STATEMENT (continued)', left, y, 11, true);
+        rightText('Page ' + pageNumber, right, y, 8);
+        y -= 30;
+      };
+      const ensureSpace = async (height: number) => {
+        if (y - height < bottom) await newPage();
+      };
+      const line = () => {
+        page.drawLine({ start: { x: left, y }, end: { x: right, y }, thickness: 0.6, color: grey });
+        y -= 13;
+      };
+      draw('CUSTOMER ACCOUNT STATEMENT', left, y, 15, true);
+      rightText('Page ' + pageNumber, right, y, 8);
+      y -= 26;
+      draw(fit(data.customer?.companyName, available, 11, true), left, y, 11, true);
+      y -= 16;
+      const address = [data.customer?.billingStreet, data.customer?.billingZip, data.customer?.billingCity,
+        data.customer?.billingCountry].filter(Boolean).join(', ');
+      if (address) { draw(fit(address, available, 9), left, y, 9); y -= 15; }
+      draw('Account: ' + safe(data.customer?.accountNumber || data.accountId), left, y);
+      y -= 16;
+      draw('Period: ' + safe(data.periodFrom) + ' to ' + safe(data.periodTo), left, y);
+      rightText('Currency: ' + safe(data.currency), right, y);
+      y -= 19;
+      line();
+      draw('Opening balance', left, y, 10, true);
+      rightText(safe(data.openingBalance) + ' ' + safe(data.currency), right, y, 10, true);
+      y -= 22;
+
+      const cols = {
+        date: left, reference: left + available * 0.18,
+        type: left + available * 0.57, amount: left + available * 0.83, balance: right,
+      };
+      const tableHeader = () => {
+        draw('Date', cols.date, y, 8, true);
+        draw('Reference', cols.reference, y, 8, true);
+        draw('Type', cols.type, y, 8, true);
+        rightText('Amount', cols.amount, y, 8, true);
+        rightText('Balance', cols.balance, y, 8, true);
+        y -= 10;
+        line();
+      };
+      await ensureSpace(40);
+      tableHeader();
+      for (const item of data.transactions || []) {
+        if (y - 24 < bottom) { await newPage(); tableHeader(); }
+        draw(fit(item.date, available * 0.17, 8), cols.date, y, 8);
+        draw(fit(item.reference, available * 0.37, 8), cols.reference, y, 8);
+        draw(fit(item.type, available * 0.18, 8), cols.type, y, 8);
+        rightText(item.amount, cols.amount, y, 8);
+        rightText(item.runningBalance, cols.balance, y, 8);
+        y -= 19;
+      }
+      await ensureSpace(90);
+      line();
+      draw('Charges', left, y);
+      rightText(data.charges + ' ' + data.currency, right, y);
+      y -= 16;
+      draw('Credits', left, y);
+      rightText(data.credits + ' ' + data.currency, right, y);
+      y -= 18;
+      draw('CLOSING BALANCE', left, y, 11, true);
+      rightText(data.closingBalance + ' ' + data.currency, right, y, 11, true);
+      y -= 28;
+      if (data.overdue?.length) {
+        await ensureSpace(40);
+        draw('OVERDUE SETTLEMENTS', left, y, 10, true);
+        y -= 18;
+        for (const item of data.overdue) {
+          await ensureSpace(19);
+          draw(fit(item.reference + ' | Due ' + item.dueDate + ' | ' + item.daysOverdue +
+            ' days overdue', available * 0.76, 8), left, y, 8);
+          rightText(item.outstanding + ' ' + data.currency, right, y, 8);
+          y -= 17;
+        }
+      }
+      const bytes = await output.save();
+      const blob = new Blob([new Uint8Array(bytes)], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'KORA-Statement-' + data.accountId + '-' + data.periodFrom + '-to-' + data.periodTo + '.pdf';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+      this.statementError.set(err instanceof Error ? err.message : 'Could not generate branded statement PDF');
+    } finally {
+      this.statementBusy.set(false);
+    }
   }
 
   pricingRules = signal<any[]>([]);
