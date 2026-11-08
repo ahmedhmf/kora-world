@@ -135,13 +135,37 @@ export class CustomerFinancialsService {
       ...s, total: amount(Number(s.totalCents)), paid: amount(allocated(s.id, 'settlementId')),
       outstanding: amount(s.status === 'active' ? Number(s.totalCents) - allocated(s.id, 'settlementId') : 0),
     }));
-    const active = reportBalances.filter(s => s.status === 'active');
+    const paymentBalances = payments.map(p => ({
+      ...p,
+      amount: amount(Number(p.amountCents)),
+      allocated: amount(allocated(p.id, 'paymentId')),
+      unallocated: amount(Number(p.amountCents) - allocated(p.id, 'paymentId')),
+    }));
+    const currencies = [...new Set([...settlements.map(s => s.currency), ...payments.map(p => p.currency)])].sort();
+    const byCurrency = currencies.map(currency => {
+      const active = settlements.filter(s => s.currency === currency && s.status === 'active');
+      const sameCurrencyPayments = payments.filter(p => p.currency === currency);
+      const owedCents = active.reduce((n, s) => n + Number(s.totalCents), 0);
+      const outstandingCents = active.reduce((n, s) => n + Number(s.totalCents) - allocated(s.id, 'settlementId'), 0);
+      const unallocatedCents = sameCurrencyPayments.reduce((n, p) => n + Number(p.amountCents) - allocated(p.id, 'paymentId'), 0);
+      return {
+        currency,
+        totalOwed: amount(owedCents),
+        outstanding: amount(outstandingCents),
+        unallocatedCredit: amount(unallocatedCents),
+        netExposure: amount(outstandingCents - unallocatedCents),
+      };
+    });
+    const current = byCurrency.find(row => row.currency === account.defaultCurrency);
     return {
       currency: account.defaultCurrency,
-      totalOwed: amount(active.reduce((n, s) => n + Number(s.totalCents), 0)),
-      outstanding: amount(active.reduce((n, s) => n + Math.round(Number(s.outstanding) * 100), 0)),
+      totalOwed: current?.totalOwed || '0.00',
+      outstanding: current?.outstanding || '0.00',
+      unallocatedCredit: current?.unallocatedCredit || '0.00',
+      netExposure: current?.netExposure || '0.00',
+      byCurrency,
       settlements: reportBalances,
-      payments: payments.map(p => ({ ...p, amount: amount(Number(p.amountCents)), unallocated: amount(Number(p.amountCents) - allocated(p.id, 'paymentId')) })),
+      payments: paymentBalances,
       allocations,
     };
   }
