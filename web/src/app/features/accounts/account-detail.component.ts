@@ -60,6 +60,16 @@ export class AccountDetailComponent implements OnInit {
     return Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
   }
 
+  reportWeekLabel(weekStart: string): string {
+    const date = new Date(weekStart + 'T00:00:00Z');
+    if (Number.isNaN(date.getTime())) return weekStart;
+    date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7));
+    const year = date.getUTCFullYear();
+    const first = new Date(Date.UTC(year, 0, 1));
+    const week = Math.ceil(((date.getTime() - first.getTime()) / 86400000 + 1) / 7);
+    return 'Week ' + week + ' / ' + year;
+  }
+
   private isoWeekDates(year: number, week: number): { weekStart: string; weekEnd: string } | null {
     if (!Number.isInteger(year) || year < 2000 || year > 2100 || !Number.isInteger(week) || week < 1 || week > 53) return null;
     const jan4 = new Date(Date.UTC(year, 0, 4));
