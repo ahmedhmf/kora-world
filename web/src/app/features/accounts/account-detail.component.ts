@@ -312,7 +312,7 @@ export class AccountDetailComponent implements OnInit {
       error: () => this.salesError.set('Could not load weekly sales reports'),
     });
     this.api.getAccountInventory(acct.id).subscribe({
-      next: rows => this.inventory.set(rows),
+      next: rows => { this.inventory.set(rows); this.loadMovements(); },
       error: () => this.inventoryError.set('Could not load customer inventory'),
     });
   }
@@ -364,14 +364,14 @@ export class AccountDetailComponent implements OnInit {
     const escapeCell = (value: unknown): string => {
       let text = String(value ?? '');
       // Prevent spreadsheet formula execution when the CSV is opened in Excel.
-      if (/^[\\s]*[=+@-]/.test(text)) text = "'" + text;
+      if (/^\s*[=+@-]/.test(text)) text = "'" + text;
       return '"' + text.replace(/"/g, '""') + '"';
     };
     const rows = this.inventoryMovements().map(m => [
       m.timestamp, m.documentDate, m.articleNumber, m.productName, m.type, m.reference,
       m.quantityChange, m.balanceBefore, m.balanceAfter, m.performedBy, m.reason, m.notes, m.timestampEstimated,
     ]);
-    const csv = '\\uFEFF' + [headers, ...rows].map(row => row.map(escapeCell).join(',')).join('\\r\\n');
+    const csv = '\uFEFF' + [headers, ...rows].map(row => row.map(escapeCell).join(',')).join('\r\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -384,7 +384,6 @@ export class AccountDetailComponent implements OnInit {
   showInventory(): void {
     this.activeTab.set('inventory');
     this.loadInventory();
-    this.loadMovements();
   }
 
   // Forecast-related state
