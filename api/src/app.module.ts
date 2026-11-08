@@ -46,6 +46,7 @@ import { PaymentsModule } from './payments/payments.module';
 import { SourcingModule } from './sourcing/sourcing.module';
 import { DeliveryNote } from './delivery-notes/delivery-note.entity';
 import { CustomerPricingRule } from './delivery-notes/customer-pricing-rule.entity';
+import { CustomerStatement } from './delivery-notes/customer-statement.entity';
 import { SalesSettlement } from './delivery-notes/sales-settlement.entity';
 import { CustomerPayment } from './delivery-notes/customer-payment.entity';
 import { PaymentAllocation } from './delivery-notes/payment-allocation.entity';
