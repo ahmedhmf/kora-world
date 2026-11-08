@@ -160,6 +160,11 @@ export const routes: Routes = [
           import('./features/accounts/account-detail.component').then((m) => m.AccountDetailComponent),
       },
       {
+        path: 'accounts/:id/delivery-notes',
+        loadComponent: () =>
+          import('./features/accounts/account-delivery-notes.component').then((m) => m.AccountDeliveryNotesComponent),
+      },
+      {
         path: 'accounts/:id/edit',
         loadComponent: () =>
           import('./features/accounts/account-form.component').then((m) => m.AccountFormComponent),
