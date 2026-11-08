@@ -45,6 +45,10 @@ import { InvoicesModule } from './invoices/invoices.module';
 import { PaymentsModule } from './payments/payments.module';
 import { SourcingModule } from './sourcing/sourcing.module';
 import { DeliveryNote } from './delivery-notes/delivery-note.entity';
+import { CustomerPricingRule } from './delivery-notes/customer-pricing-rule.entity';
+import { SalesSettlement } from './delivery-notes/sales-settlement.entity';
+import { CustomerPayment } from './delivery-notes/customer-payment.entity';
+import { PaymentAllocation } from './delivery-notes/payment-allocation.entity';
 import { InventoryAdjustment } from './delivery-notes/inventory-adjustment.entity';
 import { WeeklySalesReport } from './delivery-notes/weekly-sales-report.entity';
 import { DeliveryNotesModule } from './delivery-notes/delivery-notes.module';
@@ -88,6 +92,10 @@ import { DropdownOptionsModule } from './dropdown-options/dropdown-options.modul
           DeliveryNote,
           WeeklySalesReport,
           InventoryAdjustment,
+          CustomerPricingRule,
+          SalesSettlement,
+          CustomerPayment,
+          PaymentAllocation,
         ],
         migrations: [__dirname + '/migrations/*{.ts,.js}'],
         migrationsRun: true,
