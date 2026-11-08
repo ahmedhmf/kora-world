@@ -146,7 +146,7 @@
             <div class="flex items-center justify-between gap-3">
               <div>
                 <h2 class="text-lg font-bold text-white">Customer Inventory</h2>
-                <p class="text-sm text-zinc-400">Quantities received from signed Delivery Notes.</p>
+                <p class="text-sm text-zinc-400">Signed deliveries minus approved weekly sales. Payments are tracked separately.</p>
               </div>
               <button type="button" (click)="loadInventory()" class="px-3 py-2 bg-zinc-800 text-white rounded-lg text-sm">Refresh</button>
             </div>
@@ -154,7 +154,7 @@
             <div class="overflow-x-auto">
               <table class="w-full text-left text-sm">
                 <thead class="border-b border-zinc-700 text-zinc-400">
-                  <tr><th class="py-3 pr-4">Article</th><th class="py-3 pr-4">Product</th><th class="py-3 pr-4">Quantity received</th><th class="py-3">Delivery history</th></tr>
+                  <tr><th class="py-3 pr-4">Article</th><th class="py-3 pr-4">Product</th><th class="py-3 pr-4">Remaining</th><th class="py-3">Delivery history</th></tr>
                 </thead>
                 <tbody>
                   @for (item of inventory(); track item.productId) {
@@ -174,6 +174,69 @@
                 </tbody>
               </table>
             </div>
+          </section>
+          <section class="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6 mb-8 space-y-5">
+            <div>
+              <h2 class="text-lg font-bold text-white">Weekly Sales Report</h2>
+              <p class="text-sm text-zinc-400">Attach the customer's PDF, enter sold quantities manually, then approve the draft to deduct stock. Saving a draft does not change inventory.</p>
+            </div>
+            @if (salesError()) { <p class="text-red-400 text-sm">{{ salesError() }}</p> }
+            @if (salesSuccess()) { <p class="text-emerald-400 text-sm">{{ salesSuccess() }}</p> }
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <label class="text-sm text-zinc-300">Week start
+                <input type="date" [(ngModel)]="salesWeekStart" class="block w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white" />
+              </label>
+              <label class="text-sm text-zinc-300">Week end
+                <input type="date" [(ngModel)]="salesWeekEnd" class="block w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white" />
+              </label>
+            </div>
+            <label class="block text-sm text-zinc-300">Customer sales report (PDF, max 15 MB)
+              <input type="file" accept=".pdf,application/pdf" (change)="selectSalesPdf($event)" class="block mt-2 text-sm text-zinc-300" />
+            </label>
+            <div class="space-y-3">
+              <h3 class="text-sm font-semibold text-zinc-200">Quantities sold</h3>
+              @for (item of salesItems; track $index; let i = $index) {
+                <div class="flex items-center gap-3 flex-wrap">
+                  <select [(ngModel)]="item.productId" class="flex-1 min-w-48 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white">
+                    <option [ngValue]="0">Select delivered product...</option>
+                    @for (product of inventory(); track product.productId) {
+                      <option [ngValue]="product.productId">{{ product.articleNumber }} — {{ product.productName }} ({{ product.quantity }} remaining)</option>
+                    }
+                  </select>
+                  <input type="number" min="1" step="1" [(ngModel)]="item.quantity" aria-label="Quantity sold" class="w-24 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white" />
+                  <button type="button" (click)="removeSalesItem(i)" class="text-red-400 text-sm">Remove</button>
+                </div>
+              }
+              <button type="button" (click)="addSalesItem()" class="text-blue-400 text-sm">+ Add product</button>
+            </div>
+            <label class="block text-sm text-zinc-300">Remarks (optional)
+              <textarea [(ngModel)]="salesRemarks" rows="2" maxlength="2000" class="block w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white"></textarea>
+            </label>
+            <button type="button" [disabled]="salesBusy()" (click)="saveSalesDraft()" class="bg-white text-zinc-900 font-semibold rounded-lg px-4 py-2 disabled:opacity-50">Save Draft</button>
+          </section>
+          <section class="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6 mb-8 space-y-4">
+            <h2 class="text-lg font-bold text-white">Sales Report History</h2>
+            @for (report of salesReports(); track report.id) {
+              <div class="border border-zinc-800 rounded-lg p-4 space-y-2">
+                <div class="flex items-center justify-between flex-wrap gap-3">
+                  <div>
+                    <p class="text-white font-semibold">{{ report.weekStart }} – {{ report.weekEnd }}</p>
+                    <p class="text-xs text-zinc-400">{{ report.fileName }} · {{ report.status }}</p>
+                  </div>
+                  <div class="flex gap-3 items-center">
+                    <button type="button" (click)="viewSalesPdf(report)" class="text-blue-400 text-sm">View PDF</button>
+                    @if (report.status === 'draft') {
+                      <button type="button" [disabled]="salesBusy()" (click)="approveSalesReport(report)" class="bg-emerald-700 text-white rounded-lg px-3 py-2 text-sm disabled:opacity-50">Approve &amp; Deduct</button>
+                    }
+                  </div>
+                </div>
+                @for (item of report.items; track item.productId) {
+                  <p class="text-sm text-zinc-400">{{ item.articleNumber }} — {{ item.productName }}: {{ item.quantity }} sold</p>
+                }
+              </div>
+            } @empty {
+              <p class="text-zinc-500 text-sm">No weekly sales reports yet.</p>
+            }
           </section>
         } @else if (activeTab() === 'details') {
           <!-- ── Detail Sections ──────────────────────────────── -->
