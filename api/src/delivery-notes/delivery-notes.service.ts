@@ -210,6 +210,10 @@ export class DeliveryNotesService {
       await manager.findOne(Account, { where: { id: report.accountId }, lock: { mode: 'pessimistic_write' } });
       const current = await manager.findOne(WeeklySalesReport, { where: { id } });
       if (!current || current.status !== 'draft') throw new BadRequestException('Report already approved');
+      const sameWeek = await manager.findOne(WeeklySalesReport, {
+        where: { accountId: report.accountId, weekStart: current.weekStart, status: 'approved' },
+      });
+      if (sameWeek) throw new BadRequestException('Another report is already approved for this week');
       const remaining = await this.stockBalance(manager, report.accountId);
       for (const item of current.items) {
         if (item.quantity > (remaining.get(item.productId) || 0)) {
