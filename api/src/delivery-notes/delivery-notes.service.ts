@@ -115,7 +115,11 @@ export class DeliveryNotesService {
   }
 
   async updateSalesDraft(id: number, dto: { items: Array<{ productId: number; quantity: number }>; remarks?: string }) {
-    const report = await this.sales.findOneBy({ id });
+    return this.dataSource.transaction(async manager => {
+    const initial = await manager.findOne(WeeklySalesReport, { where: { id } });
+    if (!initial) throw new NotFoundException('Report not found');
+    await manager.findOne(Account, { where: { id: initial.accountId }, lock: { mode: 'pessimistic_write' } });
+    const report = await manager.findOne(WeeklySalesReport, { where: { id } });
     if (!report) throw new NotFoundException('Report not found');
     if (report.status !== 'draft') throw new BadRequestException('Only draft reports can be edited');
     if (!Array.isArray(dto.items) || !dto.items.length || dto.items.length > 100) throw new BadRequestException('Enter sales items');
@@ -132,7 +136,8 @@ export class DeliveryNotesService {
     }
     report.items = items;
     report.remarks = dto.remarks?.slice(0, 2000);
-    return this.sales.save(report);
+    return manager.save(WeeklySalesReport, report);
+    });
   }
 
   async cancelSales(id: number, reason: string, user: ActiveUser) {
@@ -187,6 +192,8 @@ export class DeliveryNotesService {
       if (!product) throw new BadRequestException('Unknown product');
       items.push({ productId: product.id, articleNumber: product.articleNumber, productName: product.name, quantity: item.quantity });
     }
+    const duplicate = await this.sales.findOne({ where: { accountId, weekStart: dto.weekStart, status: 'approved' } });
+    if (duplicate) throw new BadRequestException('An approved sales report already exists for this week. Cancel it before replacing.');
     return this.sales.save(this.sales.create({
       accountId, weekStart: dto.weekStart, weekEnd: dto.weekEnd,
       filePath: dto.filePath, fileName: dto.fileName, remarks: dto.remarks?.slice(0, 2000),
