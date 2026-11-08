@@ -1,13 +1,14 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DeliveryNote } from './delivery-note.entity';
+import { WeeklySalesReport } from './weekly-sales-report.entity';
 import { Account } from '../accounts/entities/account.entity';
 import { Product } from '../products/entities/product.entity';
 import { DeliveryNotesController } from './delivery-notes.controller';
 import { DeliveryNotesService } from './delivery-notes.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([DeliveryNote, Account, Product])],
+  imports: [TypeOrmModule.forFeature([DeliveryNote, WeeklySalesReport, Account, Product])],
   controllers: [DeliveryNotesController],
   providers: [DeliveryNotesService],
 })
