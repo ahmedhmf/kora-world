@@ -1,6 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
+import { InventoryAdjustment } from './inventory-adjustment.entity';
+import { ActiveUser } from '../auth/interfaces/authenticated-request.interface';
 import { WeeklySalesReport } from './weekly-sales-report.entity';
 import { DeliveryNote } from './delivery-note.entity';
 import { Account } from '../accounts/entities/account.entity';
@@ -16,6 +18,7 @@ export class DeliveryNotesService {
     @InjectRepository(Account) private readonly accounts: Repository<Account>,
     @InjectRepository(Product) private readonly products: Repository<Product>,
     @InjectRepository(WeeklySalesReport) private readonly sales: Repository<WeeklySalesReport>,
+    @InjectRepository(InventoryAdjustment) private readonly adjustments: Repository<InventoryAdjustment>,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -57,7 +60,97 @@ export class DeliveryNotesService {
         if (row) row.quantity -= item.quantity;
       }
     }
+    const adjustments = await this.adjustments.find({ where: { accountId } });
+    for (const adjustment of adjustments) {
+      const row = inventory.get(adjustment.productId);
+      if (row) row.quantity += adjustment.quantity;
+    }
     return [...inventory.values()].sort((a, b) => a.articleNumber.localeCompare(b.articleNumber));
+  }
+
+  async listAdjustments(accountId: number) {
+    if (!await this.accounts.exist({ where: { id: accountId } })) throw new NotFoundException('Account not found');
+    return this.adjustments.find({ where: { accountId }, order: { id: 'DESC' } });
+  }
+
+  async adjustInventory(accountId: number, dto: { productId: number; quantity: number; reason: string; notes: string }, user: ActiveUser) {
+    if (!Number.isInteger(dto.productId) || !Number.isInteger(dto.quantity) || dto.quantity === 0 ||
+      Math.abs(dto.quantity) > 100000 || !['return', 'damage', 'loss', 'stocktake', 'other'].includes(dto.reason) ||
+      !dto.notes?.trim() || dto.notes.length > 2000) {
+      throw new BadRequestException('Choose a product, non-zero quantity, reason and explanation');
+    }
+    return this.dataSource.transaction(async manager => {
+      const account = await manager.findOne(Account, { where: { id: accountId }, lock: { mode: 'pessimistic_write' } });
+      if (!account) throw new NotFoundException('Account not found');
+      const product = await manager.findOne(Product, { where: { id: dto.productId } });
+      if (!product) throw new BadRequestException('Product not found');
+      const balance = await this.stockBalance(manager, accountId);
+      if (!balance.has(dto.productId)) throw new BadRequestException('Product was never delivered to this account');
+      if ((balance.get(dto.productId) || 0) + dto.quantity < 0) throw new BadRequestException('Adjustment would make inventory negative');
+      return manager.save(InventoryAdjustment, manager.create(InventoryAdjustment, {
+        accountId, productId: dto.productId, articleNumber: product.articleNumber, productName: product.name,
+        quantity: dto.quantity, reason: dto.reason, notes: dto.notes.trim(),
+        createdById: user.sub, createdByName: user.name || user.email,
+      }));
+    });
+  }
+
+  private async stockBalance(manager: import('typeorm').EntityManager, accountId: number): Promise<Map<number, number>> {
+    const notes = await manager.createQueryBuilder(DeliveryNote, 'note')
+      .where('note.accountId = :accountId', { accountId })
+      .andWhere('note.signedFilePath IS NOT NULL').getMany();
+    const balance = new Map<number, number>();
+    for (const note of notes) for (const item of note.items) {
+      balance.set(item.productId, (balance.get(item.productId) || 0) + item.quantity);
+    }
+    const approved = await manager.find(WeeklySalesReport, { where: { accountId, status: 'approved' } });
+    for (const report of approved) for (const item of report.items) {
+      balance.set(item.productId, (balance.get(item.productId) || 0) - item.quantity);
+    }
+    const adjustments = await manager.find(InventoryAdjustment, { where: { accountId } });
+    for (const adjustment of adjustments) {
+      balance.set(adjustment.productId, (balance.get(adjustment.productId) || 0) + adjustment.quantity);
+    }
+    return balance;
+  }
+
+  async updateSalesDraft(id: number, dto: { items: Array<{ productId: number; quantity: number }>; remarks?: string }) {
+    const report = await this.sales.findOneBy({ id });
+    if (!report) throw new NotFoundException('Report not found');
+    if (report.status !== 'draft') throw new BadRequestException('Only draft reports can be edited');
+    if (!Array.isArray(dto.items) || !dto.items.length || dto.items.length > 100) throw new BadRequestException('Enter sales items');
+    const seen = new Set<number>();
+    const items: WeeklySalesReport['items'] = [];
+    for (const item of dto.items) {
+      if (!Number.isInteger(item.productId) || !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 100000 || seen.has(item.productId)) {
+        throw new BadRequestException('Enter unique products and positive quantities');
+      }
+      seen.add(item.productId);
+      const product = await this.products.findOneBy({ id: item.productId });
+      if (!product) throw new BadRequestException('Product not found');
+      items.push({ productId: product.id, articleNumber: product.articleNumber, productName: product.name, quantity: item.quantity });
+    }
+    report.items = items;
+    report.remarks = dto.remarks?.slice(0, 2000);
+    return this.sales.save(report);
+  }
+
+  async cancelSales(id: number, reason: string, user: ActiveUser) {
+    if (!reason?.trim() || reason.length > 2000) throw new BadRequestException('Cancellation reason is required');
+    return this.dataSource.transaction(async manager => {
+      const existing = await manager.findOne(WeeklySalesReport, { where: { id } });
+      if (!existing) throw new NotFoundException('Report not found');
+      const account = await manager.findOne(Account, { where: { id: existing.accountId }, lock: { mode: 'pessimistic_write' } });
+      if (!account) throw new NotFoundException('Account not found');
+      const report = await manager.findOne(WeeklySalesReport, { where: { id } });
+      if (!report || report.status === 'cancelled') throw new BadRequestException('Report already cancelled');
+      report.status = 'cancelled';
+      report.cancelledAt = new Date();
+      report.cancelledById = user.sub;
+      report.cancelledByName = user.name || user.email;
+      report.cancellationReason = reason.trim();
+      return manager.save(WeeklySalesReport, report);
+    });
   }
 
   async listSales(accountId: number) {
@@ -101,7 +194,7 @@ export class DeliveryNotesService {
     }));
   }
 
-  async approveSales(id: number) {
+  async approveSales(id: number, user: ActiveUser) {
     return this.dataSource.transaction(async manager => {
       const report = await manager.findOne(WeeklySalesReport, { where: { id } });
       if (!report) throw new NotFoundException('Weekly sales report not found');
@@ -110,17 +203,7 @@ export class DeliveryNotesService {
       await manager.findOne(Account, { where: { id: report.accountId }, lock: { mode: 'pessimistic_write' } });
       const current = await manager.findOne(WeeklySalesReport, { where: { id } });
       if (!current || current.status !== 'draft') throw new BadRequestException('Report already approved');
-      const notes = await manager.createQueryBuilder(DeliveryNote, 'note')
-        .where('note.accountId = :accountId', { accountId: report.accountId })
-        .andWhere('note.signedFilePath IS NOT NULL').getMany();
-      const remaining = new Map<number, number>();
-      for (const note of notes) for (const item of note.items) {
-        remaining.set(item.productId, (remaining.get(item.productId) || 0) + item.quantity);
-      }
-      const approved = await manager.find(WeeklySalesReport, { where: { accountId: report.accountId, status: 'approved' } });
-      for (const prior of approved) for (const item of prior.items) {
-        remaining.set(item.productId, (remaining.get(item.productId) || 0) - item.quantity);
-      }
+      const remaining = await this.stockBalance(manager, report.accountId);
       for (const item of current.items) {
         if (item.quantity > (remaining.get(item.productId) || 0)) {
           throw new BadRequestException('Insufficient remaining inventory for ' + item.articleNumber);
@@ -128,6 +211,8 @@ export class DeliveryNotesService {
       }
       current.status = 'approved';
       current.approvedAt = new Date();
+      current.approvedById = user.sub;
+      current.approvedByName = user.name || user.email;
       return manager.save(WeeklySalesReport, current);
     });
   }
