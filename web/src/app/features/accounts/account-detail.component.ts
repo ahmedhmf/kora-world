@@ -38,6 +38,73 @@ export class AccountDetailComponent implements OnInit {
   }>>([]);
   inventoryError = signal('');
   salesReports = signal<any[]>([]);
+  adjustments = signal<any[]>([]);
+  correctionProductId = 0;
+  correctionQuantity = -1;
+  correctionReason = 'stocktake';
+  correctionNotes = '';
+  editingReportId: number | null = null;
+  editingItems: Array<{ productId: number; quantity: number }> = [];
+  editingRemarks = '';
+  canManageInventory(): boolean {
+    return ['admin', 'employee'].includes(this.authService.currentUser()?.role || '');
+  }
+
+  startEditReport(report: any): void {
+    this.editingReportId = report.id;
+    this.editingItems = report.items.map((item: any) => ({ productId: item.productId, quantity: item.quantity }));
+    this.editingRemarks = report.remarks || '';
+  }
+
+  saveEditedReport(): void {
+    if (!this.editingReportId || !this.editingItems.length ||
+      this.editingItems.some(i => !i.productId || !Number.isInteger(Number(i.quantity)) || Number(i.quantity) < 1) ||
+      new Set(this.editingItems.map(i => i.productId)).size !== this.editingItems.length) {
+      this.salesError.set('Enter unique products with positive quantities');
+      return;
+    }
+    this.salesBusy.set(true); this.salesError.set('');
+    this.api.updateWeeklySalesDraft(this.editingReportId, {
+      items: this.editingItems.map(i => ({ productId: Number(i.productId), quantity: Number(i.quantity) })),
+      remarks: this.editingRemarks,
+    }).subscribe({
+      next: () => { this.salesBusy.set(false); this.editingReportId = null; this.salesSuccess.set('Draft updated'); this.loadInventory(); },
+      error: err => { this.salesBusy.set(false); this.salesError.set(err.error?.message || 'Could not update draft'); },
+    });
+  }
+
+  async cancelReport(report: any): Promise<void> {
+    const reason = window.prompt('Reason for cancelling this report (required):');
+    if (!reason?.trim()) return;
+    const ok = await this.dialogService.confirm('Cancel sales report',
+      'Cancel this report? If it was approved, its deducted stock will be restored. The report stays in history.');
+    if (!ok) return;
+    this.salesBusy.set(true); this.salesError.set('');
+    this.api.cancelWeeklySalesReport(report.id, reason.trim()).subscribe({
+      next: () => { this.salesBusy.set(false); this.salesSuccess.set('Report cancelled'); this.loadInventory(); },
+      error: err => { this.salesBusy.set(false); this.salesError.set(err.error?.message || 'Could not cancel report'); },
+    });
+  }
+
+  async saveCorrection(): Promise<void> {
+    const acct = this.account();
+    if (!acct || !this.correctionProductId || !Number.isInteger(Number(this.correctionQuantity)) ||
+      !Number(this.correctionQuantity) || !this.correctionNotes.trim()) {
+      this.salesError.set('Select product, non-zero whole-number adjustment and explanation');
+      return;
+    }
+    const ok = await this.dialogService.confirm('Confirm inventory correction',
+      'Apply this inventory adjustment? It will be permanently recorded in the audit history.');
+    if (!ok) return;
+    this.salesBusy.set(true); this.salesError.set('');
+    this.api.createInventoryAdjustment(acct.id, {
+      productId: Number(this.correctionProductId), quantity: Number(this.correctionQuantity),
+      reason: this.correctionReason, notes: this.correctionNotes.trim(),
+    }).subscribe({
+      next: () => { this.salesBusy.set(false); this.correctionNotes = ''; this.salesSuccess.set('Stock correction recorded'); this.loadInventory(); },
+      error: err => { this.salesBusy.set(false); this.salesError.set(err.error?.message || 'Could not record correction'); },
+    });
+  }
   salesError = signal('');
   salesSuccess = signal('');
   salesBusy = signal(false);
@@ -150,6 +217,10 @@ export class AccountDetailComponent implements OnInit {
     const acct = this.account();
     if (!acct) return;
     this.inventoryError.set('');
+    this.api.getInventoryAdjustments(acct.id).subscribe({
+      next: rows => this.adjustments.set(rows),
+      error: () => this.salesError.set('Could not load stock adjustments'),
+    });
     this.api.getWeeklySalesReports(acct.id).subscribe({
       next: reports => this.salesReports.set(reports),
       error: () => this.salesError.set('Could not load weekly sales reports'),
