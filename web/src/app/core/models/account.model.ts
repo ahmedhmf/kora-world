@@ -23,6 +23,11 @@ export interface B2BAccount {
   shippingCountry?: string;
   defaultCurrency: string;
   paymentModel?: string | null;
+  consignmentPricingMethod?: 'fixed' | 'percentage' | null;
+  consignmentSharePercent?: number | null;
+  settlementDueDay?: number | null;
+  upfrontPercent?: number | null;
+  balanceDue?: string | null;
   paymentTerms: string;
   creditLimit: number;
   vatNumber?: string;
@@ -61,6 +66,11 @@ export interface CreateAccountDto {
   shippingCountry?: string;
   defaultCurrency?: string;
   paymentModel?: string | null;
+  consignmentPricingMethod?: 'fixed' | 'percentage' | null;
+  consignmentSharePercent?: number | null;
+  settlementDueDay?: number | null;
+  upfrontPercent?: number | null;
+  balanceDue?: string | null;
   paymentTerms?: string;
   creditLimit?: number;
   vatNumber?: string;
