@@ -221,6 +221,21 @@ export class ApiService {
     return this.http.get<any[]>(`${this.base}/delivery-notes/account/${accountId}/inventory`);
   }
 
+  getWeeklySalesReports(accountId: number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.base}/delivery-notes/account/${accountId}/sales`);
+  }
+
+  createWeeklySalesReport(accountId: number, dto: {
+    weekStart: string; weekEnd: string; filePath: string; fileName: string;
+    remarks?: string; items: Array<{ productId: number; quantity: number }>;
+  }): Observable<any> {
+    return this.http.post<any>(`${this.base}/delivery-notes/account/${accountId}/sales`, dto);
+  }
+
+  approveWeeklySalesReport(reportId: number): Observable<any> {
+    return this.http.post<any>(`${this.base}/delivery-notes/sales/${reportId}/approve`, {});
+  }
+
   createDeliveryNote(accountId: number, dto: { deliveryDate: string; remarks?: string; items: Array<{ productId: number; quantity: number }> }): Observable<any> {
     return this.http.post<any>(`${this.base}/delivery-notes/account/${accountId}`, dto);
   }
