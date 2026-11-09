@@ -209,6 +209,103 @@ export class ApiService {
     return this.http.post<{ success: boolean; poIds: number[] }>(`${this.base}/accounts/${id}/forecasts/${forecastId}/create-pos`, { items: selectedItems });
   }
 
+  previewCustomerStatement(accountId: number, from: string, to: string, currency?: string): Observable<any> {
+    const params = new URLSearchParams({ from, to });
+    if (currency) params.set('currency', currency);
+    return this.http.get<any>(`${this.base}/customer-financials/account/${accountId}/statements/preview?${params.toString()}`);
+  }
+  getCustomerStatements(accountId: number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.base}/customer-financials/account/${accountId}/statements`);
+  }
+  saveCustomerStatement(accountId: number, dto: { from: string; to: string; currency?: string }): Observable<any> {
+    return this.http.post<any>(`${this.base}/customer-financials/account/${accountId}/statements`, dto);
+  }
+  getSavedCustomerStatement(accountId: number, statementId: number): Observable<any> {
+    return this.http.get<any>(`${this.base}/customer-financials/account/${accountId}/statements/${statementId}`);
+  }
+
+  getCustomerPricing(accountId: number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.base}/customer-financials/account/${accountId}/pricing`);
+  }
+  addCustomerPricing(accountId: number, dto: any): Observable<any> {
+    return this.http.post<any>(`${this.base}/customer-financials/account/${accountId}/pricing`, dto);
+  }
+  getCustomerFinancialOverview(accountId: number): Observable<any> {
+    return this.http.get<any>(`${this.base}/customer-financials/account/${accountId}/overview`);
+  }
+  previewSalesSettlement(reportId: number): Observable<any> {
+    return this.http.get<any>(`${this.base}/customer-financials/sales/${reportId}/preview`);
+  }
+  recordCustomerPayment(accountId: number, dto: any): Observable<any> {
+    return this.http.post<any>(`${this.base}/customer-financials/account/${accountId}/payments`, dto);
+  }
+  allocateCustomerPayment(accountId: number, dto: any): Observable<any> {
+    return this.http.post<any>(`${this.base}/customer-financials/account/${accountId}/allocations`, dto);
+  }
+
+  // Delivery notes
+  getDeliveryNotes(accountId: number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.base}/delivery-notes/account/${accountId}`);
+  }
+
+  getInventoryMovements(accountId: number, filters: {
+    productId?: number; type?: string; from?: string; to?: string;
+  } = {}): Observable<any> {
+    const params = new URLSearchParams();
+    if (filters.productId) params.set('productId', String(filters.productId));
+    if (filters.type) params.set('type', filters.type);
+    if (filters.from) params.set('from', filters.from);
+    if (filters.to) params.set('to', filters.to);
+    const query = params.toString();
+    return this.http.get<any>(`${this.base}/delivery-notes/account/${accountId}/movements${query ? '?' + query : ''}`);
+  }
+
+  getAccountInventory(accountId: number): Observable<Array<{
+    productId: number; articleNumber: string; productName: string; quantity: number;
+    deliveries: Array<{ noteId: number; noteNumber: string; deliveryDate: string; quantity: number }>;
+  }>> {
+    return this.http.get<any[]>(`${this.base}/delivery-notes/account/${accountId}/inventory`);
+  }
+
+  getWeeklySalesReports(accountId: number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.base}/delivery-notes/account/${accountId}/sales`);
+  }
+
+  createWeeklySalesReport(accountId: number, dto: {
+    weekStart: string; weekEnd: string; filePath: string; fileName: string;
+    remarks?: string; retailPrices?: Record<string, string>; items: Array<{ productId: number; quantity: number }>;
+  }): Observable<any> {
+    return this.http.post<any>(`${this.base}/delivery-notes/account/${accountId}/sales`, dto);
+  }
+
+  updateWeeklySalesDraft(reportId: number, dto: { items: Array<{ productId: number; quantity: number }>; remarks?: string; retailPrices?: Record<string, string> }): Observable<any> {
+    return this.http.patch<any>(`${this.base}/delivery-notes/sales/${reportId}/draft`, dto);
+  }
+
+  cancelWeeklySalesReport(reportId: number, reason: string): Observable<any> {
+    return this.http.post<any>(`${this.base}/delivery-notes/sales/${reportId}/cancel`, { reason });
+  }
+
+  getInventoryAdjustments(accountId: number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.base}/delivery-notes/account/${accountId}/adjustments`);
+  }
+
+  createInventoryAdjustment(accountId: number, dto: { productId: number; quantity: number; reason: string; notes: string }): Observable<any> {
+    return this.http.post<any>(`${this.base}/delivery-notes/account/${accountId}/adjustments`, dto);
+  }
+
+  approveWeeklySalesReport(reportId: number): Observable<any> {
+    return this.http.post<any>(`${this.base}/delivery-notes/sales/${reportId}/approve`, {});
+  }
+
+  createDeliveryNote(accountId: number, dto: { deliveryDate: string; remarks?: string; items: Array<{ productId: number; quantity: number }> }): Observable<any> {
+    return this.http.post<any>(`${this.base}/delivery-notes/account/${accountId}`, dto);
+  }
+
+  attachDeliveryNoteSignedCopy(noteId: number, file: { path: string; name: string }): Observable<any> {
+    return this.http.patch<any>(`${this.base}/delivery-notes/${noteId}/signed-copy`, file);
+  }
+
   // Receipts
   getReceipts(): Observable<Receipt[]> {
     return this.http.get<Receipt[]>(`${this.base}/receipts`);

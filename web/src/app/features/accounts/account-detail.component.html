@@ -47,6 +47,10 @@
 
           <!-- Action Buttons -->
           <div class="flex items-center gap-2 flex-shrink-0">
+            <a [routerLink]="['/accounts', acct.id, 'delivery-notes']"
+              class="px-4 py-2 bg-blue-800 hover:bg-blue-700 text-white text-sm font-medium rounded-lg">
+              Delivery Notes
+            </a>
             <a
               [routerLink]="['/accounts', acct.id, 'edit']"
               class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5"
@@ -81,14 +85,26 @@
             <p class="text-white text-xl font-bold">{{ acct.defaultCurrency }}</p>
           </div>
           <div class="bg-zinc-900/40 border border-zinc-800 rounded-xl p-4">
-            <p class="text-zinc-500 text-xs font-medium uppercase tracking-wider mb-1">Payment Terms</p>
-            <p class="text-white text-lg font-semibold">{{ acct.paymentTerms || '—' }}</p>
+            <p class="text-zinc-500 text-xs font-medium uppercase tracking-wider mb-1">Payment Arrangement</p>
+            <p class="text-white text-lg font-semibold">{{ acct.paymentModel || 'Not set' }}</p>
           </div>
           <div class="bg-zinc-900/40 border border-zinc-800 rounded-xl p-4">
             <p class="text-zinc-500 text-xs font-medium uppercase tracking-wider mb-1">Member Since</p>
             <p class="text-white text-lg font-semibold">{{ acct.createdAt | date:'MMM yyyy' }}</p>
           </div>
         </div>
+
+        @if (acct.paymentModel === 'Split Payment' || acct.paymentModel === 'Consignment') {
+          <div class="bg-zinc-900/40 border border-zinc-800 rounded-xl p-4 mb-6 text-sm text-zinc-300">
+            @if (acct.paymentModel === 'Split Payment') {
+              <strong>Split Payment:</strong> {{ acct.upfrontPercent }}% upfront, {{ 100 - (acct.upfrontPercent || 0) }}% {{ acct.balanceDue }}
+            } @else {
+              <strong>Consignment:</strong> {{ acct.consignmentPricingMethod === 'percentage' ? 'Percentage of sales' : 'Fixed wholesale price per product' }}
+              @if (acct.consignmentPricingMethod === 'percentage') { — Kora share: {{ acct.consignmentSharePercent }}% }
+              — settlement due on day {{ acct.settlementDueDay }} of each month
+            }
+          </div>
+        }
 
         <!-- ── Navigation Tabs ─────────────────────────────── -->
         <div class="flex border-b border-zinc-850 mb-6">
@@ -114,9 +130,468 @@
           >
             Forecasts
           </button>
+          <button
+            (click)="showInventory()"
+            class="px-4 py-2 text-sm font-semibold border-b-2 transition-colors duration-150"
+            [class.border-white]="activeTab() === 'inventory'"
+            [class.text-white]="activeTab() === 'inventory'"
+            [class.border-transparent]="activeTab() !== 'inventory'"
+            [class.text-zinc-400]="activeTab() !== 'inventory'"
+            [class.hover:text-zinc-200]="activeTab() !== 'inventory'"
+          >Inventory</button>
+          <button type="button" (click)="showFinancials()" class="px-4 py-2 text-sm font-semibold border-b-2 transition-colors" [class.border-white]="activeTab() === 'financials'" [class.text-white]="activeTab() === 'financials'" [class.border-transparent]="activeTab() !== 'financials'" [class.text-zinc-400]="activeTab() !== 'financials'">Financials</button>
         </div>
 
-        @if (activeTab() === 'details') {
+        @if (activeTab() === 'inventory') {
+          <section class="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6 mb-8 space-y-4">
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <h2 class="text-lg font-bold text-white">Customer Inventory</h2>
+                <p class="text-sm text-zinc-400">Signed deliveries minus approved weekly sales. Payments are tracked separately.</p>
+              </div>
+              <button type="button" (click)="loadInventory()" class="px-3 py-2 bg-zinc-800 text-white rounded-lg text-sm">Refresh</button>
+            </div>
+            @if (inventoryError()) { <p class="text-red-400 text-sm">{{ inventoryError() }}</p> }
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-sm">
+                <thead class="border-b border-zinc-700 text-zinc-400">
+                  <tr><th class="py-3 pr-4">Article</th><th class="py-3 pr-4">Product</th><th class="py-3 pr-4">Remaining</th><th class="py-3">Delivery history</th></tr>
+                </thead>
+                <tbody>
+                  @for (item of inventory(); track item.productId) {
+                    <tr class="border-b border-zinc-800 text-zinc-200">
+                      <td class="py-3 pr-4 font-mono">{{ item.articleNumber }}</td>
+                      <td class="py-3 pr-4">{{ item.productName }}</td>
+                      <td class="py-3 pr-4 font-semibold">{{ item.quantity }}</td>
+                      <td class="py-3">
+                        @for (delivery of item.deliveries; track delivery.noteId) {
+                          <div class="text-xs text-zinc-400">{{ delivery.noteNumber }} · {{ delivery.deliveryDate }} · +{{ delivery.quantity }}</div>
+                        }
+                      </td>
+                    </tr>
+                  } @empty {
+                    <tr><td colspan="4" class="py-6 text-zinc-500">No signed deliveries yet.</td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </section>
+          <section class="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6 mb-8 space-y-5">
+            <div>
+              <h2 class="text-lg font-bold text-white">Weekly Sales Report</h2>
+              <p class="text-sm text-zinc-400">Attach the customer's PDF, enter sold quantities manually, then approve the draft to deduct stock. Saving a draft does not change inventory.</p>
+            </div>
+            @if (salesError()) { <p class="text-red-400 text-sm">{{ salesError() }}</p> }
+            @if (salesSuccess()) { <p class="text-emerald-400 text-sm">{{ salesSuccess() }}</p> }
+            @if (canManageInventory()) {
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <label class="text-sm text-zinc-300">Work week number (ISO, Monday–Sunday)
+                <input type="number" min="1" max="53" step="1" [(ngModel)]="salesWeek" class="block w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white" />
+              </label>
+              <label class="text-sm text-zinc-300">Year
+                <input type="number" min="2000" max="2100" step="1" [(ngModel)]="salesYear" class="block w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white" />
+              </label>
+            </div>
+            <label class="block text-sm text-zinc-300">Customer sales report (PDF, max 15 MB)
+              <input type="file" accept=".pdf,application/pdf" (change)="selectSalesPdf($event)" class="block mt-2 text-sm text-zinc-300" />
+            </label>
+            <div class="space-y-3">
+              <h3 class="text-sm font-semibold text-zinc-200">Quantities sold</h3>
+              @for (item of salesItems; track $index; let i = $index) {
+                <div class="flex items-center gap-3 flex-wrap">
+                  <select [(ngModel)]="item.productId" class="flex-1 min-w-48 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white">
+                    <option [ngValue]="0">Select delivered product...</option>
+                    @for (product of inventory(); track product.productId) {
+                      <option [ngValue]="product.productId">{{ product.articleNumber }} — {{ product.productName }} ({{ product.quantity }} remaining)</option>
+                    }
+                  </select>
+                  <input type="number" min="1" step="1" [(ngModel)]="item.quantity" aria-label="Quantity sold" class="w-24 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white" />
+                  <input type="text" inputmode="decimal" [(ngModel)]="salesRetailPrices[item.productId]" placeholder="Actual retail/unit (if applicable)" aria-label="Actual retail price per unit" class="w-48 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white" />
+                  <button type="button" (click)="removeSalesItem(i)" class="text-red-400 text-sm">Remove</button>
+                </div>
+              }
+              <button type="button" (click)="addSalesItem()" class="text-blue-400 text-sm">+ Add product</button>
+            </div>
+            <label class="block text-sm text-zinc-300">Remarks (optional)
+              <textarea [(ngModel)]="salesRemarks" rows="2" maxlength="2000" class="block w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white"></textarea>
+            </label>
+            <button type="button" [disabled]="salesBusy()" (click)="saveSalesDraft()" class="bg-white text-zinc-900 font-semibold rounded-lg px-4 py-2 disabled:opacity-50">Save Draft</button>
+            }
+          </section>
+          <section class="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6 mb-8 space-y-4">
+            <h2 class="text-lg font-bold text-white">Sales Report History</h2>
+            @for (report of salesReports(); track report.id) {
+              <div class="border border-zinc-800 rounded-lg p-4 space-y-2">
+                <div class="flex items-center justify-between flex-wrap gap-3">
+                  <div>
+                    <p class="text-white font-semibold">{{ reportWeekLabel(report.weekStart) }}</p>
+                    <p class="text-xs text-zinc-400">{{ report.fileName }} · {{ report.status }}</p>
+                  </div>
+                  <div class="flex gap-3 items-center">
+                    <button type="button" (click)="viewSalesPdf(report)" class="text-blue-400 text-sm">View PDF</button>
+                    @if (canManageInventory() && report.status === 'draft') {
+                      <button type="button" [disabled]="salesBusy()" (click)="startEditReport(report)" class="text-blue-400 text-sm">Edit Draft</button>
+                      <button type="button" [disabled]="salesBusy()" (click)="previewReport(report)" class="text-amber-400 text-sm">Preview amount owed</button>
+                      <button type="button" [disabled]="salesBusy()" (click)="approveSalesReport(report)" class="bg-emerald-700 text-white rounded-lg px-3 py-2 text-sm disabled:opacity-50">Approve &amp; Deduct</button>
+                    }
+                    @if (canManageInventory() && report.status !== 'cancelled') {
+                      <button type="button" [disabled]="salesBusy()" (click)="cancelReport(report)" class="text-red-400 text-sm">Cancel</button>
+                    }
+                  </div>
+                </div>
+                @if (settlementPreview()?.reportId === report.id) {
+                  <div class="bg-zinc-950 rounded-lg p-3 text-sm text-emerald-400">
+                    KORA owed: {{ (+settlementPreview().totalCents / 100) | currency:settlementPreview().currency }}
+                    <div class="text-xs text-zinc-400">Preview only. Approval locks this amount and deducts inventory.</div>
+                  </div>
+                }
+                @if (report.approvedByName) {
+                  <p class="text-xs text-zinc-500">Approved by {{ report.approvedByName }} · {{ report.approvedAt | date:'medium' }}</p>
+                }
+                @if (report.cancelledByName) {
+                  <p class="text-xs text-red-400">Cancelled by {{ report.cancelledByName }} · {{ report.cancelledAt | date:'medium' }} — {{ report.cancellationReason }}</p>
+                }
+                @if (editingReportId === report.id) {
+                  <div class="bg-zinc-950 rounded-lg p-3 space-y-3">
+                    @for (line of editingItems; track $index; let i = $index) {
+                      <div class="flex gap-2 flex-wrap">
+                        <select [(ngModel)]="line.productId" class="flex-1 bg-zinc-900 text-white border border-zinc-700 p-2 rounded-lg">
+                          @for (product of inventory(); track product.productId) {
+                            <option [ngValue]="product.productId">{{ product.articleNumber }} — {{ product.productName }}</option>
+                          }
+                        </select>
+                        <input type="number" min="1" [(ngModel)]="line.quantity" class="w-24 bg-zinc-900 text-white border border-zinc-700 p-2 rounded-lg" />
+                        <input type="text" [(ngModel)]="editingRetailPrices[line.productId]" placeholder="Actual retail/unit" class="w-40 bg-zinc-900 text-white border border-zinc-700 p-2 rounded-lg" />
+                        <button type="button" (click)="editingItems.splice(i, 1)" class="text-red-400 text-sm">Remove</button>
+                      </div>
+                    }
+                    <button type="button" (click)="editingItems.push({productId: 0, quantity: 1})" class="text-blue-400 text-sm">+ Add line</button>
+                    <textarea [(ngModel)]="editingRemarks" placeholder="Remarks" class="block w-full bg-zinc-900 text-white border border-zinc-700 p-2 rounded-lg"></textarea>
+                    <div class="flex gap-3">
+                      <button type="button" [disabled]="salesBusy()" (click)="saveEditedReport()" class="bg-emerald-700 text-white rounded-lg px-3 py-2 text-sm">Save changes</button>
+                      <button type="button" (click)="editingReportId = null" class="text-zinc-400 text-sm">Discard</button>
+                    </div>
+                  </div>
+                }
+                @for (item of report.items; track item.productId) {
+                  <p class="text-sm text-zinc-400">{{ item.articleNumber }} — {{ item.productName }}: {{ item.quantity }} sold</p>
+                }
+              </div>
+            } @empty {
+              <p class="text-zinc-500 text-sm">No weekly sales reports yet.</p>
+            }
+          </section>
+          <section class="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6 mb-8 space-y-4">
+            <h2 class="text-lg font-bold text-white">Stock Corrections &amp; Returns</h2>
+            <p class="text-sm text-zinc-400">Use a negative quantity to remove damaged, missing, or incorrectly counted stock. Use a positive quantity to restore stock. Every adjustment is recorded.</p>
+            @if (canManageInventory()) {
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <label class="text-sm text-zinc-300">Product
+                  <select [(ngModel)]="correctionProductId" class="block w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white">
+                    <option [ngValue]="0">Select product</option>
+                    @for (item of inventory(); track item.productId) {
+                      <option [ngValue]="item.productId">{{ item.articleNumber }} — {{ item.productName }}</option>
+                    }
+                  </select>
+                </label>
+                <label class="text-sm text-zinc-300">Stock change (+ or −)
+                  <input type="number" step="1" [(ngModel)]="correctionQuantity" class="block w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white" />
+                </label>
+                <label class="text-sm text-zinc-300">Reason
+                  <select [(ngModel)]="correctionReason" class="block w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white">
+                    <option value="return">Return</option>
+                    <option value="damage">Damage</option>
+                    <option value="loss">Loss</option>
+                    <option value="stocktake">Stock count correction</option>
+                    <option value="other">Other</option>
+                  </select>
+                </label>
+                <label class="text-sm text-zinc-300">Explanation
+                  <textarea [(ngModel)]="correctionNotes" rows="2" maxlength="2000" class="block w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white"></textarea>
+                </label>
+              </div>
+              <button type="button" [disabled]="salesBusy()" (click)="saveCorrection()" class="bg-white text-zinc-900 font-semibold rounded-lg px-4 py-2 disabled:opacity-50">Record Stock Correction</button>
+            }
+            <h3 class="text-sm font-semibold text-white">Correction History</h3>
+            @for (change of adjustments(); track change.id) {
+              <div class="border-t border-zinc-800 pt-3 text-sm text-zinc-300">
+                <p><strong>{{ change.articleNumber }}</strong> — {{ change.quantity > 0 ? '+' : '' }}{{ change.quantity }} · {{ change.reason }}</p>
+                <p class="text-zinc-400">{{ change.notes }}</p>
+                <p class="text-xs text-zinc-500">{{ change.createdByName }} · {{ change.createdAt | date:'medium' }}</p>
+              </div>
+            } @empty { <p class="text-zinc-500 text-sm">No corrections recorded.</p> }
+          </section>
+          <section class="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6 mb-8 space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 class="text-lg font-bold text-white">Inventory Movement History</h2>
+                <p class="text-sm text-zinc-400">Signed deliveries, approved sales, cancellations and stock corrections in one running ledger.</p>
+              </div>
+              <div class="flex gap-2">
+                <button type="button" (click)="loadMovements()" class="px-3 py-2 bg-zinc-800 text-white rounded-lg text-sm">Refresh</button>
+                <button type="button" (click)="exportMovementsCsv()" class="px-3 py-2 bg-blue-800 text-white rounded-lg text-sm">Export CSV</button>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <label class="text-sm text-zinc-300">Product
+                <select [(ngModel)]="movementProductId" (ngModelChange)="loadMovements()" class="block w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white">
+                  <option [ngValue]="0">All products</option>
+                  @for (item of inventory(); track item.productId) {
+                    <option [ngValue]="item.productId">{{ item.articleNumber }} — {{ item.productName }}</option>
+                  }
+                </select>
+              </label>
+              <label class="text-sm text-zinc-300">Movement type
+                <select [(ngModel)]="movementType" (ngModelChange)="loadMovements()" class="block w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white">
+                  <option value="">All types</option><option value="delivery">Signed delivery</option>
+                  <option value="sale">Approved sale</option><option value="cancellation">Cancellation</option>
+                  <option value="adjustment">Stock correction / return</option>
+                </select>
+              </label>
+              <label class="text-sm text-zinc-300">From date
+                <input type="date" [(ngModel)]="movementFrom" (change)="loadMovements()" class="block w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white" />
+              </label>
+              <label class="text-sm text-zinc-300">To date
+                <input type="date" [(ngModel)]="movementTo" (change)="loadMovements()" class="block w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white" />
+              </label>
+            </div>
+            @if (movementError()) { <p class="text-red-400 text-sm">{{ movementError() }}</p> }
+            @if (movementLoading()) { <p class="text-zinc-400 text-sm">Loading movements...</p> }
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-sm">
+                <thead class="border-b border-zinc-700 text-zinc-400">
+                  <tr><th class="py-2 pr-3">Recorded at</th><th class="py-2 pr-3">Product</th><th class="py-2 pr-3">Movement</th><th class="py-2 pr-3">Reference</th><th class="py-2 pr-3 text-right">Change</th><th class="py-2 pr-3 text-right">Before</th><th class="py-2 pr-3 text-right">After</th><th class="py-2">By / Reason</th></tr>
+                </thead>
+                <tbody>
+                  @for (m of inventoryMovements(); track m.id) {
+                    <tr class="border-b border-zinc-800 text-zinc-200">
+                      <td class="py-3 pr-3 whitespace-nowrap">{{ m.timestamp | date:'short' }} @if (m.timestampEstimated) { <span class="text-amber-400" title="Historical delivery signing time was not recorded">~</span> }</td>
+                      <td class="py-3 pr-3">{{ m.articleNumber }}<div class="text-xs text-zinc-500">{{ m.productName }}</div></td>
+                      <td class="py-3 pr-3">{{ m.type }}</td>
+                      <td class="py-3 pr-3">{{ m.reference }} @if (m.documentDate) { <div class="text-xs text-zinc-500">Document: {{ m.documentDate }}</div> }</td>
+                      <td class="py-3 pr-3 text-right font-semibold" [class.text-emerald-400]="m.quantityChange > 0" [class.text-red-400]="m.quantityChange < 0">{{ m.quantityChange > 0 ? '+' : '' }}{{ m.quantityChange }}</td>
+                      <td class="py-3 pr-3 text-right">{{ m.balanceBefore }}</td>
+                      <td class="py-3 pr-3 text-right">{{ m.balanceAfter }}</td>
+                      <td class="py-3">{{ m.performedBy || 'Not recorded' }}<div class="text-xs text-zinc-400">{{ m.reason }} @if (m.notes) { — {{ m.notes }} }</div></td>
+                    </tr>
+                  } @empty { <tr><td colspan="8" class="py-6 text-zinc-500">No movements match the selected filters.</td></tr> }
+                </tbody>
+              </table>
+            </div>
+            <p class="text-xs text-zinc-500">{{ movementNotice() }}</p>
+            <h3 class="text-sm font-semibold text-white">Inventory reconciliation (all-time)</h3>
+            @for (row of inventoryReconciliation(); track row.productId) {
+              <p class="text-sm" [class.text-emerald-400]="row.matches" [class.text-red-400]="!row.matches">
+                {{ row.articleNumber }} — Stock: {{ row.stock }} · Ledger: {{ row.ledger }} · {{ row.matches ? 'Matched' : 'Mismatch — investigate' }}
+              </p>
+            } @empty { <p class="text-sm text-zinc-500">No inventory to reconcile.</p> }
+          </section>
+        } @else if (activeTab() === 'financials') {
+          <div class="space-y-6">
+            @if (financialError()) { <p class="text-red-400 text-sm">{{ financialError() }}</p> }
+            @if (financialSuccess()) { <p class="text-emerald-400 text-sm">{{ financialSuccess() }}</p> }
+            <section class="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6 space-y-4">
+              <div class="flex justify-between items-center">
+                <h2 class="text-lg font-bold text-white">Customer Financials</h2>
+                <button type="button" (click)="loadFinancials()" class="text-sm text-blue-400">Refresh</button>
+              </div>
+              @if (financialOverview(); as fin) {
+                <div class="grid grid-cols-2 gap-4">
+                  <div><p class="text-zinc-400 text-sm">Approved sales owed</p><p class="text-xl font-bold text-white">{{ +fin.totalOwed | currency:fin.currency }}</p></div>
+                  <div><p class="text-zinc-400 text-sm">Outstanding balance</p><p class="text-xl font-bold text-amber-400">{{ +fin.outstanding | currency:fin.currency }}</p></div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                  <div><p class="text-zinc-400 text-sm">Unallocated customer credit</p><p class="text-xl font-bold text-emerald-400">{{ +fin.unallocatedCredit | currency:fin.currency }}</p></div>
+                  <div><p class="text-zinc-400 text-sm">Net exposure (after credit)</p><p class="text-xl font-bold text-white">{{ +fin.netExposure | currency:fin.currency }}</p></div>
+                </div>
+                <p class="text-xs text-zinc-500">Customer credit is not applied to a settlement until allocated. Net exposure is informational, not a posted accounting entry.</p>
+                @if (fin.byCurrency.length > 1) {
+                  <h3 class="font-semibold text-white">Balances by currency</h3>
+                  @for (group of fin.byCurrency; track group.currency) {
+                    <p class="text-sm text-zinc-300">{{ group.currency }} · Outstanding {{ +group.outstanding | currency:group.currency }} · Unallocated {{ +group.unallocatedCredit | currency:group.currency }} · Net {{ +group.netExposure | currency:group.currency }}</p>
+                  }
+                }
+                <h3 class="font-semibold text-white">Unallocated payments / advances</h3>
+                @for (payment of fin.payments; track payment.id) {
+                  @if (+payment.unallocated > 0) {
+                    <div class="flex flex-wrap justify-between gap-2 border-t border-zinc-800 py-2 text-sm text-zinc-300">
+                      <span>{{ payment.paymentDate }} · {{ payment.reference }} · {{ payment.method }}</span>
+                      <span class="text-emerald-400">Available: {{ +payment.unallocated | currency:payment.currency }}</span>
+                    </div>
+                  }
+                }
+                <h3 class="font-semibold text-white">Settlements</h3>
+                @for (settlement of fin.settlements; track settlement.id) {
+                  <div class="border-t border-zinc-800 py-3 text-sm text-zinc-300">
+                    Report #{{ settlement.reportId }} · {{ settlement.status }} ·
+                    Total {{ +settlement.total | currency:fin.currency }} ·
+                    Paid {{ +settlement.paid | currency:fin.currency }} ·
+                    Outstanding {{ +settlement.outstanding | currency:fin.currency }}
+                  </div>
+                } @empty { <p class="text-sm text-zinc-500">No priced settlements yet.</p> }
+              }
+            </section>
+            <section class="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6 space-y-4">
+              <h2 class="text-lg font-bold text-white">Customer Statements &amp; Settlement Management</h2>
+              <p class="text-sm text-zinc-400">Statements show allocated payments, not unallocated customer credit. Select one currency per statement.</p>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <label class="text-sm text-zinc-300">From
+                  <input type="date" [(ngModel)]="statementFrom" class="block w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white" />
+                </label>
+                <label class="text-sm text-zinc-300">To
+                  <input type="date" [(ngModel)]="statementTo" class="block w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white" />
+                </label>
+                <label class="text-sm text-zinc-300">Currency
+                  <select [(ngModel)]="statementCurrency" class="block w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white">
+                    <option value="">Customer default</option>
+                    @if (financialOverview(); as fin) { <option [value]="fin.currency">{{ fin.currency }}</option> }
+                    @if (statementPreview(); as statement) {
+                      @for (currencyCode of statement.availableCurrencies; track currencyCode) {
+                        <option [value]="currencyCode">{{ currencyCode }}</option>
+                      }
+                    }
+                  </select>
+                </label>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <button type="button" [disabled]="statementBusy()" (click)="previewStatement()" class="px-4 py-2 bg-zinc-700 text-white rounded-lg text-sm">Preview statement</button>
+                @if (canManageInventory()) {
+                  <button type="button" [disabled]="statementBusy()" (click)="saveStatement()" class="px-4 py-2 bg-blue-700 text-white rounded-lg text-sm">Save statement snapshot</button>
+                }
+                @if (statementPreview()) {
+                  <button type="button" (click)="printStatement()" [disabled]="statementBusy()" class="px-4 py-2 bg-zinc-700 text-white rounded-lg text-sm">Download branded PDF</button>
+                }
+              </div>
+              @if (statementError()) { <p class="text-red-400 text-sm">{{ statementError() }}</p> }
+              @if (statementPreview(); as statement) {
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                  <div><p class="text-zinc-400">Opening</p><p class="text-white font-bold">{{ +statement.openingBalance | currency:statement.currency }}</p></div>
+                  <div><p class="text-zinc-400">Charges</p><p class="text-white font-bold">{{ +statement.charges | currency:statement.currency }}</p></div>
+                  <div><p class="text-zinc-400">Credits</p><p class="text-white font-bold">{{ +statement.credits | currency:statement.currency }}</p></div>
+                  <div><p class="text-zinc-400">Closing</p><p class="text-amber-400 font-bold">{{ +statement.closingBalance | currency:statement.currency }}</p></div>
+                </div>
+                <div class="overflow-x-auto">
+                  <table class="w-full text-left text-sm text-zinc-200">
+                    <thead class="border-b border-zinc-700 text-zinc-400"><tr><th class="py-2">Date</th><th>Reference</th><th>Type</th><th class="text-right">Amount</th><th class="text-right">Balance</th></tr></thead>
+                    <tbody>
+                      @for (entry of statement.transactions; track entry.id) {
+                        <tr class="border-b border-zinc-800"><td class="py-2">{{ entry.date }}</td><td>{{ entry.reference }}</td><td>{{ entry.type }}</td><td class="text-right">{{ +entry.amount | currency:statement.currency }}</td><td class="text-right">{{ +entry.runningBalance | currency:statement.currency }}</td></tr>
+                      } @empty { <tr><td colspan="5" class="py-4 text-zinc-500">No transactions in this period.</td></tr> }
+                    </tbody>
+                  </table>
+                </div>
+                <p class="text-sm text-zinc-300">Unallocated customer credit: <strong>{{ +statement.unallocatedCredit | currency:statement.currency }}</strong> · Net exposure after credit: <strong>{{ +statement.netExposure | currency:statement.currency }}</strong></p>
+                <h3 class="text-white font-semibold">Overdue settlements</h3>
+                @for (item of statement.overdue; track item.settlementId) {
+                  <p class="text-sm text-amber-400">{{ item.reference }} · Due {{ item.dueDate }} · {{ item.daysOverdue }} days overdue · {{ +item.outstanding | currency:statement.currency }}</p>
+                } @empty { <p class="text-sm text-zinc-500">No overdue settlements with a configured due date.</p> }
+                <p class="text-xs text-zinc-500">{{ statement.dueDatePolicy }}</p>
+                <p class="text-xs text-zinc-500">{{ statement.paymentPolicy }}</p>
+              }
+              <h3 class="text-white font-semibold">Saved statement history</h3>
+              @for (saved of statementHistory(); track saved.id) {
+                <div class="flex items-center justify-between gap-3 border-t border-zinc-800 py-2 text-sm text-zinc-300">
+                  <span>#{{ saved.id }} · {{ saved.periodFrom }} to {{ saved.periodTo }} · {{ saved.currency }}</span>
+                  <button type="button" (click)="viewSavedStatement(saved.id)" class="text-blue-400">Open snapshot</button>
+                </div>
+              } @empty { <p class="text-sm text-zinc-500">No saved statements yet.</p> }
+            </section>
+            <section class="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6 space-y-4">
+              <h2 class="text-lg font-bold text-white">Product Pricing Agreements</h2>
+              <p class="text-sm text-zinc-400">Set one non-overlapping agreement per product and effective date. Actual retail pricing requires a retail amount in the weekly sales report.</p>
+              @if (canManageInventory()) {
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <label class="text-sm text-zinc-300">Product
+                    <select [(ngModel)]="pricingProductId" class="block w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white">
+                      <option [ngValue]="0">Select product</option>
+                      @for (product of allProducts(); track product.id) { <option [ngValue]="product.id">{{ product.articleNumber }} — {{ product.name }}</option> }
+                    </select>
+                  </label>
+                  <label class="text-sm text-zinc-300">Pricing model
+                    <select [(ngModel)]="pricingKind" class="block w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white">
+                      <option value="fixed">Fixed wholesale</option>
+                      <option value="customer_fixed">Customer-specific fixed</option>
+                      <option value="commission_actual">Commission — actual retail</option>
+                      <option value="commission_agreed">Commission — agreed retail</option>
+                    </select>
+                  </label>
+                  @if (pricingKind === 'fixed' || pricingKind === 'customer_fixed') {
+                    <label class="text-sm text-zinc-300">KORA unit price ({{ acct.defaultCurrency }})
+                      <input [(ngModel)]="pricingUnitPrice" placeholder="30.00" class="block w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white" />
+                    </label>
+                  } @else {
+                    <label class="text-sm text-zinc-300">Customer commission %
+                      <input [(ngModel)]="pricingCommission" placeholder="20" class="block w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white" />
+                    </label>
+                    @if (pricingKind === 'commission_agreed') {
+                      <label class="text-sm text-zinc-300">Agreed retail unit price ({{ acct.defaultCurrency }})
+                        <input [(ngModel)]="pricingRetailPrice" placeholder="80.00" class="block w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white" />
+                      </label>
+                    }
+                  }
+                  <label class="text-sm text-zinc-300">Effective from
+                    <input type="date" [(ngModel)]="pricingEffectiveFrom" class="block w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white" />
+                  </label>
+                  <label class="text-sm text-zinc-300">Effective to (optional)
+                    <input type="date" [(ngModel)]="pricingEffectiveTo" class="block w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white" />
+                  </label>
+                </div>
+                <button type="button" [disabled]="financialBusy()" (click)="addPricingRule()" class="bg-white text-zinc-900 rounded-lg px-4 py-2 font-semibold">Save Pricing Agreement</button>
+              }
+              @for (rule of pricingRules(); track rule.id) {
+                <p class="text-sm text-zinc-300 border-t border-zinc-800 pt-2">
+                  Product #{{ rule.productId }} · {{ rule.kind }} ·
+                  @if (rule.unitPrice) { {{ +rule.unitPrice | currency:rule.currency }} / unit }
+                  @if (rule.commissionPercent) { {{ rule.commissionPercent }}% commission }
+                  @if (rule.agreedRetailPrice) { · retail {{ +rule.agreedRetailPrice | currency:rule.currency }} }
+                  · {{ rule.effectiveFrom }} to {{ rule.effectiveTo || 'ongoing' }}
+                </p>
+              } @empty { <p class="text-sm text-zinc-500">No pricing agreements configured.</p> }
+            </section>
+            <section class="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6 space-y-4">
+              <h2 class="text-lg font-bold text-white">Payments &amp; Reconciliation</h2>
+              @if (canManageInventory()) {
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <input [(ngModel)]="paymentAmount" placeholder="Amount received" aria-label="Payment amount" class="bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white" />
+                  <input type="date" [(ngModel)]="paymentDate" aria-label="Payment date" class="bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white" />
+                  <input [(ngModel)]="paymentReference" placeholder="Bank/payment reference" aria-label="Payment reference" class="bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white" />
+                  <select [(ngModel)]="paymentMethod" aria-label="Payment method" class="bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white">
+                    <option value="bank_transfer">Bank transfer</option><option value="cash">Cash</option><option value="card">Card</option><option value="other">Other</option>
+                  </select>
+                </div>
+                <button type="button" [disabled]="financialBusy()" (click)="recordPayment()" class="bg-white text-zinc-900 rounded-lg px-4 py-2 font-semibold">Record Payment</button>
+              }
+              @if (financialOverview(); as fin) {
+                <h3 class="font-semibold text-white">Received payments</h3>
+                @for (payment of fin.payments; track payment.id) {
+                  <p class="text-sm text-zinc-300 border-t border-zinc-800 pt-2">
+                    #{{ payment.id }} · {{ payment.paymentDate }} · {{ payment.reference }} ·
+                    {{ +payment.amount | currency:fin.currency }} received · {{ +payment.unallocated | currency:fin.currency }} unallocated
+                  </p>
+                } @empty { <p class="text-sm text-zinc-500">No payments recorded.</p> }
+                @if (canManageInventory()) {
+                  <h3 class="font-semibold text-white">Allocate payment to settlement</h3>
+                  <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <select [(ngModel)]="allocationPaymentId" aria-label="Payment to allocate" class="bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white">
+                      <option [ngValue]="0">Select payment</option>
+                      @for (payment of fin.payments; track payment.id) {
+                        @if (+payment.unallocated > 0) { <option [ngValue]="payment.id">#{{ payment.id }} · {{ payment.reference }} ({{ +payment.unallocated | currency:fin.currency }})</option> }
+                      }
+                    </select>
+                    <select [(ngModel)]="allocationSettlementId" aria-label="Settlement to pay" class="bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white">
+                      <option [ngValue]="0">Select settlement</option>
+                      @for (settlement of fin.settlements; track settlement.id) {
+                        @if (settlement.status === 'active' && +settlement.outstanding > 0) { <option [ngValue]="settlement.id">Report #{{ settlement.reportId }} ({{ +settlement.outstanding | currency:fin.currency }})</option> }
+                      }
+                    </select>
+                    <input [(ngModel)]="allocationAmount" placeholder="Amount to allocate" aria-label="Allocation amount" class="bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white" />
+                  </div>
+                  <button type="button" [disabled]="financialBusy()" (click)="allocatePayment()" class="bg-emerald-700 text-white rounded-lg px-4 py-2 font-semibold">Allocate Payment</button>
+                }
+              }
+            </section>
+          </div>
+        } @else if (activeTab() === 'details') {
           <!-- ── Detail Sections ──────────────────────────────── -->
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
 
@@ -181,6 +656,10 @@
                     <dd class="text-white text-xs font-mono">{{ acct.vatNumber }}</dd>
                   </div>
                 }
+                <div class="flex justify-between items-baseline">
+                  <dt class="text-zinc-500 text-xs">Sales / Payment Model</dt>
+                  <dd class="text-zinc-200 text-xs font-medium">{{ acct.paymentModel || 'Not set' }}</dd>
+                </div>
                 <div class="flex justify-between items-baseline">
                   <dt class="text-zinc-500 text-xs">Type</dt>
                   <dd class="text-zinc-200 text-xs font-medium">{{ acct.customerType }}</dd>

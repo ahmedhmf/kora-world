@@ -44,6 +44,15 @@ import { AccountingModule } from './accounting/accounting.module';
 import { InvoicesModule } from './invoices/invoices.module';
 import { PaymentsModule } from './payments/payments.module';
 import { SourcingModule } from './sourcing/sourcing.module';
+import { DeliveryNote } from './delivery-notes/delivery-note.entity';
+import { CustomerPricingRule } from './delivery-notes/customer-pricing-rule.entity';
+import { CustomerStatement } from './delivery-notes/customer-statement.entity';
+import { SalesSettlement } from './delivery-notes/sales-settlement.entity';
+import { CustomerPayment } from './delivery-notes/customer-payment.entity';
+import { PaymentAllocation } from './delivery-notes/payment-allocation.entity';
+import { InventoryAdjustment } from './delivery-notes/inventory-adjustment.entity';
+import { WeeklySalesReport } from './delivery-notes/weekly-sales-report.entity';
+import { DeliveryNotesModule } from './delivery-notes/delivery-notes.module';
 import { DropdownOption } from './dropdown-options/entities/dropdown-option.entity';
 import { DropdownOptionsModule } from './dropdown-options/dropdown-options.module';
 
@@ -81,6 +90,14 @@ import { DropdownOptionsModule } from './dropdown-options/dropdown-options.modul
           InvoiceLine,
           Payment,
           DropdownOption,
+          DeliveryNote,
+          WeeklySalesReport,
+          InventoryAdjustment,
+          CustomerPricingRule,
+          SalesSettlement,
+          CustomerPayment,
+          PaymentAllocation,
+          CustomerStatement,
         ],
         migrations: [__dirname + '/migrations/*{.ts,.js}'],
         migrationsRun: true,
@@ -106,6 +123,7 @@ import { DropdownOptionsModule } from './dropdown-options/dropdown-options.modul
     PaymentsModule,
     SourcingModule,
     DropdownOptionsModule,
+    DeliveryNotesModule,
     ThrottlerModule.forRoot([
       {
         ttl: 60000,

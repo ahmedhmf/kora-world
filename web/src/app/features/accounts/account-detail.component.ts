@@ -31,7 +31,564 @@ export class AccountDetailComponent implements OnInit {
   loading = signal(false);
   error = signal<string | null>(null);
 
-  activeTab = signal<'details' | 'forecasts'>('details');
+  activeTab = signal<'details' | 'forecasts' | 'inventory' | 'financials'>('details');
+  inventory = signal<Array<{
+    productId: number; articleNumber: string; productName: string; quantity: number;
+    deliveries: Array<{ noteId: number; noteNumber: string; deliveryDate: string; quantity: number }>;
+  }>>([]);
+  inventoryError = signal('');
+  statementFrom = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toLocaleDateString('en-CA');
+  statementTo = new Date().toLocaleDateString('en-CA');
+  statementCurrency = '';
+  statementPreview = signal<any | null>(null);
+  statementHistory = signal<any[]>([]);
+  statementError = signal('');
+  statementBusy = signal(false);
+
+  loadStatements(): void {
+    const acct = this.account();
+    if (!acct) return;
+    this.api.getCustomerStatements(acct.id).subscribe({
+      next: rows => this.statementHistory.set(rows),
+      error: () => this.statementError.set('Could not load saved statements'),
+    });
+  }
+
+  previewStatement(): void {
+    const acct = this.account();
+    if (!acct) return;
+    this.statementBusy.set(true); this.statementError.set('');
+    this.api.previewCustomerStatement(acct.id, this.statementFrom, this.statementTo, this.statementCurrency || undefined).subscribe({
+      next: result => { this.statementPreview.set(result); this.statementBusy.set(false); },
+      error: err => { this.statementError.set(err.error?.message || 'Statement preview failed'); this.statementBusy.set(false); },
+    });
+  }
+
+  saveStatement(): void {
+    const acct = this.account();
+    if (!acct) return;
+    this.statementBusy.set(true); this.statementError.set('');
+    this.api.saveCustomerStatement(acct.id, {
+      from: this.statementFrom, to: this.statementTo, currency: this.statementCurrency || undefined,
+    }).subscribe({
+      next: saved => { this.statementPreview.set(saved.snapshot); this.statementBusy.set(false); this.loadStatements(); },
+      error: err => { this.statementError.set(err.error?.message || 'Could not save statement'); this.statementBusy.set(false); },
+    });
+  }
+
+  viewSavedStatement(id: number): void {
+    const acct = this.account();
+    if (!acct) return;
+    this.api.getSavedCustomerStatement(acct.id, id).subscribe({
+      next: saved => this.statementPreview.set(saved.snapshot),
+      error: () => this.statementError.set('Could not open saved statement'),
+    });
+  }
+
+  async printStatement(): Promise<void> {
+    const data = this.statementPreview();
+    if (!data) return;
+    this.statementBusy.set(true);
+    this.statementError.set('');
+    try {
+      const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib');
+      // Angular copies web/public verbatim to the site's root.
+      const response = await fetch('/assets/kora-stationery.pdf');
+      if (!response.ok) throw new Error('KORA stationery not found at /assets/kora-stationery.pdf');
+      const templateBytes = await response.arrayBuffer();
+      const template = await PDFDocument.load(templateBytes);
+      if (template.getPageCount() < 1) throw new Error('KORA stationery PDF has no pages');
+      const output = await PDFDocument.create();
+      const regular = await output.embedFont(StandardFonts.Helvetica);
+      const bold = await output.embedFont(StandardFonts.HelveticaBold);
+      const black = rgb(0.12, 0.12, 0.12);
+      const grey = rgb(0.37, 0.37, 0.37);
+      const [templatePage] = await output.copyPages(template, [0]);
+      const pageWidth = templatePage.getWidth();
+      const pageHeight = templatePage.getHeight();
+      // Margins are proportional to the original branded page so the KORA
+      // border, top logo and black footer remain unobstructed.
+      const left = pageWidth * 0.095;
+      const right = pageWidth * 0.905;
+      const top = pageHeight * 0.915;
+      const bottom = pageHeight * 0.095;
+      const available = right - left;
+      let page = templatePage;
+      output.addPage(page);
+      let y = top;
+      let pageNumber = 1;
+
+      // Helvetica's built-in encoding is WinAnsi; replace unsupported glyphs
+      // rather than silently producing a corrupt PDF for customer text.
+      const safe = (v: unknown): string => String(v ?? '').replace(/[^\\x20-\\x7E\\xA0-\\xFF]/g, '?');
+      const width = (v: string, size: number, isBold = false) =>
+        (isBold ? bold : regular).widthOfTextAtSize(safe(v), size);
+      const fit = (v: unknown, max: number, size = 9, isBold = false): string => {
+        let value = safe(v);
+        if (width(value, size, isBold) <= max) return value;
+        while (value.length && width(value + '...', size, isBold) > max) value = value.slice(0, -1);
+        return value + '...';
+      };
+      const draw = (v: unknown, x: number, atY: number, size = 9, isBold = false, color = black) => {
+        page.drawText(safe(v), { x, y: atY, size, font: isBold ? bold : regular, color });
+      };
+      const rightText = (v: unknown, x: number, atY: number, size = 9, isBold = false) => {
+        const value = safe(v);
+        draw(value, x - width(value, size, isBold), atY, size, isBold);
+      };
+      const newPage = async () => {
+        const [copied] = await output.copyPages(template, [0]);
+        page = copied;
+        output.addPage(page);
+        pageNumber++;
+        y = top;
+        draw('CUSTOMER ACCOUNT STATEMENT (continued)', left, y, 11, true);
+        rightText('Page ' + pageNumber, right, y, 8);
+        y -= 30;
+      };
+      const ensureSpace = async (height: number) => {
+        if (y - height < bottom) await newPage();
+      };
+      const line = () => {
+        page.drawLine({ start: { x: left, y }, end: { x: right, y }, thickness: 0.6, color: grey });
+        y -= 13;
+      };
+      draw('CUSTOMER ACCOUNT STATEMENT', left, y, 15, true);
+      rightText('Page ' + pageNumber, right, y, 8);
+      y -= 26;
+      draw(fit(data.customer?.companyName, available, 11, true), left, y, 11, true);
+      y -= 16;
+      const address = [data.customer?.billingStreet, data.customer?.billingZip, data.customer?.billingCity,
+        data.customer?.billingCountry].filter(Boolean).join(', ');
+      if (address) { draw(fit(address, available, 9), left, y, 9); y -= 15; }
+      draw('Account: ' + safe(data.customer?.accountNumber || data.accountId), left, y);
+      y -= 16;
+      draw('Period: ' + safe(data.periodFrom) + ' to ' + safe(data.periodTo), left, y);
+      rightText('Currency: ' + safe(data.currency), right, y);
+      y -= 19;
+      line();
+      draw('Opening balance', left, y, 10, true);
+      rightText(safe(data.openingBalance) + ' ' + safe(data.currency), right, y, 10, true);
+      y -= 22;
+
+      const cols = {
+        date: left, reference: left + available * 0.18,
+        type: left + available * 0.57, amount: left + available * 0.83, balance: right,
+      };
+      const tableHeader = () => {
+        draw('Date', cols.date, y, 8, true);
+        draw('Reference', cols.reference, y, 8, true);
+        draw('Type', cols.type, y, 8, true);
+        rightText('Amount', cols.amount, y, 8, true);
+        rightText('Balance', cols.balance, y, 8, true);
+        y -= 10;
+        line();
+      };
+      await ensureSpace(40);
+      tableHeader();
+      for (const item of data.transactions || []) {
+        if (y - 24 < bottom) { await newPage(); tableHeader(); }
+        draw(fit(item.date, available * 0.17, 8), cols.date, y, 8);
+        draw(fit(item.reference, available * 0.37, 8), cols.reference, y, 8);
+        draw(fit(item.type, available * 0.18, 8), cols.type, y, 8);
+        rightText(item.amount, cols.amount, y, 8);
+        rightText(item.runningBalance, cols.balance, y, 8);
+        y -= 19;
+      }
+      await ensureSpace(90);
+      line();
+      draw('Charges', left, y);
+      rightText(data.charges + ' ' + data.currency, right, y);
+      y -= 16;
+      draw('Credits', left, y);
+      rightText(data.credits + ' ' + data.currency, right, y);
+      y -= 18;
+      draw('CLOSING BALANCE', left, y, 11, true);
+      rightText(data.closingBalance + ' ' + data.currency, right, y, 11, true);
+      y -= 21;
+      draw('Unallocated customer credit', left, y, 9);
+      rightText((data.unallocatedCredit || '0.00') + ' ' + data.currency, right, y, 9);
+      y -= 17;
+      draw('Net exposure after credit', left, y, 9, true);
+      rightText((data.netExposure || data.closingBalance) + ' ' + data.currency, right, y, 9, true);
+      y -= 28;
+      if (data.overdue?.length) {
+        await ensureSpace(40);
+        draw('OVERDUE SETTLEMENTS', left, y, 10, true);
+        y -= 18;
+        for (const item of data.overdue) {
+          await ensureSpace(19);
+          draw(fit(item.reference + ' | Due ' + item.dueDate + ' | ' + item.daysOverdue +
+            ' days overdue', available * 0.76, 8), left, y, 8);
+          rightText(item.outstanding + ' ' + data.currency, right, y, 8);
+          y -= 17;
+        }
+      }
+      const bytes = await output.save();
+      const blob = new Blob([new Uint8Array(bytes)], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'KORA-Statement-' + data.accountId + '-' + data.periodFrom + '-to-' + data.periodTo + '.pdf';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+      this.statementError.set(err instanceof Error ? err.message : 'Could not generate branded statement PDF');
+    } finally {
+      this.statementBusy.set(false);
+    }
+  }
+
+  pricingRules = signal<any[]>([]);
+  financialOverview = signal<any | null>(null);
+  financialError = signal('');
+  financialSuccess = signal('');
+  financialBusy = signal(false);
+  pricingProductId = 0;
+  pricingKind = 'customer_fixed';
+  pricingUnitPrice = '';
+  pricingCommission = '20';
+  pricingRetailPrice = '';
+  pricingEffectiveFrom = new Date().toISOString().slice(0, 10);
+  pricingEffectiveTo = '';
+  paymentAmount = '';
+  paymentDate = new Date().toISOString().slice(0, 10);
+  paymentReference = '';
+  paymentMethod = 'bank_transfer';
+  allocationPaymentId = 0;
+  allocationSettlementId = 0;
+  allocationAmount = '';
+  salesRetailPrices: Record<string, string> = {};
+  editingRetailPrices: Record<string, string> = {};
+  settlementPreview = signal<any | null>(null);
+
+  showFinancials(): void { this.activeTab.set('financials'); this.loadFinancials(); this.loadStatements(); }
+  loadFinancials(): void {
+    const acct = this.account();
+    if (!acct) return;
+    this.financialError.set('');
+    this.api.getCustomerPricing(acct.id).subscribe({
+      next: rows => this.pricingRules.set(rows),
+      error: () => this.financialError.set('Could not load pricing agreements'),
+    });
+    this.api.getCustomerFinancialOverview(acct.id).subscribe({
+      next: data => this.financialOverview.set(data),
+      error: () => this.financialError.set('Could not load financial balances'),
+    });
+  }
+  addPricingRule(): void {
+    const acct = this.account();
+    if (!acct || !this.pricingProductId) { this.financialError.set('Select a product'); return; }
+    this.financialBusy.set(true); this.financialError.set('');
+    this.api.addCustomerPricing(acct.id, {
+      productId: Number(this.pricingProductId), kind: this.pricingKind,
+      unitPrice: this.pricingUnitPrice, commissionPercent: this.pricingCommission,
+      agreedRetailPrice: this.pricingRetailPrice, effectiveFrom: this.pricingEffectiveFrom,
+      effectiveTo: this.pricingEffectiveTo || undefined,
+    }).subscribe({
+      next: () => { this.financialBusy.set(false); this.financialSuccess.set('Pricing agreement saved'); this.loadFinancials(); },
+      error: err => { this.financialBusy.set(false); this.financialError.set(err.error?.message || 'Could not save pricing agreement'); },
+    });
+  }
+  recordPayment(): void {
+    const acct = this.account();
+    if (!acct) return;
+    this.financialBusy.set(true); this.financialError.set('');
+    this.api.recordCustomerPayment(acct.id, {
+      amount: this.paymentAmount, paymentDate: this.paymentDate,
+      reference: this.paymentReference, method: this.paymentMethod,
+    }).subscribe({
+      next: () => { this.financialBusy.set(false); this.paymentAmount = ''; this.paymentReference = ''; this.financialSuccess.set('Payment recorded; allocate it to a settlement below'); this.loadFinancials(); },
+      error: err => { this.financialBusy.set(false); this.financialError.set(err.error?.message || 'Could not record payment'); },
+    });
+  }
+  allocatePayment(): void {
+    const acct = this.account();
+    if (!acct) return;
+    this.financialBusy.set(true); this.financialError.set('');
+    this.api.allocateCustomerPayment(acct.id, {
+      paymentId: Number(this.allocationPaymentId), settlementId: Number(this.allocationSettlementId),
+      amount: this.allocationAmount,
+    }).subscribe({
+      next: () => { this.financialBusy.set(false); this.allocationAmount = ''; this.financialSuccess.set('Payment allocated'); this.loadFinancials(); },
+      error: err => { this.financialBusy.set(false); this.financialError.set(err.error?.message || 'Could not allocate payment'); },
+    });
+  }
+  previewReport(report: any): void {
+    this.salesError.set('');
+    this.api.previewSalesSettlement(report.id).subscribe({
+      next: result => this.settlementPreview.set({ reportId: report.id, ...result }),
+      error: err => this.salesError.set(err.error?.message || 'Cannot calculate settlement; check pricing agreements and retail prices'),
+    });
+  }
+
+  salesReports = signal<any[]>([]);
+  adjustments = signal<any[]>([]);
+  correctionProductId = 0;
+  correctionQuantity = -1;
+  correctionReason = 'stocktake';
+  correctionNotes = '';
+  editingReportId: number | null = null;
+  editingItems: Array<{ productId: number; quantity: number }> = [];
+  editingRemarks = '';
+  canManageInventory(): boolean {
+    return ['admin', 'employee'].includes(this.authService.currentUser()?.role || '');
+  }
+
+  startEditReport(report: any): void {
+    this.editingReportId = report.id;
+    this.editingItems = report.items.map((item: any) => ({ productId: item.productId, quantity: item.quantity }));
+    this.editingRemarks = report.remarks || '';
+    this.editingRetailPrices = { ...(report.retailPrices || {}) };
+  }
+
+  saveEditedReport(): void {
+    if (!this.editingReportId || !this.editingItems.length ||
+      this.editingItems.some(i => !i.productId || !Number.isInteger(Number(i.quantity)) || Number(i.quantity) < 1) ||
+      new Set(this.editingItems.map(i => i.productId)).size !== this.editingItems.length) {
+      this.salesError.set('Enter unique products with positive quantities');
+      return;
+    }
+    this.salesBusy.set(true); this.salesError.set('');
+    this.api.updateWeeklySalesDraft(this.editingReportId, {
+      items: this.editingItems.map(i => ({ productId: Number(i.productId), quantity: Number(i.quantity) })),
+      remarks: this.editingRemarks, retailPrices: this.editingRetailPrices,
+    }).subscribe({
+      next: () => { this.salesBusy.set(false); this.editingReportId = null; this.salesSuccess.set('Draft updated'); this.loadInventory(); },
+      error: err => { this.salesBusy.set(false); this.salesError.set(err.error?.message || 'Could not update draft'); },
+    });
+  }
+
+  async cancelReport(report: any): Promise<void> {
+    const reason = window.prompt('Reason for cancelling this report (required):');
+    if (!reason?.trim()) return;
+    const ok = await this.dialogService.confirm('Cancel sales report',
+      'Cancel this report? If it was approved, its deducted stock will be restored. The report stays in history.');
+    if (!ok) return;
+    this.salesBusy.set(true); this.salesError.set('');
+    this.api.cancelWeeklySalesReport(report.id, reason.trim()).subscribe({
+      next: () => { this.salesBusy.set(false); this.salesSuccess.set('Report cancelled'); this.loadInventory(); },
+      error: err => { this.salesBusy.set(false); this.salesError.set(err.error?.message || 'Could not cancel report'); },
+    });
+  }
+
+  async saveCorrection(): Promise<void> {
+    const acct = this.account();
+    if (!acct || !this.correctionProductId || !Number.isInteger(Number(this.correctionQuantity)) ||
+      !Number(this.correctionQuantity) || !this.correctionNotes.trim()) {
+      this.salesError.set('Select product, non-zero whole-number adjustment and explanation');
+      return;
+    }
+    const ok = await this.dialogService.confirm('Confirm inventory correction',
+      'Apply this inventory adjustment? It will be permanently recorded in the audit history.');
+    if (!ok) return;
+    this.salesBusy.set(true); this.salesError.set('');
+    this.api.createInventoryAdjustment(acct.id, {
+      productId: Number(this.correctionProductId), quantity: Number(this.correctionQuantity),
+      reason: this.correctionReason, notes: this.correctionNotes.trim(),
+    }).subscribe({
+      next: () => { this.salesBusy.set(false); this.correctionNotes = ''; this.salesSuccess.set('Stock correction recorded'); this.loadInventory(); },
+      error: err => { this.salesBusy.set(false); this.salesError.set(err.error?.message || 'Could not record correction'); },
+    });
+  }
+  salesError = signal('');
+  salesSuccess = signal('');
+  salesBusy = signal(false);
+  salesFile: File | null = null;
+  salesYear = this.currentIsoYear();
+
+  private currentIsoYear(): number {
+    const date = new Date();
+    const utc = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    utc.setUTCDate(utc.getUTCDate() + 4 - (utc.getUTCDay() || 7));
+    return utc.getUTCFullYear();
+  }
+  salesWeek = this.currentIsoWeek();
+
+  private currentIsoWeek(): number {
+    const now = new Date();
+    const date = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+    date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7));
+    const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+    return Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  }
+
+  reportWeekLabel(weekStart: string): string {
+    const date = new Date(weekStart + 'T00:00:00Z');
+    if (Number.isNaN(date.getTime())) return weekStart;
+    date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7));
+    const year = date.getUTCFullYear();
+    const first = new Date(Date.UTC(year, 0, 1));
+    const week = Math.ceil(((date.getTime() - first.getTime()) / 86400000 + 1) / 7);
+    return 'Week ' + week + ' / ' + year;
+  }
+
+  private isoWeekDates(year: number, week: number): { weekStart: string; weekEnd: string } | null {
+    if (!Number.isInteger(year) || year < 2000 || year > 2100 || !Number.isInteger(week) || week < 1 || week > 53) return null;
+    const jan4 = new Date(Date.UTC(year, 0, 4));
+    const monday = new Date(jan4);
+    monday.setUTCDate(jan4.getUTCDate() - (jan4.getUTCDay() || 7) + 1 + (week - 1) * 7);
+    const thursday = new Date(monday);
+    thursday.setUTCDate(monday.getUTCDate() + 3);
+    if (thursday.getUTCFullYear() !== year) return null;
+    const sunday = new Date(monday);
+    sunday.setUTCDate(monday.getUTCDate() + 6);
+    return { weekStart: monday.toISOString().slice(0, 10), weekEnd: sunday.toISOString().slice(0, 10) };
+  }
+  salesRemarks = '';
+  salesItems: Array<{ productId: number; quantity: number }> = [{ productId: 0, quantity: 1 }];
+
+  selectSalesPdf(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0] || null;
+    this.salesFile = file && file.type === 'application/pdf' && file.size <= 15 * 1024 * 1024 ? file : null;
+    if (file && !this.salesFile) this.salesError.set('Choose a PDF under 15 MB');
+    else this.salesError.set('');
+  }
+
+  addSalesItem(): void { this.salesItems.push({ productId: 0, quantity: 1 }); }
+  removeSalesItem(index: number): void { this.salesItems.splice(index, 1); }
+
+  saveSalesDraft(): void {
+    const acct = this.account();
+    const period = this.isoWeekDates(Number(this.salesYear), Number(this.salesWeek));
+    if (!acct || !this.salesFile || !period || !this.salesItems.length ||
+      this.salesItems.some(i => !i.productId || !Number.isInteger(Number(i.quantity)) || Number(i.quantity) < 1) ||
+      new Set(this.salesItems.map(i => i.productId)).size !== this.salesItems.length) {
+      this.salesError.set('Provide a PDF, valid ISO work week and year, and unique products with positive quantities.');
+      return;
+    }
+    this.salesBusy.set(true); this.salesError.set(''); this.salesSuccess.set('');
+    this.api.uploadFile(this.salesFile).subscribe({
+      next: uploaded => this.api.createWeeklySalesReport(acct.id, {
+        weekStart: period!.weekStart, weekEnd: period!.weekEnd,
+        filePath: uploaded.path, fileName: uploaded.name, remarks: this.salesRemarks, retailPrices: this.salesRetailPrices,
+        items: this.salesItems.map(i => ({ productId: Number(i.productId), quantity: Number(i.quantity) })),
+      }).subscribe({
+        next: () => {
+          this.salesBusy.set(false);
+          this.salesRetailPrices = {};
+          this.salesFile = null; this.salesRemarks = ''; this.salesItems = [{ productId: 0, quantity: 1 }];
+          this.salesSuccess.set('Draft saved. Review and approve it to deduct inventory.');
+          this.loadInventory();
+        },
+        error: err => { this.salesBusy.set(false); this.salesError.set(err.error?.message || 'Could not save sales report'); },
+      }),
+      error: () => { this.salesBusy.set(false); this.salesError.set('PDF upload failed'); },
+    });
+  }
+
+  async approveSalesReport(report: any): Promise<void> {
+    if (this.salesBusy()) return;
+    const ok = await this.dialogService.confirm('Approve weekly sales',
+      'Approve this report and deduct its sold quantities from customer inventory? This action cannot be undone.');
+    if (!ok) return;
+    this.salesBusy.set(true); this.salesError.set(''); this.salesSuccess.set('');
+    this.settlementPreview.set(null);
+    this.api.approveWeeklySalesReport(report.id).subscribe({
+      next: () => { this.salesBusy.set(false); this.salesSuccess.set('Report approved and inventory updated.'); this.loadInventory(); },
+      error: err => { this.salesBusy.set(false); this.salesError.set(err.error?.message || 'Could not approve report'); },
+    });
+  }
+
+  viewSalesPdf(report: any): void {
+    this.api.downloadFile(report.filePath).subscribe({
+      next: blob => {
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+      },
+      error: () => this.salesError.set('Could not open report PDF'),
+    });
+  }
+  loadInventory(): void {
+    const acct = this.account();
+    if (!acct) return;
+    this.inventoryError.set('');
+    this.api.getInventoryAdjustments(acct.id).subscribe({
+      next: rows => this.adjustments.set(rows),
+      error: () => this.salesError.set('Could not load stock adjustments'),
+    });
+    this.api.getWeeklySalesReports(acct.id).subscribe({
+      next: reports => this.salesReports.set(reports),
+      error: () => this.salesError.set('Could not load weekly sales reports'),
+    });
+    this.api.getAccountInventory(acct.id).subscribe({
+      next: rows => { this.inventory.set(rows); this.loadMovements(); },
+      error: () => this.inventoryError.set('Could not load customer inventory'),
+    });
+  }
+  inventoryMovements = signal<any[]>([]);
+  inventoryMovementBalances = signal<Array<{ productId: number; quantity: number }>>([]);
+  movementNotice = signal('');
+  movementError = signal('');
+  movementProductId = 0;
+  movementType = '';
+  movementFrom = '';
+  movementTo = '';
+  movementLoading = signal(false);
+
+  loadMovements(): void {
+    const acct = this.account();
+    if (!acct) return;
+    this.movementLoading.set(true);
+    this.movementError.set('');
+    this.api.getInventoryMovements(acct.id, {
+      productId: this.movementProductId || undefined,
+      type: this.movementType || undefined,
+      from: this.movementFrom || undefined,
+      to: this.movementTo || undefined,
+    }).subscribe({
+      next: result => {
+        this.inventoryMovements.set(result.movements);
+        this.inventoryMovementBalances.set(result.currentBalances);
+        this.movementNotice.set(result.timestampNotice || '');
+        this.movementLoading.set(false);
+      },
+      error: err => {
+        this.movementError.set(err.error?.message || 'Could not load movement history');
+        this.movementLoading.set(false);
+      },
+    });
+  }
+
+  inventoryReconciliation(): Array<{ productId: number; articleNumber: string; stock: number; ledger: number; matches: boolean }> {
+    const balances = new Map(this.inventoryMovementBalances().map(row => [row.productId, row.quantity]));
+    return this.inventory().map(row => ({
+      productId: row.productId, articleNumber: row.articleNumber, stock: row.quantity,
+      ledger: balances.get(row.productId) ?? 0, matches: row.quantity === (balances.get(row.productId) ?? 0),
+    }));
+  }
+
+  exportMovementsCsv(): void {
+    const headers = ['Timestamp', 'Document date', 'Article', 'Product', 'Type', 'Reference',
+      'Quantity change', 'Balance before', 'Balance after', 'Performed by', 'Reason', 'Notes', 'Timestamp estimated'];
+    const escapeCell = (value: unknown): string => {
+      let text = String(value ?? '');
+      // Prevent spreadsheet formula execution when the CSV is opened in Excel.
+      if (/^\s*[=+@-]/.test(text)) text = "'" + text;
+      return '"' + text.replace(/"/g, '""') + '"';
+    };
+    const rows = this.inventoryMovements().map(m => [
+      m.timestamp, m.documentDate, m.articleNumber, m.productName, m.type, m.reference,
+      m.quantityChange, m.balanceBefore, m.balanceAfter, m.performedBy, m.reason, m.notes, m.timestampEstimated,
+    ]);
+    const csv = '\uFEFF' + [headers, ...rows].map(row => row.map(escapeCell).join(',')).join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'kora-inventory-movements-' + this.account()?.id + '.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  showInventory(): void {
+    this.activeTab.set('inventory');
+    this.loadInventory();
+  }
 
   // Forecast-related state
   isModalOpen = signal(false);

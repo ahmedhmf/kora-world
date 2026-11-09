@@ -4,6 +4,8 @@ import { FormsModule } from '@angular/forms';
 import { AccountsStore } from '../../store/accounts.store';
 import { ApiService } from '../../core/services/api.service';
 import { CreateAccountDto, AccountStatus, CustomerType } from '../../core/models/account.model';
+import { DropdownOptionsService } from '../../core/services/dropdown-options.service';
+import { DropdownOption } from '../../core/models/dropdown-option.model';
 import { DialogService } from '../../core/services/dialog.service';
 
 @Component({
@@ -19,6 +21,8 @@ export class AccountFormComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly dialogService = inject(DialogService);
+  private readonly dropdownOptions = inject(DropdownOptionsService);
+  readonly paymentModels = signal<DropdownOption[]>([]);
 
   readonly isEdit = signal(false);
   private editId = signal<number | null>(null);
@@ -55,6 +59,11 @@ export class AccountFormComponent implements OnInit {
     shippingZip: '',
     shippingCountry: '',
     defaultCurrency: 'USD',
+    paymentModel: undefined,
+    consignmentPricingMethod: 'fixed',
+    settlementDueDay: 5,
+    upfrontPercent: 30,
+    balanceDue: 'Before delivery',
     paymentTerms: '',
     creditLimit: 0,
     vatNumber: '',
@@ -62,6 +71,10 @@ export class AccountFormComponent implements OnInit {
   };
 
   ngOnInit(): void {
+    this.dropdownOptions.getOptions('accountPaymentModel').subscribe({
+      next: options => { this.paymentModels.set(options); this.cdr.detectChanges(); },
+      error: err => console.error('Could not load account payment models', err),
+    });
     this.route.paramMap.subscribe((params) => {
       const id = params.get('id');
       if (id) {
@@ -86,6 +99,12 @@ export class AccountFormComponent implements OnInit {
               shippingZip: account.shippingZip || '',
               shippingCountry: account.shippingCountry || '',
               defaultCurrency: account.defaultCurrency || 'USD',
+              paymentModel: account.paymentModel || undefined,
+              consignmentPricingMethod: account.consignmentPricingMethod || 'fixed',
+              consignmentSharePercent: account.consignmentSharePercent ?? undefined,
+              settlementDueDay: account.settlementDueDay ?? 5,
+              upfrontPercent: account.upfrontPercent ?? 30,
+              balanceDue: account.balanceDue || 'Before delivery',
               paymentTerms: account.paymentTerms || '',
               creditLimit: account.creditLimit || 0,
               vatNumber: account.vatNumber || '',
@@ -123,11 +142,23 @@ export class AccountFormComponent implements OnInit {
       shippingZip: '',
       shippingCountry: '',
       defaultCurrency: 'USD',
+      consignmentPricingMethod: 'fixed',
+      settlementDueDay: 5,
+      upfrontPercent: 30,
+      balanceDue: 'Before delivery',
       paymentTerms: '',
       creditLimit: 0,
       vatNumber: '',
       remarks: '',
     };
+  }
+
+  isConsignment(): boolean {
+    return this.form.paymentModel === 'Consignment' || this.form.paymentModel === 'Consignment (Monthly Settlement)';
+  }
+
+  isHistoricalPaymentModel(): boolean {
+    return !!this.form.paymentModel && !['Full Payment Upfront', 'Split Payment', 'Consignment'].includes(this.form.paymentModel) && !this.paymentModels().some(option => option.value === this.form.paymentModel);
   }
 
   copyBillingToShipping(): void {
@@ -157,6 +188,12 @@ export class AccountFormComponent implements OnInit {
       shippingZip: this.form.shippingZip || undefined,
       shippingCountry: this.form.shippingCountry || undefined,
       defaultCurrency: this.form.defaultCurrency || 'USD',
+      paymentModel: this.form.paymentModel || undefined,
+      consignmentPricingMethod: this.isConsignment() ? this.form.consignmentPricingMethod || 'fixed' : undefined,
+      consignmentSharePercent: this.isConsignment() && this.form.consignmentPricingMethod === 'percentage' ? Number(this.form.consignmentSharePercent) : undefined,
+      settlementDueDay: this.isConsignment() ? Number(this.form.settlementDueDay) : undefined,
+      upfrontPercent: this.form.paymentModel === 'Split Payment' ? Number(this.form.upfrontPercent) : undefined,
+      balanceDue: this.form.paymentModel === 'Split Payment' ? this.form.balanceDue : undefined,
       paymentTerms: this.form.paymentTerms || undefined,
       creditLimit: this.form.creditLimit ? +this.form.creditLimit : 0,
       vatNumber: this.form.vatNumber || undefined,
