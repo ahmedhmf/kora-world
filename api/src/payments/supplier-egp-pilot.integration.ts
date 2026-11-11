@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, ForbiddenException } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { SupplierEgpPilotService } from './supplier-egp-pilot.service';
 import { AccountingAccount, AccountType } from '../accounting/entities/accounting-account.entity';
@@ -15,6 +15,7 @@ import { PurchaseOrderLineItem } from '../purchase-orders/entities/purchase-orde
 import { Supplier } from '../suppliers/entities/supplier.entity';
 import { SupplierContact } from '../suppliers/entities/supplier-contact.entity';
 import { Product } from '../products/entities/product.entity';
+import { User } from '../users/entities/user.entity';
 
 dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
@@ -32,6 +33,8 @@ describe('Supplier EGP pilot (local PostgreSQL integration)', () => {
   let expenseId: number;
   let invoiceId: number;
   let bookingId: number;
+  let accountantId: number;
+  let employeeId: number;
   const priorEnv = process.env.SUPPLIER_EGP_PILOT;
 
   const args = (requestKey = randomUUID(), amountCents = 40000) => ({
@@ -60,7 +63,7 @@ describe('Supplier EGP pilot (local PostgreSQL integration)', () => {
       entities: [
         AccountingAccount, JournalEntry, JournalLine,
         Invoice, InvoiceLine, Payment, PurchaseOrder,
-        PurchaseOrderLineItem, Supplier, SupplierContact, Product,
+        PurchaseOrderLineItem, Supplier, SupplierContact, Product, User,
       ],
       synchronize: false, migrationsRun: false, logging: false,
     });
@@ -137,6 +140,18 @@ describe('Supplier EGP pilot (local PostgreSQL integration)', () => {
       }),
     );
     bookingId = booked.id;
+    const users = await db.getRepository(User).save([
+      db.getRepository(User).create({
+        email: `it-accountant-${tag}@example.invalid`,
+        password: 'NOT-A-LOGIN', name: 'Disposable Accountant', role: 'accountant',
+      }),
+      db.getRepository(User).create({
+        email: `it-employee-${tag}@example.invalid`,
+        password: 'NOT-A-LOGIN', name: 'Disposable Employee', role: 'employee',
+      }),
+    ]);
+    accountantId = users[0].id;
+    employeeId = users[1].id;
   });
 
   afterEach(async () => {
@@ -147,9 +162,11 @@ describe('Supplier EGP pilot (local PostgreSQL integration)', () => {
       await db.getRepository(Payment).delete({ invoiceId });
       await db.getRepository(Invoice).delete({ id: invoiceId });
     }
+    if (accountantId) await db.getRepository(User).delete({ id: accountantId });
+    if (employeeId) await db.getRepository(User).delete({ id: employeeId });
     if (bankId) await db.getRepository(AccountingAccount).delete({ id: bankId });
     if (expenseId) await db.getRepository(AccountingAccount).delete({ id: expenseId });
-    invoiceId = 0; bookingId = 0; bankId = 0; expenseId = 0;
+    invoiceId = 0; bookingId = 0; bankId = 0; expenseId = 0; accountantId = 0; employeeId = 0;
   });
 
   afterAll(async () => {
@@ -276,6 +293,74 @@ describe('Supplier EGP pilot (local PostgreSQL integration)', () => {
       [firstRow.request_key, second.paymentId],
     )).rejects.toMatchObject({ code: '23505' });
     expect(await db.getRepository(Payment).countBy({ invoiceId })).toBe(2);
+  });
+
+  it('reverses a full payment without deleting payment or original journal', async () => {
+    const saved = await service.create(args(randomUUID(), 100000));
+    const reversed = await service.reverse(saved.paymentId, accountantId, 'Incorrect bank transfer');
+    expect(reversed.status).toBe('sent');
+    expect(reversed.remainingCents).toBe(100000);
+    expect(await db.getRepository(Payment).countBy({ invoiceId })).toBe(1);
+    const original = await db.getRepository(JournalEntry).findOneByOrFail({ id: saved.journalId });
+    expect(original.postingStatus).toBe('reversed');
+    expect(original.reversedById).toBe(accountantId);
+    const reversal = await db.getRepository(JournalEntry).findOne({
+      where: { id: reversed.reversalJournalId }, relations: { lines: true },
+    });
+    expect(reversal?.reversalOfId).toBe(original.id);
+    expect(reversal?.sourceEventKey).toBe(`supplier-payment:${saved.paymentId}:reversal:v1`);
+    const values = await db.query(`
+      SELECT l.account_id AS account_id, SUM(l.debit - l.credit)::numeric AS net
+      FROM journal_lines l JOIN journal_entries j ON j.id=l.journal_entry_id
+      WHERE j.id = $1 OR j.id = $2 GROUP BY l.account_id
+    `, [original.id, reversed.reversalJournalId]);
+    expect(values).toHaveLength(2);
+    expect(values.every((v: {net: string}) => Number(v.net) === 0)).toBe(true);
+    await expect(service.reverse(saved.paymentId, accountantId, 'Again'))
+      .rejects.toThrow(ConflictException);
+    expect(await db.getRepository(JournalEntry).countBy({
+      reversalOfId: saved.journalId,
+    })).toBe(1);
+  });
+
+  it('recomputes outstanding balance using only unreversed settlements', async () => {
+    const first = await service.create(args(randomUUID(), 40000));
+    await service.create(args(randomUUID(), 20000));
+    const reversed = await service.reverse(first.paymentId, accountantId, 'First transfer returned');
+    expect(reversed).toEqual(expect.objectContaining({
+      status: 'partially_paid', remainingCents: 80000,
+    }));
+    const replacement = await service.create(args(randomUUID(), 80000));
+    expect(replacement).toEqual(expect.objectContaining({ status: 'paid', remainingCents: 0 }));
+    expect(await db.getRepository(Payment).countBy({ invoiceId })).toBe(3);
+    expect(await db.getRepository(JournalEntry).countBy({
+      invoiceId, type: JournalEntryType.PAYMENT,
+    })).toBe(4); // three original journals + one reversal
+  });
+
+  it('rejects reversal by an employee or without a reason', async () => {
+    const saved = await service.create(args());
+    await expect(service.reverse(saved.paymentId, employeeId, 'Not authorized'))
+      .rejects.toThrow(ForbiddenException);
+    await expect(service.reverse(saved.paymentId, accountantId, ' '))
+      .rejects.toThrow();
+    expect((await db.getRepository(JournalEntry).findOneByOrFail({ id: saved.journalId })).postingStatus)
+      .toBe('posted');
+  });
+
+  it('allows only one of two simultaneous reversals to commit', async () => {
+    const saved = await service.create(args());
+    const outcomes = await Promise.allSettled([
+      service.reverse(saved.paymentId, accountantId, 'Duplicate request A'),
+      service.reverse(saved.paymentId, accountantId, 'Duplicate request B'),
+    ]);
+    expect(outcomes.filter(r => r.status === 'fulfilled')).toHaveLength(1);
+    expect(outcomes.filter(r => r.status === 'rejected')).toHaveLength(1);
+    expect(await db.getRepository(JournalEntry).countBy({
+      reversalOfId: saved.journalId,
+    })).toBe(1);
+    const invoice = await db.getRepository(Invoice).findOneByOrFail({ id: invoiceId });
+    expect(invoice.status).toBe('sent');
   });
 
   it('rolls back payment, journal, and invoice status when a transaction fails after writing', async () => {
