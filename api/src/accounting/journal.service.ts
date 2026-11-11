@@ -147,6 +147,7 @@ export class JournalService {
     const query = this.lineRepo
       .createQueryBuilder('line')
       .innerJoin('line.journalEntry', 'entry')
+      .andWhere('entry.posting_status IN (:...includedStatuses)', { includedStatuses: ['posted', 'reversed'] })
       .select('SUM(line.debit)', 'totalDebit')
       .addSelect('SUM(line.credit)', 'totalCredit')
       .where('line.accountId = :accountId', { accountId });
@@ -227,6 +228,7 @@ export class JournalService {
       const priorLines = await this.lineRepo
         .createQueryBuilder('line')
         .innerJoin('line.journalEntry', 'entry')
+      .andWhere('entry.posting_status IN (:...includedStatuses)', { includedStatuses: ['posted', 'reversed'] })
         .where('line.accountId = :accountId', { accountId })
         .andWhere('entry.date < :startDate', {
           startDate: new Date(startDate).toISOString().split('T')[0],
@@ -242,6 +244,7 @@ export class JournalService {
     const query = this.lineRepo
       .createQueryBuilder('line')
       .innerJoinAndSelect('line.journalEntry', 'entry')
+      .andWhere('entry.posting_status IN (:...includedStatuses)', { includedStatuses: ['posted', 'reversed'] })
       .where('line.accountId = :accountId', { accountId })
       .addOrderBy('entry.date', 'ASC')
       .addOrderBy('line.id', 'ASC');
