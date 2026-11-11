@@ -94,7 +94,8 @@ export function buildSupplierSettlementEvent(
     throw new BadRequestException('Payment date is invalid');
   }
   calculateSupplierSettlement(invoice, payment.amountCents);
-  if (payableAccount.id === bankAccount.id ||
+  if (payment.bankAccountId !== bankAccount.id ||
+      payableAccount.id === bankAccount.id ||
       payableAccount.type !== AccountType.LIABILITY ||
       payableAccount.code !== '2100' ||
       bankAccount.type !== AccountType.ASSET ||
