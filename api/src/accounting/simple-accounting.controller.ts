@@ -1,7 +1,8 @@
 import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '../auth/auth.guard';
 import type { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
-import { SimpleAccountingService, SimpleTransactionInput } from './simple-accounting.service';
+import { SimpleAccountingService } from './simple-accounting.service';
+import type { SimpleTransactionInput } from './simple-accounting.service';
 
 @Controller('accounting/simple')
 @UseGuards(AuthGuard)
