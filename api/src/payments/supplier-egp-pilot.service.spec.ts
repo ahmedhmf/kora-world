@@ -88,6 +88,7 @@ describe('SupplierEgpPilotService — disabled-by-default EGP transaction path',
 
   beforeEach(() => {
     jest.clearAllMocks();
+    db.transaction.mockImplementation(async (_isolation: string, fn: (m: typeof manager) => Promise<unknown>) => fn(manager));
     process.env.SUPPLIER_EGP_PILOT = 'true';
     process.env.DATABASE_NAME = 'kora_test';
     process.env.DATABASE_HOST = '127.0.0.1';
@@ -187,6 +188,48 @@ describe('SupplierEgpPilotService — disabled-by-default EGP transaction path',
     }];
     await expect(service.create(input)).rejects.toThrow(ConflictException);
     expect(manager.save).not.toHaveBeenCalled();
+  });
+
+  it('retries a transient 40001 serialization conflict using the same request key', async () => {
+    const originalTransaction = db.transaction.getMockImplementation()!;
+    let attempts = 0;
+    db.transaction.mockImplementation(async (isolation, callback) => {
+      attempts++;
+      if (attempts === 1) {
+        throw { code: '40001', message: 'could not serialize access' };
+      }
+      return originalTransaction(isolation, callback);
+    });
+
+    const result = await service.create(input);
+    expect(result.paymentId).toBe(99);
+    expect(result.replayed).toBe(false);
+    expect(db.transaction).toHaveBeenCalledTimes(2);
+    expect(state.savedPayment.reference).toBe('SEGP-' + input.requestKey);
+  });
+
+  it('stops after three serialization conflicts without persisting a payment', async () => {
+    db.transaction.mockRejectedValue({
+      driverError: { code: '40001' }, message: 'serialization failed',
+    });
+    await expect(service.create(input)).rejects.toMatchObject({
+      driverError: { code: '40001' },
+    });
+    expect(db.transaction).toHaveBeenCalledTimes(3);
+    expect(manager.save).not.toHaveBeenCalled();
+  });
+
+  it('does not retry validation errors, ordinary failures, or uniqueness errors', async () => {
+    for (const error of [
+      new BadRequestException('invalid amount'),
+      new Error('connection failure'),
+      { driverError: { code: '23505' }, message: 'unique key' },
+    ]) {
+      db.transaction.mockReset();
+      db.transaction.mockRejectedValue(error);
+      await expect(service.create(input)).rejects.toBe(error);
+      expect(db.transaction).toHaveBeenCalledTimes(1);
+    }
   });
 
   it('propagates journal failure so the real transaction manager can roll back', async () => {
