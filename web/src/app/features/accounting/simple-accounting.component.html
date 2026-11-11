@@ -1,0 +1,129 @@
+<div class="max-w-5xl mx-auto p-6 md:p-8 text-zinc-100">
+  <div class="flex flex-wrap justify-between items-start gap-3 mb-6">
+    <div>
+      <h1 class="text-2xl font-bold">Simple Accounting</h1>
+      <p class="text-zinc-400 mt-1 text-sm">Record business money movements without journal debits and credits.</p>
+    </div>
+    <a routerLink="/accounting/journal" class="border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-900">View history &amp; approvals</a>
+  </div>
+
+  <p class="rounded-lg border border-amber-900/60 bg-amber-950/20 p-3 text-xs text-amber-200 mb-5">
+    EGP only in this first version. For an existing invoice, customer delivery, or purchase order, use its dedicated Kora World workflow—not this form—to avoid recording it twice.
+  </p>
+
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+    <button type="button" (click)="choose('expense')"
+      [class.border-white]="kind() === 'expense'" [class.bg-zinc-800]="kind() === 'expense'"
+      class="text-left p-4 border border-zinc-700 rounded-xl hover:bg-zinc-900">
+      <div class="text-xl mb-2">↗</div>
+      <div class="font-bold">Money Out</div>
+      <p class="text-zinc-400 text-xs mt-1">Standalone business expenses</p>
+    </button>
+    <button type="button" (click)="choose('income')"
+      [class.border-white]="kind() === 'income'" [class.bg-zinc-800]="kind() === 'income'"
+      class="text-left p-4 border border-zinc-700 rounded-xl hover:bg-zinc-900">
+      <div class="text-xl mb-2">↙</div>
+      <div class="font-bold">Money In</div>
+      <p class="text-zinc-400 text-xs mt-1">Other income, not customer invoice receipts</p>
+    </button>
+    <button type="button" (click)="choose('transfer')"
+      [class.border-white]="kind() === 'transfer'" [class.bg-zinc-800]="kind() === 'transfer'"
+      class="text-left p-4 border border-zinc-700 rounded-xl hover:bg-zinc-900">
+      <div class="text-xl mb-2">⇄</div>
+      <div class="font-bold">Transfer</div>
+      <p class="text-zinc-400 text-xs mt-1">Between your cash/bank accounts</p>
+    </button>
+  </div>
+
+  @if (error()) {
+    <div role="alert" class="mb-4 rounded-lg border border-red-800 bg-red-950/30 p-3 text-red-200 text-sm">{{ error() }}</div>
+  }
+  @if (success()) {
+    <div role="status" class="mb-4 rounded-lg border border-emerald-900 bg-emerald-950/30 p-3 text-emerald-300 text-sm">
+      {{ success() }}
+      <a routerLink="/accounting/journal" class="underline ml-2">View journal</a>
+    </div>
+  }
+
+  <div class="rounded-xl border border-zinc-800 bg-zinc-950 p-5 md:p-7">
+    <h2 class="text-lg font-semibold mb-4">
+      @switch (kind()) {
+        @case ('expense') { Record a Business Expense }
+        @case ('income') { Record Other Income }
+        @case ('transfer') { Transfer Between Accounts }
+      }
+    </h2>
+    @if (loading()) {
+      <p class="text-sm text-zinc-400 mb-3">Loading your accounts…</p>
+    }
+    @if (!loading() && (moneyAccounts().length === 0 || (kind() !== 'transfer' && categories().length === 0))) {
+      <p class="text-sm text-amber-300 mb-4">No eligible EGP cash/bank or category accounts found. Configure active leaf EGP accounts in the Chart of Accounts first.</p>
+    }
+
+    <form (ngSubmit)="save()" class="space-y-5">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <label class="block text-sm">Date
+          <input type="date" name="date" [(ngModel)]="form.date"
+            class="mt-2 block w-full bg-zinc-900 border border-zinc-700 rounded-lg p-3 text-zinc-100"/>
+        </label>
+        <label class="block text-sm">Amount (EGP)
+          <input type="number" min="0.01" step="0.01" name="amount" [(ngModel)]="form.amount" placeholder="e.g. 2000.00"
+            class="mt-2 block w-full bg-zinc-900 border border-zinc-700 rounded-lg p-3 text-zinc-100"/>
+        </label>
+      </div>
+      <label class="block text-sm">Description — what happened?
+        <input name="description" [(ngModel)]="form.description" maxlength="500" placeholder="e.g. Office supplies"
+          class="mt-2 block w-full bg-zinc-900 border border-zinc-700 rounded-lg p-3 text-zinc-100"/>
+      </label>
+
+      <label class="block text-sm">
+        {{ kind() === 'income' ? 'Where did the money arrive?' : kind() === 'transfer' ? 'Transfer from' : 'How was it paid?' }}
+        <select name="cashAccountId" [(ngModel)]="form.cashAccountId"
+          class="mt-2 block w-full bg-zinc-900 border border-zinc-700 rounded-lg p-3 text-zinc-100">
+          <option [ngValue]="0">Select a cash/bank account</option>
+          @for (account of moneyAccounts(); track account.id) {
+            <option [ngValue]="account.id">{{ account.name }} ({{ account.code }})</option>
+          }
+        </select>
+      </label>
+
+      @if (kind() === 'transfer') {
+        <label class="block text-sm">Transfer to
+          <select name="destinationAccountId" [(ngModel)]="form.destinationAccountId"
+            class="mt-2 block w-full bg-zinc-900 border border-zinc-700 rounded-lg p-3 text-zinc-100">
+            <option [ngValue]="0">Select receiving cash/bank account</option>
+            @for (account of moneyAccounts(); track account.id) {
+              <option [ngValue]="account.id" [disabled]="account.id === +form.cashAccountId">{{ account.name }} ({{ account.code }})</option>
+            }
+          </select>
+        </label>
+      } @else {
+        <label class="block text-sm">
+          {{ kind() === 'expense' ? 'What was the expense for?' : 'What type of income was this?' }}
+          <select name="categoryAccountId" [(ngModel)]="form.categoryAccountId"
+            class="mt-2 block w-full bg-zinc-900 border border-zinc-700 rounded-lg p-3 text-zinc-100">
+            <option [ngValue]="0">Select a category</option>
+            @for (account of categories(); track account.id) {
+              <option [ngValue]="account.id">{{ account.name }}</option>
+            }
+          </select>
+        </label>
+      }
+
+      <div class="border-t border-zinc-800 pt-4 flex flex-wrap items-center justify-between gap-3">
+        <p class="text-xs text-zinc-400 max-w-sm">
+          {{ isAdmin()
+            ? 'As Admin, a valid transaction will be posted immediately.'
+            : 'Your transaction will go to Admin for approval before it affects the accounts.' }}
+        </p>
+        <button type="submit" [disabled]="!!validation() || busy() || loading()"
+          class="px-5 py-2.5 bg-white text-zinc-950 rounded-lg font-semibold text-sm disabled:opacity-40">
+          {{ busy() ? 'Saving…' : isAdmin() ? 'Save & Post' : 'Send for Approval' }}
+        </button>
+      </div>
+      @if (validation()) {
+        <p class="text-xs text-zinc-500">To continue: {{ validation() }}</p>
+      }
+    </form>
+  </div>
+</div>
