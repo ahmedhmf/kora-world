@@ -59,6 +59,7 @@ export class ReportsService {
     const lines = await this.lineRepo
       .createQueryBuilder('line')
       .innerJoinAndSelect('line.journalEntry', 'entry')
+      .andWhere('entry.posting_status IN (:...includedStatuses)', { includedStatuses: ['posted', 'reversed'] })
       .innerJoinAndSelect('line.account', 'account')
       .where('entry.date >= :startDate', { startDate: formattedStartDate })
       .andWhere('entry.date <= :endDate', { endDate: formattedEndDate })
@@ -177,6 +178,7 @@ export class ReportsService {
     const lines = (await this.lineRepo
       .createQueryBuilder('line')
       .innerJoin('line.journalEntry', 'entry')
+      .andWhere('entry.posting_status IN (:...includedStatuses)', { includedStatuses: ['posted', 'reversed'] })
       .select('line.accountId', 'accountId')
       .addSelect('SUM(line.amount_base)', 'totalAmountBase')
       .where('entry.date <= :asOfDate', { asOfDate: formattedAsOf })
@@ -277,6 +279,7 @@ export class ReportsService {
     const lines = await this.lineRepo
       .createQueryBuilder('line')
       .innerJoinAndSelect('line.journalEntry', 'entry')
+      .andWhere('entry.posting_status IN (:...includedStatuses)', { includedStatuses: ['posted', 'reversed'] })
       .innerJoinAndSelect('line.account', 'account')
       .where('entry.date >= :startDate', { startDate: formattedStartDate })
       .andWhere('entry.date <= :endDate', { endDate: formattedEndDate })
