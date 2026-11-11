@@ -25,8 +25,8 @@ export class CreateUserDto {
   })
   password: string;
 
-  @IsEnum(['admin', 'employee', 'supplier'], {
-    message: 'Role must be one of admin, employee, or supplier',
+  @IsEnum(['admin', 'accountant', 'employee', 'supplier'], {
+    message: 'Role must be one of admin, accountant, employee, or supplier',
   })
   @IsOptional()
   role?: string;
