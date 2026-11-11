@@ -7,6 +7,7 @@ dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 import { ConflictException } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { AccountingPostingService } from './accounting-posting.service';
+import { JournalWorkflowService } from './journal-workflow.service';
 import { AccountingAccount } from './entities/accounting-account.entity';
 import { JournalEntry, JournalEntryType } from './entities/journal-entry.entity';
 import { JournalLine } from './entities/journal-line.entity';
@@ -15,6 +16,7 @@ import { PurchaseOrder } from '../purchase-orders/entities/purchase-order.entity
 import { Supplier } from '../suppliers/entities/supplier.entity';
 import { SupplierContact } from '../suppliers/entities/supplier-contact.entity';
 import { Product } from '../products/entities/product.entity';
+import { User } from '../users/entities/user.entity';
 import { PurchaseOrderLineItem } from '../purchase-orders/entities/purchase-order-line-item.entity';
 import { InvoiceLine } from '../invoices/entities/invoice-line.entity';
 
@@ -27,6 +29,10 @@ import { InvoiceLine } from '../invoices/entities/invoice-line.entity';
 describe('AccountingPostingService (PostgreSQL integration)', () => {
   let db: DataSource;
   let service: AccountingPostingService;
+  let workflow: JournalWorkflowService;
+  let employeeId: number;
+  let accountantId: number;
+  const workflowJournalIds: number[] = [];
   let debitAccountId: number;
   let creditAccountId: number;
   const eventKeys: string[] = [];
@@ -66,7 +72,7 @@ describe('AccountingPostingService (PostgreSQL integration)', () => {
       entities: [
         AccountingAccount, JournalEntry, JournalLine,
         Invoice, InvoiceLine, PurchaseOrder, PurchaseOrderLineItem,
-        Supplier, SupplierContact, Product,
+        Supplier, SupplierContact, Product, User,
       ],
       synchronize: false,
       migrationsRun: false,
@@ -87,10 +93,16 @@ describe('AccountingPostingService (PostgreSQL integration)', () => {
           SELECT 1 FROM pg_indexes
           WHERE schemaname = 'public' AND tablename = 'journal_entries'
           AND indexname = 'uq_journal_source_event'
-        ) AS posting_migration_ready
+        ) AS posting_migration_ready,
+        EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_schema = 'public' AND table_name = 'journal_entries'
+          AND column_name = 'created_by_id'
+        ) AS workflow_migration_ready
     `);
     if (!schemaCheck.accounts_ready || !schemaCheck.entries_ready ||
-        !schemaCheck.lines_ready || !schemaCheck.posting_migration_ready) {
+        !schemaCheck.lines_ready || !schemaCheck.posting_migration_ready ||
+        !schemaCheck.workflow_migration_ready) {
       await db.destroy();
       throw new Error('kora_test needs the existing application migrations and posting foundation migration before integration tests');
     }
@@ -107,13 +119,32 @@ describe('AccountingPostingService (PostgreSQL integration)', () => {
     );
     creditAccountId = b[0].id;
     service = new AccountingPostingService(db);
+    workflow = new JournalWorkflowService(db);
+    const emailTag = randomUUID().replace(/-/g, '');
+    const employee = await db.query(
+      'INSERT INTO users (email, password, name, role) VALUES ($1, $2, $3, $4) RETURNING id',
+      [`accounting-test-employee-${emailTag}@example.invalid`, 'TEST-NOT-A-LOGIN', 'Integration Employee', 'employee'],
+    );
+    const accountant = await db.query(
+      'INSERT INTO users (email, password, name, role) VALUES ($1, $2, $3, $4) RETURNING id',
+      [`accounting-test-accountant-${emailTag}@example.invalid`, 'TEST-NOT-A-LOGIN', 'Integration Accountant', 'accountant'],
+    );
+    employeeId = employee[0].id;
+    accountantId = accountant[0].id;
   });
 
   afterAll(async () => {
     if (!db?.isInitialized) return;
     try {
+      for (const id of workflowJournalIds) {
+        await db.query('DELETE FROM journal_entries WHERE reversal_of_id = $1', [id]);
+        await db.query('DELETE FROM journal_entries WHERE id = $1', [id]);
+      }
       if (eventKeys.length) {
         await db.query('DELETE FROM journal_entries WHERE source_event_key = ANY($1::varchar[])', [eventKeys]);
+      }
+      if (employeeId && accountantId) {
+        await db.query('DELETE FROM users WHERE id IN ($1, $2)', [employeeId, accountantId]);
       }
       if (debitAccountId && creditAccountId) {
         await db.query('DELETE FROM accounting_accounts WHERE id IN ($1, $2)', [debitAccountId, creditAccountId]);
@@ -151,6 +182,55 @@ describe('AccountingPostingService (PostgreSQL integration)', () => {
       [key],
     );
     expect(counts.total).toBe(1);
+  });
+
+  it('persists a draft, submits it, approves it, and reverses it with a net zero balance', async () => {
+    const draft = await workflow.createDraft({
+      date: '2026-11-11',
+      description: 'Controlled manual entry',
+      lines: [
+        { accountId: debitAccountId, debitCents: 7654, creditCents: 0 },
+        { accountId: creditAccountId, debitCents: 0, creditCents: 7654 },
+      ],
+    }, employeeId);
+    workflowJournalIds.push(draft.id);
+    const [initial] = await db.query(
+      'SELECT posting_status, source_event_key, posted_at, created_by_id FROM journal_entries WHERE id = $1',
+      [draft.id],
+    );
+    expect(initial.posting_status).toBe('draft');
+    expect(initial.source_event_key).toBeNull();
+    expect(initial.posted_at).toBeNull();
+    expect(initial.created_by_id).toBe(employeeId);
+
+    const submitted = await workflow.submit(draft.id, employeeId);
+    expect(submitted.postingStatus).toBe('pending_approval');
+    await expect(workflow.approveAndPost(draft.id, employeeId)).rejects.toThrow('Only accountants');
+    const posted = await workflow.approveAndPost(draft.id, accountantId);
+    expect(posted.postingStatus).toBe('posted');
+    expect(posted.approvedById).toBe(accountantId);
+    expect(posted.sourceEventKey).toBe(`manual:journal:${draft.id}:posted:v1`);
+    await expect(workflow.approveAndPost(draft.id, accountantId)).rejects.toThrow();
+
+    const reversal = await workflow.reverse(draft.id, accountantId, 'Corrected an input mistake');
+    expect(reversal.reversalOfId).toBe(draft.id);
+    expect(reversal.postingStatus).toBe('posted');
+    await expect(workflow.reverse(draft.id, accountantId, 'Again')).rejects.toThrow();
+    const [totals] = await db.query(`
+      SELECT COUNT(*)::int AS line_count, COALESCE(SUM(l.amount_base), 0)::numeric AS net_egp
+      FROM journal_lines l
+      INNER JOIN journal_entries e ON e.id = l.journal_entry_id
+      WHERE e.id = $1 OR e.reversal_of_id = $1
+    `, [draft.id]);
+    expect(totals.line_count).toBe(4);
+    expect(Number(totals.net_egp)).toBe(0);
+    const [original] = await db.query(
+      'SELECT posting_status, reversed_by_id, reversed_at FROM journal_entries WHERE id = $1',
+      [draft.id],
+    );
+    expect(original.posting_status).toBe('reversed');
+    expect(original.reversed_by_id).toBe(accountantId);
+    expect(original.reversed_at).not.toBeNull();
   });
 
   it('rolls back real journal inserts if the enclosing transaction fails', async () => {
