@@ -18,7 +18,7 @@ describe('SimpleAccountingService', () => {
     getRepository: jest.fn((entity: { name: string }) => entity.name === 'User' ? repoUser : repoAccounts),
   };
   const workflow = {
-    createDraft: jest.fn(async (_event: unknown, _userId: number) => ({ id: 99 })),
+    createDraft: jest.fn(async (_event: { lines: Array<{ accountId: number; debitCents: number; creditCents: number }> }, _userId: number) => ({ id: 99 })),
     submit: jest.fn(async (_id: number, _userId: number) => ({ id: 99 })),
     approveAndPost: jest.fn(async (_id: number, _userId: number) => ({ id: 99 })),
   };
