@@ -1,0 +1,218 @@
+import { randomUUID } from 'crypto';
+import * as dotenv from 'dotenv';
+import * as path from 'path';
+import { ConflictException } from '@nestjs/common';
+import { DataSource, EntityManager } from 'typeorm';
+import { SupplierEgpPilotService } from './supplier-egp-pilot.service';
+import { AccountingAccount, AccountType } from '../accounting/entities/accounting-account.entity';
+import { JournalEntry, JournalEntryType } from '../accounting/entities/journal-entry.entity';
+import { JournalLine } from '../accounting/entities/journal-line.entity';
+import { Invoice, InvoiceStatus, InvoiceType } from '../invoices/entities/invoice.entity';
+import { InvoiceLine } from '../invoices/entities/invoice-line.entity';
+import { Payment } from './entities/payment.entity';
+import { PurchaseOrder } from '../purchase-orders/entities/purchase-order.entity';
+import { PurchaseOrderLineItem } from '../purchase-orders/entities/purchase-order-line-item.entity';
+import { Supplier } from '../suppliers/entities/supplier.entity';
+import { SupplierContact } from '../suppliers/entities/supplier-contact.entity';
+import { Product } from '../products/entities/product.entity';
+
+dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+
+/**
+ * Real DB pilot checks. ALWAYS local kora_test, no Nest AppModule, no migrations,
+ * no schema synchronization. Fixture rows are removed after each test.
+ * Do not run against a database containing any real financial records.
+ */
+describe('Supplier EGP pilot (local PostgreSQL integration)', () => {
+  let db: DataSource;
+  let service: SupplierEgpPilotService;
+  let apId: number;
+  let bankId: number;
+  let expenseId: number;
+  let invoiceId: number;
+  let bookingId: number;
+  const priorEnv = process.env.SUPPLIER_EGP_PILOT;
+
+  const args = (requestKey = randomUUID(), amountCents = 40000) => ({
+    invoiceId,
+    bankAccountId: bankId,
+    amountCents,
+    date: '2026-11-11',
+    requestKey,
+    description: 'Disposable EGP supplier payment test',
+  });
+
+  beforeAll(async () => {
+    if (process.env.DATABASE_NAME !== 'kora_test' ||
+        !['127.0.0.1', 'localhost', '::1'].includes(process.env.DATABASE_HOST || '127.0.0.1')) {
+      throw new Error('REFUSING supplier integration tests: DATABASE_NAME must be kora_test on loopback host');
+    }
+    const username = process.env.DATABASE_USER || process.env.DB_USER;
+    const password = process.env.DATABASE_PASSWORD || process.env.DB_PASSWORD;
+    if (!username || !password) {
+      throw new Error('Missing local PostgreSQL test credentials');
+    }
+    db = new DataSource({
+      type: 'postgres', host: process.env.DATABASE_HOST || '127.0.0.1',
+      port: Number(process.env.DATABASE_PORT || 5432),
+      database: 'kora_test', username, password,
+      entities: [
+        AccountingAccount, JournalEntry, JournalLine,
+        Invoice, InvoiceLine, Payment, PurchaseOrder,
+        PurchaseOrderLineItem, Supplier, SupplierContact, Product,
+      ],
+      synchronize: false, migrationsRun: false, logging: false,
+    });
+    await db.initialize();
+    const [identity] = await db.query('SELECT current_database() AS db');
+    if (identity?.db !== 'kora_test') {
+      await db.destroy();
+      throw new Error('Refusing: actual database is not kora_test');
+    }
+    const ap = await db.getRepository(AccountingAccount).findOneBy({ code: '2100' });
+    if (!ap || ap.type !== AccountType.LIABILITY || ap.currency !== 'EGP' || !ap.isActive ||
+        await db.getRepository(AccountingAccount).existsBy({ parentId: ap.id })) {
+      throw new Error('Pilot test prerequisite: account 2100 must be an active leaf EGP liability. Run check-supplier-pilot-readiness.js.');
+    }
+    apId = ap.id;
+    process.env.SUPPLIER_EGP_PILOT = 'true';
+    service = new SupplierEgpPilotService(db);
+  });
+
+  beforeEach(async () => {
+    const tag = randomUUID().replace(/-/g, '').slice(0, 16);
+    const bank = await db.getRepository(AccountingAccount).save(
+      db.getRepository(AccountingAccount).create({
+        code: '11IT' + tag, name: 'TEST EGP bank (disposable)',
+        type: AccountType.ASSET, currency: 'EGP', isActive: true,
+      }),
+    );
+    bankId = bank.id;
+    const expense = await db.getRepository(AccountingAccount).save(
+      db.getRepository(AccountingAccount).create({
+        code: '5IT' + tag, name: 'TEST supplier expense (disposable)',
+        type: AccountType.EXPENSE, currency: 'EGP', isActive: true,
+      }),
+    );
+    expenseId = expense.id;
+    const invoice = await db.getRepository(Invoice).save(
+      db.getRepository(Invoice).create({
+        number: 'IT-SUP-' + tag,
+        type: InvoiceType.INCOMING, status: InvoiceStatus.SENT,
+        currency: 'EGP', total: 1000, subtotal: 1000, tax: 0,
+        date: '2026-11-11', dueDate: '2026-12-11',
+        lines: [],
+      }),
+    );
+    invoiceId = invoice.id;
+    const booked = await db.getRepository(JournalEntry).save(
+      db.getRepository(JournalEntry).create({
+        type: JournalEntryType.INVOICE, invoiceId,
+        date: '2026-11-11', description: 'Disposable supplier invoice booking',
+        sourceEventKey: 'test:invoice:' + tag, postingStatus: 'posted', postedAt: new Date(),
+        lines: [
+          db.getRepository(JournalLine).create({
+            accountId: expenseId, currency: 'EGP', exchangeRate: 1,
+            debit: 1000, credit: 0, amountBase: 1000, amountEgp: 1000,
+          }),
+          db.getRepository(JournalLine).create({
+            accountId: apId, currency: 'EGP', exchangeRate: 1,
+            debit: 0, credit: 1000, amountBase: -1000, amountEgp: -1000,
+          }),
+        ],
+      }),
+    );
+    bookingId = booked.id;
+  });
+
+  afterEach(async () => {
+    if (!db?.isInitialized) return;
+    // Restrict every delete to IDs created in this test. Avoid touching legacy rows.
+    if (invoiceId) {
+      await db.getRepository(JournalEntry).delete({ invoiceId });
+      await db.getRepository(Payment).delete({ invoiceId });
+      await db.getRepository(Invoice).delete({ id: invoiceId });
+    }
+    if (bankId) await db.getRepository(AccountingAccount).delete({ id: bankId });
+    if (expenseId) await db.getRepository(AccountingAccount).delete({ id: expenseId });
+    invoiceId = 0; bookingId = 0; bankId = 0; expenseId = 0;
+  });
+
+  afterAll(async () => {
+    if (priorEnv === undefined) delete process.env.SUPPLIER_EGP_PILOT;
+    else process.env.SUPPLIER_EGP_PILOT = priorEnv;
+    if (db?.isInitialized) await db.destroy();
+  });
+
+  it('persists two partial payments, their balanced journals, and final paid status', async () => {
+    const first = await service.create(args(randomUUID(), 40000));
+    expect(first).toEqual(expect.objectContaining({
+      status: 'partially_paid', remainingCents: 60000, replayed: false,
+    }));
+    const second = await service.create(args(randomUUID(), 60000));
+    expect(second).toEqual(expect.objectContaining({
+      status: 'paid', remainingCents: 0, replayed: false,
+    }));
+    const invoice = await db.getRepository(Invoice).findOneByOrFail({ id: invoiceId });
+    expect(invoice.status).toBe('paid');
+    const payments = await db.getRepository(Payment).findBy({ invoiceId });
+    expect(payments).toHaveLength(2);
+    const journals = await db.getRepository(JournalEntry).find({
+      where: { invoiceId, type: JournalEntryType.PAYMENT },
+      relations: { lines: true },
+    });
+    expect(journals).toHaveLength(2);
+    expect(journals.map(j => j.sourceEventKey).sort()).toEqual(
+      payments.map(p => `supplier-payment:${p.id}:posted:v1`).sort(),
+    );
+    for (const journal of journals) {
+      expect(journal.postingStatus).toBe('posted');
+      expect(journal.lines).toHaveLength(2);
+      const apLine = journal.lines.find(l => l.accountId === apId)!;
+      const bankLine = journal.lines.find(l => l.accountId === bankId)!;
+      expect(apLine.debit).toBeGreaterThan(0);
+      expect(bankLine.credit).toBe(apLine.debit);
+      expect(Number(apLine.amountBase) + Number(bankLine.amountBase)).toBe(0);
+    }
+  });
+
+  it('replays an identical request without creating another payment or journal', async () => {
+    const input = args();
+    const original = await service.create(input);
+    const replay = await service.create(input);
+    expect(replay).toEqual({ ...original, replayed: true });
+    expect(await db.getRepository(Payment).countBy({ invoiceId })).toBe(1);
+    expect(await db.getRepository(JournalEntry).countBy({
+      invoiceId, type: JournalEntryType.PAYMENT,
+    })).toBe(1);
+  });
+
+  it('rejects reusing the same request identity with different amount', async () => {
+    const input = args();
+    await service.create(input);
+    await expect(service.create({ ...input, amountCents: 35000 }))
+      .rejects.toThrow(ConflictException);
+    expect(await db.getRepository(Payment).countBy({ invoiceId })).toBe(1);
+  });
+
+  it('rolls back payment, journal, and invoice status when a transaction fails after writing', async () => {
+    const failingDb = {
+      transaction: (
+        isolation: 'SERIALIZABLE',
+        callback: (manager: EntityManager) => Promise<unknown>,
+      ) => db.transaction(isolation, async manager => {
+        await callback(manager);
+        throw new Error('intentional rollback after supplier settlement');
+      }),
+    } as unknown as DataSource;
+    const failing = new SupplierEgpPilotService(failingDb);
+    await expect(failing.create(args())).rejects.toThrow('intentional rollback');
+    expect(await db.getRepository(Payment).countBy({ invoiceId })).toBe(0);
+    expect(await db.getRepository(JournalEntry).countBy({
+      invoiceId, type: JournalEntryType.PAYMENT,
+    })).toBe(0);
+    const invoice = await db.getRepository(Invoice).findOneByOrFail({ id: invoiceId });
+    expect(invoice.status).toBe('sent');
+  });
+});
