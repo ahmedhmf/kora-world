@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Get,
   Param,
   ParseIntPipe,
   Post,
@@ -21,6 +22,11 @@ import type { PostingLine } from './accounting-posting.service';
 @UseGuards(AuthGuard)
 export class ManualJournalsController {
   constructor(private readonly workflow: JournalWorkflowService) {}
+
+  @Get()
+  list(@Req() req: AuthenticatedRequest) {
+    return this.workflow.listVisible(req.user.sub);
+  }
 
   @Post('drafts')
   createDraft(
