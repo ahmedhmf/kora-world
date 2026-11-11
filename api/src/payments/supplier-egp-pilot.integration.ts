@@ -354,6 +354,29 @@ describe('Supplier EGP pilot (local PostgreSQL integration)', () => {
       .toBe('posted');
   });
 
+  it('rolls back a reversal and leaves the original payment posted if the transaction fails', async () => {
+    const saved = await service.create(args(randomUUID(), 40000));
+    const failingDb = {
+      transaction: (
+        isolation: 'SERIALIZABLE',
+        callback: (manager: EntityManager) => Promise<unknown>,
+      ) => db.transaction(isolation, async manager => {
+        await callback(manager);
+        throw new Error('intentional reversal rollback');
+      }),
+    } as unknown as DataSource;
+    const failing = new SupplierEgpPilotService(failingDb);
+    await expect(failing.reverse(saved.paymentId, accountantId, 'Incorrect bank'))
+      .rejects.toThrow('intentional reversal rollback');
+    expect(await db.getRepository(JournalEntry).countBy({
+      reversalOfId: saved.journalId,
+    })).toBe(0);
+    const original = await db.getRepository(JournalEntry).findOneByOrFail({ id: saved.journalId });
+    expect(original.postingStatus).toBe('posted');
+    const invoice = await db.getRepository(Invoice).findOneByOrFail({ id: invoiceId });
+    expect(invoice.status).toBe('partially_paid');
+  });
+
   it('allows only one of two simultaneous reversals to commit', async () => {
     const saved = await service.create(args());
     const outcomes = await Promise.allSettled([
