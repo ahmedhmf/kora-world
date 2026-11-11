@@ -186,14 +186,17 @@ export class JournalComponent implements OnInit {
     if (this.newEntry.reference.length > 100) return 'Reference must be 100 characters or fewer.';
     if (this.newEntry.lines.length < 2) return 'At least two lines are required.';
     const allowed = new Set(this.accountsForEntry().map(account => account.id));
+    if (!allowed.size) return 'No eligible EGP accounts are available. Create or activate a leaf EGP account in the Chart of Accounts.';
     let debit = 0;
     let credit = 0;
-    for (const line of this.newEntry.lines) {
-      if (!allowed.has(Number(line.accountId))) return 'Select an active EGP posting account for every line.';
+    for (const [index, line] of this.newEntry.lines.entries()) {
+      const row = index + 1;
+      if (!allowed.has(Number(line.accountId))) return `Line ${row}: select an active leaf EGP account.`;
       const d = this.toCents(line.debit);
       const c = this.toCents(line.credit);
-      if (d === null || c === null) return 'Amounts must be nonnegative with at most two decimal places.';
-      if ((d > 0) === (c > 0)) return 'Each line must have exactly one debit or one credit amount.';
+      if (d === null || c === null) return `Line ${row}: enter nonnegative amounts with at most two decimal places.`;
+      if (d === 0 && c === 0) return `Line ${row}: enter an amount in Debit or Credit (leave the other blank).`;
+      if (d > 0 && c > 0) return `Line ${row}: use either Debit or Credit, not both.`;
       debit += d;
       credit += c;
       if (!Number.isSafeInteger(debit) || !Number.isSafeInteger(credit)) return 'Amount is too large.';
