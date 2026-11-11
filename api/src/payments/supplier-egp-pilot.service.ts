@@ -17,7 +17,7 @@ export interface CreateSupplierEgpPilotPayment {
   bankAccountId: number;
   amountCents: number;
   date: string;
-  requestKey: string; // UUID generated once per user submission, persisted in payment.reference
+  requestKey: string; // Stable client UUID persisted as a uniquely indexed payment request key
   description?: string;
 }
 
@@ -98,7 +98,7 @@ export class SupplierEgpPilotService {
         (input.description?.length || 0) > 255) {
       throw new BadRequestException('Invalid EGP supplier payment fields or request key');
     }
-    const ref = `SEGP-${input.requestKey.toLowerCase()}`;
+    const requestKey = input.requestKey.toLowerCase();
 
     return this.withSerializationRetry(() => this.db.transaction('SERIALIZABLE', async (m) => {
       // Fail closed even when the environment points to an unexpected database.
@@ -109,7 +109,7 @@ export class SupplierEgpPilotService {
 
       // Serialize retries of the same request key even across different invoices.
       // Two int32 advisory keys: domain-specific namespace and hash of UUID.
-      await m.query('SELECT pg_advisory_xact_lock($1::int, hashtext($2))', [824613, ref]);
+      await m.query('SELECT pg_advisory_xact_lock($1::int, hashtext($2))', [824613, requestKey]);
 
       // Locked invoice provides stable serialization for every payment to it.
       const invoice = await m.findOne(Invoice, {
@@ -120,9 +120,26 @@ export class SupplierEgpPilotService {
         throw new BadRequestException('Only EGP incoming supplier invoices are supported');
       }
 
-      // Request identity is persisted in the existing reference column. Check
-      // before the paid-state restriction to make completed requests retryable.
-      const prior = await m.findOne(Payment, { where: { reference: ref } });
+      // The pilot schema is installed explicitly on disposable local kora_test.
+      // No request-key column is added to the shared Payment entity until the
+      // production schema rollout has been separately reviewed.
+      const column = await m.query(`
+        SELECT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_schema='public' AND table_name='payments'
+            AND column_name='request_key' AND data_type='uuid'
+        ) AS ready
+      `);
+      if (!column[0]?.ready) {
+        throw new ConflictException('Local test database requires the supplier request-key schema preparation');
+      }
+      // Look up by the dedicated UUID column, not the mutable payment reference.
+      const existing = await m.query(
+        'SELECT id FROM public.payments WHERE request_key = $1::uuid', [requestKey],
+      );
+      const prior = existing.length
+        ? await m.findOne(Payment, { where: { id: Number(existing[0].id) } })
+        : null;
       if (prior) {
         if (prior.invoiceId !== input.invoiceId ||
             prior.paidFromAccountId !== input.bankAccountId ||
@@ -192,7 +209,6 @@ export class SupplierEgpPilotService {
         amountBase: input.amountCents / 100,
         amountEgp: input.amountCents / 100,
         method: 'bank_transfer',
-        reference: ref,
         description: input.description?.trim() || `EGP supplier invoice ${invoice.number} settlement`,
         paidFromAccountId: bankAccount.id,
         categoryAccountId: apAccount.id,
@@ -200,6 +216,13 @@ export class SupplierEgpPilotService {
       });
       // Both payment and journal are persisted inside the SAME DB transaction.
       const saved = await m.save(Payment, payment);
+      // Unique PostgreSQL index enforces at most one persisted Payment per UUID,
+      // including calls from other processes. This update is in the same
+      // transaction as payment, journal and invoice-status writes.
+      await m.query(
+        'UPDATE public.payments SET request_key = $1::uuid, reference = $2 WHERE id = $3',
+        [requestKey, `SUP-PAY-${saved.id}`, saved.id],
+      );
       const event = buildSupplierSettlementEvent({
         id: invoice.id, type: 'incoming', status: invoice.status,
         currency: invoice.currency,
@@ -208,7 +231,7 @@ export class SupplierEgpPilotService {
       }, {
         id: saved.id, invoiceId: invoice.id, date: input.date,
         amountCents: input.amountCents, currency: 'EGP',
-        bankAccountId: bankAccount.id, reference: ref,
+        bankAccountId: bankAccount.id, reference: `SUP-PAY-${saved.id}`,
       }, apAccount, bankAccount);
 
       const journal = m.create(JournalEntry, {
@@ -238,6 +261,15 @@ export class SupplierEgpPilotService {
         paymentId: saved.id, journalId: posted.id,
         status: summary.status, remainingCents: summary.remainingCents, replayed: false,
       };
-    }));
+    })).catch((error: unknown) => {
+      // A duplicate UUID is a deterministic conflict, not a serialization
+      // retry. The unique index is authoritative even across application nodes.
+      const err = error as { code?: string; driverError?: { code?: string; constraint?: string } };
+      if ((err?.driverError?.code || err?.code) === '23505' &&
+          err?.driverError?.constraint === 'uq_payments_request_key') {
+        throw new ConflictException('Supplier payment request key already exists');
+      }
+      throw error;
+    });
   }
 }
