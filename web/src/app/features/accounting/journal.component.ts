@@ -6,7 +6,6 @@ import { AccountingStore } from '../../store/accounting.store';
 import {
   AccountingApiService,
   JournalEntry,
-  AccountingAccount,
 } from '../../core/services/accounting-api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ApiService } from '../../core/services/api.service';
@@ -79,7 +78,7 @@ export class JournalComponent implements OnInit {
   refresh(): void {
     this.loading.set(true);
     this.error.set('');
-    this.accounting.getJournalEntries()
+    this.accounting.getWorkflowJournalEntries()
       .pipe(finalize(() => this.loading.set(false)))
       .subscribe({
         next: entries => this.entries.set(entries),
