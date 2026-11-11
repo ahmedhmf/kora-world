@@ -163,6 +163,14 @@
         </div>
         <div class="p-5 overflow-y-auto space-y-4">
           <p class="text-xs text-amber-300">EGP amounts only. Entries require accountant approval before they are posted.</p>
+          <p class="text-xs text-zinc-400">Choose an eligible account for each line. Enter a positive amount in <strong>Debit</strong> or <strong>Credit</strong>, not both. For example, debit 1,000 on line 1 and credit 1,000 on line 2.</p>
+          @if (accountsForEntry().length === 0) {
+            <p role="alert" class="text-sm text-amber-300 border border-amber-900 rounded p-3">
+              No active leaf EGP accounts are available. Check the Chart of Accounts before creating a journal.
+            </p>
+          } @else {
+            <p class="text-xs text-zinc-500">{{ accountsForEntry().length }} eligible EGP posting accounts available in the dropdown.</p>
+          }
           <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
             <label class="text-xs text-zinc-300">Date
               <input type="date" [(ngModel)]="newEntry.date"
