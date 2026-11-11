@@ -87,7 +87,10 @@ export class AccountingController {
   }
 
   @Get('journal-entries/:id')
-  findJournalEntryById(@Param('id', ParseIntPipe) id: number) {
-    return this.accountingService.findJournalEntryById(id);
+  findJournalEntryById(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.journalWorkflow.getVisible(id, req.user.sub);
   }
 }
