@@ -36,11 +36,23 @@ describe('SupplierEgpPilotService — disabled-by-default EGP transaction path',
     failJournal?: boolean;
   };
   const manager = {
-    query: jest.fn(async (sql: string) =>
-      sql.includes('current_database') ? [{ database_name: 'kora_test' }] : []),
+    query: jest.fn(async (sql: string, params?: unknown[]) => {
+      if (sql.includes('current_database')) return [{ database_name: 'kora_test' }];
+      if (sql.includes('information_schema.columns')) return [{ ready: true }];
+      if (sql.includes('SELECT id FROM public.payments')) {
+        return state.payments
+          .filter(p => p.requestKey === params?.[0])
+          .map(p => ({ id: p.id }));
+      }
+      if (sql.includes('UPDATE public.payments SET request_key')) {
+        state.savedPayment.requestKey = params?.[0];
+        state.savedPayment.reference = params?.[1];
+      }
+      return [];
+    }),
     findOne: jest.fn(async (type: { name: string }, opts: any) => {
       if (type.name === 'Invoice') return { ...invoice, status: state.status };
-      if (type.name === 'Payment') return state.payments.find(p => p.reference === opts.where.reference) || null;
+      if (type.name === 'Payment') return state.payments.find(p => p.id === opts.where.id) || null;
       if (type.name === 'AccountingAccount') {
         if (opts.where.code === '2100') return ap;
         return opts.where.id === 20 ? ap : opts.where.id === 11 ? bank : null;
@@ -128,7 +140,8 @@ describe('SupplierEgpPilotService — disabled-by-default EGP transaction path',
       paymentId: 99, journalId: 199,
       status: 'partially_paid', remainingCents: 60_000, replayed: false,
     });
-    expect(state.savedPayment.reference).toBe('SEGP-' + input.requestKey);
+    expect(state.savedPayment.reference).toBe('SUP-PAY-99');
+    expect(state.savedPayment.requestKey).toBe(input.requestKey);
     expect(state.savedJournal.sourceEventKey).toBe('supplier-payment:99:posted:v1');
     expect(state.savedJournal.lines.map((l: any) => ({
       accountId: l.accountId, debit: l.debit, credit: l.credit,
@@ -147,7 +160,7 @@ describe('SupplierEgpPilotService — disabled-by-default EGP transaction path',
     state.status = 'paid';
     state.payments = [{
       id: 90, invoiceId: 7, paidFromAccountId: 11,
-      amount: 400, date: '2026-11-11', reference: 'SEGP-' + input.requestKey,
+      amount: 400, date: '2026-11-11', requestKey: input.requestKey, reference: 'SUP-PAY-90',
     }];
     state.journalEntries = [{
       id: 190, type: 'payment', sourceEventKey: 'supplier-payment:90:posted:v1',
@@ -163,7 +176,7 @@ describe('SupplierEgpPilotService — disabled-by-default EGP transaction path',
   it('refuses conflicting reuse of a request key', async () => {
     state.payments = [{
       id: 90, invoiceId: 7, paidFromAccountId: 11,
-      amount: 200, date: '2026-11-11', reference: 'SEGP-' + input.requestKey,
+      amount: 200, date: '2026-11-11', requestKey: input.requestKey, reference: 'SUP-PAY-90',
     }];
     await expect(service.create(input)).rejects.toThrow(ConflictException);
     expect(manager.save).not.toHaveBeenCalled();
@@ -205,7 +218,7 @@ describe('SupplierEgpPilotService — disabled-by-default EGP transaction path',
     expect(result.paymentId).toBe(99);
     expect(result.replayed).toBe(false);
     expect(db.transaction).toHaveBeenCalledTimes(2);
-    expect(state.savedPayment.reference).toBe('SEGP-' + input.requestKey);
+    expect(state.savedPayment.requestKey).toBe(input.requestKey);
   });
 
   it('stops after three serialization conflicts without persisting a payment', async () => {
