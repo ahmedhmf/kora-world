@@ -137,6 +137,10 @@ export class AccountingApiService {
     return this.http.post<JournalEntry>(`${this.base}/accounting/journal/manual`, dto);
   }
 
+  getWorkflowJournalEntries(): Observable<JournalEntry[]> {
+    return this.http.get<JournalEntry[]>(`${this.base}/accounting/manual-journals`);
+  }
+
   // New controlled manual journal workflow; amounts use integer EGP cents.
   createManualDraft(dto: {
     date: string;
