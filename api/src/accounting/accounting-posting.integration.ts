@@ -64,12 +64,17 @@ describe('AccountingPostingService (PostgreSQL integration)', () => {
     if (!['localhost', '127.0.0.1', '::1'].includes(host)) {
       throw new Error('REFUSING integration tests: DATABASE_HOST must be local');
     }
+    const dbUser = process.env.DATABASE_USER || process.env.DB_USER;
+    const dbPassword = process.env.DATABASE_PASSWORD || process.env.DB_PASSWORD;
+    if (!dbUser || !dbPassword) {
+      throw new Error('Missing DATABASE_USER/DATABASE_PASSWORD or DB_USER/DB_PASSWORD');
+    }
     db = new DataSource({
       type: 'postgres',
       host,
       port: Number(process.env.DATABASE_PORT || 5432),
-      username: process.env.DATABASE_USER,
-      password: process.env.DATABASE_PASSWORD,
+      username: dbUser,
+      password: dbPassword,
       database: 'kora_test',
       entities: [AccountingAccount, JournalEntry, JournalLine, invoiceReference, purchaseOrderReference],
       synchronize: false,
