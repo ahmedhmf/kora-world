@@ -133,6 +133,19 @@ describe('SupplierEgpPilotService — disabled-by-default EGP transaction path',
     expect(manager.save).not.toHaveBeenCalled();
   });
 
+  it('requires a reason and authenticated user ID for supplier reversal', async () => {
+    await expect(service.reverse(99, 1, ' ')).rejects.toThrow(BadRequestException);
+    await expect(service.reverse(99, 0, 'Incorrect payment')).rejects.toThrow(BadRequestException);
+    await expect(service.reverse(0, 1, 'Incorrect payment')).rejects.toThrow(BadRequestException);
+    expect(db.transaction).not.toHaveBeenCalled();
+  });
+
+  it('does not allow reversal when the pilot flag is disabled', async () => {
+    delete process.env.SUPPLIER_EGP_PILOT;
+    await expect(service.reverse(99, 1, 'Incorrect payment')).rejects.toThrow(ForbiddenException);
+    expect(db.transaction).not.toHaveBeenCalled();
+  });
+
   it('saves one payment and one balanced AP/bank journal and updates invoice status inside transaction', async () => {
     const result = await service.create(input);
     expect(db.transaction).toHaveBeenCalledWith('SERIALIZABLE', expect.any(Function));
