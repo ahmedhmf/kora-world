@@ -59,6 +59,24 @@ export class JournalEntry {
   @Column({ name: 'reversal_of_id', type: 'integer', nullable: true })
   reversalOfId?: number | null;
 
+  @Column({ name: 'created_by_id', type: 'integer', nullable: true })
+  createdById?: number | null;
+
+  @Column({ name: 'submitted_by_id', type: 'integer', nullable: true })
+  submittedById?: number | null;
+
+  @Column({ name: 'submitted_at', type: 'timestamptz', nullable: true })
+  submittedAt?: Date | null;
+
+  @Column({ name: 'approved_by_id', type: 'integer', nullable: true })
+  approvedById?: number | null;
+
+  @Column({ name: 'reversed_by_id', type: 'integer', nullable: true })
+  reversedById?: number | null;
+
+  @Column({ name: 'reversed_at', type: 'timestamptz', nullable: true })
+  reversedAt?: Date | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 
