@@ -40,6 +40,31 @@ export class SupplierEgpPilotService {
     }
   }
 
+  /**
+   * Retry only PostgreSQL SERIALIZABLE conflicts (SQLSTATE 40001).
+   * A failed transaction is rolled back by TypeORM before the next attempt.
+   * All retries keep the original request UUID, so a prior successful commit
+   * is detected as a replay rather than posted again.
+   */
+  private async withSerializationRetry<T>(work: () => Promise<T>): Promise<T> {
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await work();
+      } catch (error) {
+        const err = error as { code?: string; driverError?: { code?: string } };
+        const sqlstate = err?.driverError?.code || err?.code;
+        if (sqlstate !== '40001' || attempt === maxAttempts) {
+          throw error;
+        }
+        // Short bounded delay, without increasing the number of transactions
+        // in flight. No retry for overpayments, uniqueness, or validation.
+        await new Promise<void>(resolve => setTimeout(resolve, 15 * attempt));
+      }
+    }
+    throw new Error('Unreachable serialization retry state');
+  }
+
   private static cents(value: number, name: string): number {
     const scaled = Number(value) * 100;
     const rounded = Math.round(scaled);
@@ -75,7 +100,7 @@ export class SupplierEgpPilotService {
     }
     const ref = `SEGP-${input.requestKey.toLowerCase()}`;
 
-    return this.db.transaction('SERIALIZABLE', async (m) => {
+    return this.withSerializationRetry(() => this.db.transaction('SERIALIZABLE', async (m) => {
       // Fail closed even when the environment points to an unexpected database.
       const [identity] = await m.query('SELECT current_database() AS database_name');
       if (identity?.database_name !== 'kora_test') {
@@ -213,6 +238,6 @@ export class SupplierEgpPilotService {
         paymentId: saved.id, journalId: posted.id,
         status: summary.status, remainingCents: summary.remainingCents, replayed: false,
       };
-    });
+    }));
   }
 }
