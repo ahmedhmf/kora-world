@@ -7,6 +7,7 @@ import {
   Query,
   UseGuards,
   ParseIntPipe,
+  GoneException,
 } from '@nestjs/common';
 import { JournalService } from './journal.service';
 import { AuthGuard } from '../auth/auth.guard';
@@ -20,8 +21,8 @@ export class JournalController {
   constructor(private readonly journalService: JournalService) {}
 
   @Post('manual')
-  createManualEntry(@Body() dto: CreateJournalEntryDto) {
-    return this.journalService.createManualEntry(dto);
+  createManualEntry(@Body() _dto: CreateJournalEntryDto) {
+    throw new GoneException('Legacy manual journal posting is disabled. Use /accounting/manual-journals/drafts and the approval workflow.');
   }
 
   @Post('po-payment')
