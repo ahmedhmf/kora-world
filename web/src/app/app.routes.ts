@@ -207,6 +207,16 @@ export const routes: Routes = [
       },
       // Accounting Routes
       {
+        path: 'accounting',
+        pathMatch: 'full',
+        redirectTo: 'accounting/simple',
+      },
+      {
+        path: 'accounting/simple',
+        loadComponent: () =>
+          import('./features/accounting/simple-accounting.component').then(m => m.SimpleAccountingComponent),
+      },
+      {
         path: 'accounting/chart-of-accounts',
         loadComponent: () =>
           import('./features/accounting/chart-of-accounts.component').then((m) => m.ChartOfAccountsComponent),
