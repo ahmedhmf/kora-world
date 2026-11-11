@@ -173,7 +173,8 @@ describe('SupplierEgpPilotService — disabled-by-default EGP transaction path',
     state.status = 'paid';
     state.payments = [{
       id: 90, invoiceId: 7, paidFromAccountId: 11,
-      amount: 400, date: '2026-11-11', requestKey: input.requestKey, reference: 'SUP-PAY-90',
+      amount: 400, currency: 'EGP', exchangeRate: 1,
+      date: '2026-11-11', requestKey: input.requestKey, reference: 'SUP-PAY-90',
     }];
     state.journalEntries = [{
       id: 190, type: 'payment', sourceEventKey: 'supplier-payment:90:posted:v1',
