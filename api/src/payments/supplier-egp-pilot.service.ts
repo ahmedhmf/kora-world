@@ -82,6 +82,10 @@ export class SupplierEgpPilotService {
         throw new ForbiddenException('Supplier pilot can only write to kora_test');
       }
 
+      // Serialize retries of the same request key even across different invoices.
+      // Two int32 advisory keys: domain-specific namespace and hash of UUID.
+      await m.query('SELECT pg_advisory_xact_lock($1::int, hashtext($2))', [824613, ref]);
+
       // Locked invoice provides stable serialization for every payment to it.
       const invoice = await m.findOne(Invoice, {
         where: { id: input.invoiceId }, lock: { mode: 'pessimistic_write' },
