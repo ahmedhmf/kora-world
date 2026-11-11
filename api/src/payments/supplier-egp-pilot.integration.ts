@@ -196,6 +196,58 @@ describe('Supplier EGP pilot (local PostgreSQL integration)', () => {
     expect(await db.getRepository(Payment).countBy({ invoiceId })).toBe(1);
   });
 
+  it('does not double-post simultaneous submissions with the same request key', async () => {
+    const input = args(randomUUID(), 40000);
+    const results = await Promise.allSettled([
+      service.create(input),
+      service.create(input),
+    ]);
+
+    // Under SERIALIZABLE, one concurrent request may be rejected with SQLSTATE
+    // 40001 instead of replaying. That is acceptable only if a later retry
+    // with the same key returns the first saved payment.
+    expect(results.some(r => r.status === 'fulfilled')).toBe(true);
+    const original = results.find(
+      (r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof service.create>>> =>
+        r.status === 'fulfilled',
+    )!.value;
+    const retry = await service.create(input);
+    expect(retry.paymentId).toBe(original.paymentId);
+    expect(retry.journalId).toBe(original.journalId);
+    expect(retry.replayed).toBe(true);
+
+    expect(await db.getRepository(Payment).countBy({ invoiceId })).toBe(1);
+    expect(await db.getRepository(JournalEntry).countBy({
+      invoiceId, type: JournalEntryType.PAYMENT,
+    })).toBe(1);
+    const invoice = await db.getRepository(Invoice).findOneByOrFail({ id: invoiceId });
+    expect(invoice.status).toBe('partially_paid');
+  });
+
+  it('does not overpay when two distinct concurrent payments exceed the invoice total', async () => {
+    const first = args(randomUUID(), 60000);
+    const second = args(randomUUID(), 60000);
+    const results = await Promise.allSettled([
+      service.create(first),
+      service.create(second),
+    ]);
+
+    // Only one 600-EGP payment may commit against a 1,000-EGP invoice.
+    // The other must fail (overpayment or serializable conflict).
+    expect(results.filter(r => r.status === 'fulfilled')).toHaveLength(1);
+    expect(results.filter(r => r.status === 'rejected')).toHaveLength(1);
+    expect(await db.getRepository(Payment).countBy({ invoiceId })).toBe(1);
+    expect(await db.getRepository(JournalEntry).countBy({
+      invoiceId, type: JournalEntryType.PAYMENT,
+    })).toBe(1);
+    const invoice = await db.getRepository(Invoice).findOneByOrFail({ id: invoiceId });
+    expect(invoice.status).toBe('partially_paid');
+    await expect(service.create(first.requestKey ===
+      (await db.getRepository(Payment).findOneByOrFail({ invoiceId })).reference?.replace('SEGP-', '')
+      ? second : first)).rejects.toThrow();
+    expect(await db.getRepository(Payment).countBy({ invoiceId })).toBe(1);
+  });
+
   it('rolls back payment, journal, and invoice status when a transaction fails after writing', async () => {
     const failingDb = {
       transaction: (
