@@ -158,6 +158,12 @@ describe('Supplier EGP pilot (local PostgreSQL integration)', () => {
     if (!db?.isInitialized) return;
     // Restrict every delete to IDs created in this test. Avoid touching legacy rows.
     if (invoiceId) {
+      // Remove reversal children before their original journals, in case the
+      // database enforces the reversal_of_id self-reference.
+      await db.query(
+        'DELETE FROM journal_entries WHERE invoice_id = $1 AND reversal_of_id IS NOT NULL',
+        [invoiceId],
+      );
       await db.getRepository(JournalEntry).delete({ invoiceId });
       await db.getRepository(Payment).delete({ invoiceId });
       await db.getRepository(Invoice).delete({ id: invoiceId });
