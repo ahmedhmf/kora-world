@@ -84,7 +84,7 @@ export class AccountingPostingService {
         const journal = manager.create(JournalEntry, {
           date: event.date,
           description: event.description.trim(),
-          reference: event.reference?.trim() || null,
+          reference: event.reference?.trim() || undefined,
           type: event.type,
           postingStatus: 'posted',
           postedAt: new Date(),
