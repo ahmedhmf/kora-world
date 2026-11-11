@@ -58,16 +58,16 @@ import { DropdownOptionsModule } from './dropdown-options/dropdown-options.modul
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({ isGlobal: true, envFilePath: ['.env', '../.env'] }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (config: ConfigService) => ({
         type: 'postgres',
-        host: config.get('DATABASE_HOST'),
-        port: config.get<number>('DATABASE_PORT'),
-        username: config.get('DATABASE_USER'),
-        password: config.get('DATABASE_PASSWORD'),
-        database: config.get('DATABASE_NAME'),
+        host: config.get('DATABASE_HOST') || 'localhost',
+        port: Number(config.get('DATABASE_PORT') || 5432),
+        username: config.get('DATABASE_USER') || config.get('DB_USER'),
+        password: config.get('DATABASE_PASSWORD') || config.get('DB_PASSWORD'),
+        database: config.get('DATABASE_NAME') || config.get('DB_NAME'),
         entities: [
           Supplier,
           SupplierContact,
