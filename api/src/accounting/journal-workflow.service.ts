@@ -103,6 +103,23 @@ export class JournalWorkflowService {
     });
   }
 
+  async getVisible(id: number, userId: number): Promise<JournalEntry> {
+    if (!Number.isSafeInteger(id) || id <= 0) {
+      throw new BadRequestException('Invalid journal ID');
+    }
+    const actor = await this.actor(this.db.manager, userId);
+    const journal = await this.db.getRepository(JournalEntry).findOne({
+      where: { id },
+      relations: { lines: { account: true } },
+    });
+    if (!journal) throw new NotFoundException('Journal not found');
+    const canView = ['accountant', 'admin'].includes(actor.role) ||
+      journal.createdById === userId ||
+      ['posted', 'reversed'].includes(journal.postingStatus);
+    if (!canView) throw new NotFoundException('Journal not found');
+    return journal;
+  }
+
   async createDraft(event: Omit<PostAccountingEvent, 'sourceEventKey' | 'type'>, userId: number) {
     this.validate({ ...event, sourceEventKey: '', type: JournalEntryType.MANUAL });
     return this.db.transaction(async (m) => {
