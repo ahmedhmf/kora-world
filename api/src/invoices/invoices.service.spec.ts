@@ -215,6 +215,42 @@ describe('InvoicesService', () => {
     });
   });
 
+  it('characterizes invoice PAID status generating a synthetic supplier payment journal', async () => {
+    const invoice = {
+      id: 20,
+      number: 'SUP-TEST-20',
+      type: InvoiceType.INCOMING,
+      status: InvoiceStatus.SENT,
+      currency: 'EGP',
+      date: new Date('2026-11-11'),
+      subtotal: 100,
+      tax: 0,
+      total: 100,
+      lines: [],
+    } as Invoice;
+    mockInvoiceRepo.findOne.mockResolvedValue(invoice);
+    mockInvoiceRepo.save.mockImplementation(async (value: Invoice) => value);
+    // Existing invoice-booking journal exists, but no synthetic PAID journal.
+    mockAccountingService.findAllJournalEntries.mockResolvedValue([
+      { invoiceId: 20, type: 'invoice', reference: 'SUP-TEST-20' },
+    ]);
+    mockAccountingService.findAllAccounts.mockResolvedValue([
+      { id: 101, code: '2100' },
+      { id: 102, code: '1102' },
+      { id: 103, code: '1200' },
+    ]);
+
+    await service.update(20, { status: InvoiceStatus.PAID });
+
+    expect(mockAccountingService.createJournalEntry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        invoiceId: 20,
+        reference: 'SUP-TEST-20-PAY',
+        type: 'payment',
+      }),
+    );
+  });
+
   describe('findAll', () => {
     it('should return all invoices with relations', async () => {
       const mockInvoices = [{ id: 1 } as Invoice];
