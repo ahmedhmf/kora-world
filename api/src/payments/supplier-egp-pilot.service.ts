@@ -8,6 +8,7 @@ import { Invoice, InvoiceType, InvoiceStatus } from '../invoices/entities/invoic
 import { AccountingAccount, AccountType } from '../accounting/entities/accounting-account.entity';
 import { JournalEntry, JournalEntryType } from '../accounting/entities/journal-entry.entity';
 import { JournalLine } from '../accounting/entities/journal-line.entity';
+import { User } from '../users/entities/user.entity';
 import {
   buildSupplierSettlementEvent, calculateSupplierSettlement,
 } from './supplier-settlement.policy';
@@ -84,6 +85,49 @@ export class SupplierEgpPilotService {
     };
   }
 
+  private async settlementHistory(m: EntityManager, invoiceId: number): Promise<{
+    paidCents: number;
+    payments: Payment[];
+    originals: JournalEntry[];
+  }> {
+    const payments = await m.find(Payment, { where: { invoiceId } });
+    const entries = await m.find(JournalEntry, {
+      where: { invoiceId, type: JournalEntryType.PAYMENT },
+    });
+    const originals = entries.filter(j => !j.reversalOfId);
+    const reversals = entries.filter(j => !!j.reversalOfId);
+    if (payments.length !== originals.length || reversals.length > originals.length ||
+        payments.some(p => p.currency !== 'EGP' || Number(p.exchangeRate) !== 1)) {
+      throw new ConflictException('Supplier invoice has ambiguous payment history');
+    }
+    let paidCents = 0;
+    const originalIds = new Set<number>();
+    for (const p of payments) {
+      const sourceKey = `supplier-payment:${p.id}:posted:v1`;
+      const journal = originals.find(j => j.sourceEventKey === sourceKey);
+      if (!journal || originalIds.has(journal.id)) {
+        throw new ConflictException('Supplier invoice has legacy or unlinked payment journals');
+      }
+      originalIds.add(journal.id);
+      const linkedReversals = reversals.filter(j => j.reversalOfId === journal.id);
+      if (linkedReversals.length > 1) throw new ConflictException('Duplicate supplier payment reversal');
+      if (journal.postingStatus === 'posted' && linkedReversals.length === 0) {
+        paidCents += SupplierEgpPilotService.cents(p.amount, 'Payment');
+        if (!Number.isSafeInteger(paidCents)) throw new ConflictException('Payment sum exceeds supported range');
+      } else if (journal.postingStatus === 'reversed' && linkedReversals.length === 1 &&
+          linkedReversals[0].postingStatus === 'posted' &&
+          linkedReversals[0].sourceEventKey === `supplier-payment:${p.id}:reversal:v1`) {
+        // Retained payment row is not an active settlement.
+      } else {
+        throw new ConflictException('Inconsistent supplier payment reversal history');
+      }
+    }
+    if (reversals.some(j => !originalIds.has(j.reversalOfId!))) {
+      throw new ConflictException('Orphaned supplier payment reversal');
+    }
+    return { paidCents, payments, originals };
+  }
+
   async create(input: CreateSupplierEgpPilotPayment): Promise<{
     paymentId: number; journalId: number; status: string; remainingCents: number; replayed: boolean;
   }> {
@@ -150,12 +194,14 @@ export class SupplierEgpPilotService {
         const posted = await m.findOne(JournalEntry, {
           where: { sourceEventKey: `supplier-payment:${prior.id}:posted:v1` },
         });
-        if (!posted || posted.postingStatus !== 'posted') {
-          throw new ConflictException('Existing payment is missing its posted journal; manual review required');
+        if (!posted) {
+          throw new ConflictException('Existing payment is missing its journal; manual review required');
         }
-        const payments = await m.find(Payment, { where: { invoiceId: invoice.id } });
-        const remaining = SupplierEgpPilotService.cents(invoice.total, 'Invoice total') -
-          payments.reduce((sum, p) => sum + SupplierEgpPilotService.cents(p.amount, 'Payment'), 0);
+        if (posted.postingStatus !== 'posted') {
+          throw new ConflictException('Reversed payment cannot be replayed as a new settlement');
+        }
+        const history = await this.settlementHistory(m, invoice.id);
+        const remaining = SupplierEgpPilotService.cents(invoice.total, 'Invoice total') - history.paidCents;
         return {
           paymentId: prior.id, journalId: posted.id, status: invoice.status,
           remainingCents: remaining, replayed: true,
@@ -172,22 +218,10 @@ export class SupplierEgpPilotService {
       if (booked.length !== 1 || booked[0].postingStatus !== 'posted') {
         throw new ConflictException('Invoice requires exactly one posted booking journal before payment');
       }
-      // Do not settle an invoice that was already given a synthetic PAID journal
-      // by the legacy mechanism or any other payment journal.
-      const paymentJournals = await m.find(JournalEntry, {
-        where: { invoiceId: invoice.id, type: JournalEntryType.PAYMENT },
-      });
-      const payments = await m.find(Payment, { where: { invoiceId: invoice.id } });
-      if (payments.some(p => p.currency !== 'EGP' || Number(p.exchangeRate) !== 1) ||
-          paymentJournals.some(j => j.sourceEventKey == null ||
-            !j.sourceEventKey.startsWith('supplier-payment:')) ||
-          paymentJournals.length !== payments.length) {
-        throw new ConflictException('Invoice has legacy or ambiguous payments; pilot refuses to alter it');
-      }
-
-      const alreadyPaidCents = payments.reduce(
-        (sum, p) => sum + SupplierEgpPilotService.cents(p.amount, 'Prior payment'), 0,
-      );
+      // Reversed payments remain in the database for audit, but are excluded
+      // from the amount currently settled. Reject any ambiguous legacy history.
+      const history = await this.settlementHistory(m, invoice.id);
+      const alreadyPaidCents = history.paidCents;
       const summary = calculateSupplierSettlement({
         id: invoice.id, type: 'incoming', status: invoice.status,
         currency: invoice.currency,
@@ -271,5 +305,108 @@ export class SupplierEgpPilotService {
       }
       throw error;
     });
+  async reverse(paymentId: number, actorId: number, reason: string): Promise<{
+    paymentId: number; originalJournalId: number; reversalJournalId: number;
+    status: string; remainingCents: number;
+  }> {
+    this.ensurePilotEnabled();
+    if (!Number.isSafeInteger(paymentId) || paymentId <= 0 ||
+        !Number.isSafeInteger(actorId) || actorId <= 0 ||
+        !reason?.trim() || reason.trim().length > 500) {
+      throw new BadRequestException('Valid payment, user, and reversal reason (1-500 characters) are required');
+    }
+    return this.withSerializationRetry(() => this.db.transaction('SERIALIZABLE', async m => {
+      const [identity] = await m.query('SELECT current_database() AS database_name');
+      if (identity?.database_name !== 'kora_test') {
+        throw new ForbiddenException('Supplier pilot is restricted to local kora_test');
+      }
+      const actor = await m.findOne(User, { where: { id: actorId } });
+      if (!actor || !['accountant', 'admin'].includes(actor.role)) {
+        throw new ForbiddenException('Only an accountant or administrator may reverse supplier payments');
+      }
+      // First find invoice ID without locking, then lock the same invoice row
+      // used by create() to serialize payments and corrections.
+      const payment = await m.findOne(Payment, { where: { id: paymentId } });
+      if (!payment || !payment.invoiceId) throw new NotFoundException('Supplier payment not found');
+      const invoice = await m.findOne(Invoice, {
+        where: { id: payment.invoiceId }, lock: { mode: 'pessimistic_write' },
+      });
+      if (!invoice || invoice.type !== InvoiceType.INCOMING || invoice.currency !== 'EGP') {
+        throw new ConflictException('Reversal requires an existing EGP supplier invoice');
+      }
+      const keyRow = await m.query(
+        'SELECT request_key FROM public.payments WHERE id = $1', [payment.id],
+      );
+      if (!keyRow[0]?.request_key) {
+        throw new ConflictException('Only pilot payments with a dedicated request key may be reversed');
+      }
+      const original = await m.findOne(JournalEntry, {
+        where: { sourceEventKey: `supplier-payment:${payment.id}:posted:v1` },
+      });
+      if (!original || original.invoiceId !== invoice.id ||
+          original.type !== JournalEntryType.PAYMENT ||
+          original.postingStatus !== 'posted') {
+        throw new ConflictException('Supplier payment is not eligible for reversal or is already reversed');
+      }
+      const history = await this.settlementHistory(m, invoice.id);
+      const currentPaid = history.paidCents;
+      const paymentCents = SupplierEgpPilotService.cents(payment.amount, 'Payment');
+      if (currentPaid < paymentCents) throw new ConflictException('Inconsistent payment total');
+      const lines = await m.find(JournalLine, {
+        where: { journalEntryId: original.id }, order: { id: 'ASC' },
+      });
+      if (lines.length !== 2 ||
+          lines.some(l => l.currency !== 'EGP' || Number(l.exchangeRate) !== 1) ||
+          !lines.some(l => l.accountId === payment.categoryAccountId &&
+            SupplierEgpPilotService.cents(l.debit, 'AP debit') === paymentCents &&
+            SupplierEgpPilotService.cents(l.credit, 'AP credit') === 0) ||
+          !lines.some(l => l.accountId === payment.paidFromAccountId &&
+            SupplierEgpPilotService.cents(l.credit, 'Bank credit') === paymentCents &&
+            SupplierEgpPilotService.cents(l.debit, 'Bank debit') === 0)) {
+        throw new ConflictException('Supplier settlement journal does not match its payment');
+      }
+      const existing = await m.findOne(JournalEntry, { where: { reversalOfId: original.id } });
+      if (existing) throw new ConflictException('Payment already has a reversal journal');
+      const now = new Date();
+      const reversal = m.create(JournalEntry, {
+        date: now.toISOString().slice(0, 10),
+        description: `Supplier payment #${payment.id} reversed: ${reason.trim()}`,
+        reference: `REV-${original.id}`,
+        invoiceId: invoice.id,
+        poId: original.poId || null,
+        type: JournalEntryType.PAYMENT,
+        reversalOfId: original.id,
+        sourceEventKey: `supplier-payment:${payment.id}:reversal:v1`,
+        postingStatus: 'posted',
+        createdById: actorId,
+        approvedById: actorId,
+        postedAt: now,
+        lines: lines.map(l => m.create(JournalLine, {
+          accountId: l.accountId,
+          debit: l.credit, credit: l.debit,
+          currency: 'EGP', exchangeRate: 1,
+          amountBase: -Number(l.amountBase),
+          amountEgp: -Number(l.amountEgp),
+        })),
+      });
+      const posted = await m.save(JournalEntry, reversal);
+      original.postingStatus = 'reversed';
+      original.reversedById = actorId;
+      original.reversedAt = now;
+      await m.save(JournalEntry, original);
+      const remainingPaid = currentPaid - paymentCents;
+      const total = SupplierEgpPilotService.cents(invoice.total, 'Invoice total');
+      if (remainingPaid > total) throw new ConflictException('Invalid invoice payment balance');
+      invoice.status = (remainingPaid === 0
+        ? InvoiceStatus.SENT
+        : remainingPaid === total ? InvoiceStatus.PAID : 'partially_paid') as InvoiceStatus;
+      await m.save(Invoice, invoice);
+      return {
+        paymentId: payment.id, originalJournalId: original.id,
+        reversalJournalId: posted.id,
+        status: invoice.status, remainingCents: total - remainingPaid,
+      };
+    }));
+  }
   }
 }
