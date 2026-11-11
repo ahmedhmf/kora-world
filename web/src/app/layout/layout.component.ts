@@ -80,7 +80,9 @@ export class LayoutComponent {
   ];
 
   // Collapsible submenus state
-  openSubmenus = signal<Record<string, boolean>>({});
+  // Keep the primary accounting actions visible on initial load.
+  // Users can still collapse the section with the Accounting button.
+  openSubmenus = signal<Record<string, boolean>>({ Accounting: true });
 
   toggleSubmenu(label: string) {
     this.openSubmenus.update((m) => ({
