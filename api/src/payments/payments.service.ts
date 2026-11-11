@@ -1,6 +1,7 @@
 import {
   Injectable,
   BadRequestException,
+  ConflictException,
   NotFoundException,
   Inject,
   forwardRef,
@@ -133,6 +134,11 @@ export class PaymentsService {
   async remove(id: number): Promise<void> {
     const payment = await this.findOne(id);
     const invoiceId = payment.invoiceId;
+
+    // Pilot settlements must be reversed, never hard-deleted by the legacy route.
+    if (payment.reference?.startsWith('SUP-PAY-')) {
+      throw new ConflictException('Pilot supplier payments must be reversed, not deleted');
+    }
 
     // Delete payment
     await this.paymentRepo.remove(payment);
