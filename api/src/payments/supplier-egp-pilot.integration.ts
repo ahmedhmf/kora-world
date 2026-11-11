@@ -75,6 +75,19 @@ describe('Supplier EGP pilot (local PostgreSQL integration)', () => {
         await db.getRepository(AccountingAccount).existsBy({ parentId: ap.id })) {
       throw new Error('Pilot test prerequisite: account 2100 must be an active leaf EGP liability. Run check-supplier-pilot-readiness.js.');
     }
+    const [schema] = await db.query(`
+      SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns WHERE table_schema='public'
+          AND table_name='payments' AND column_name='request_key' AND data_type='uuid'
+      ) AS column_ready,
+      EXISTS (
+        SELECT 1 FROM pg_indexes WHERE schemaname='public'
+          AND tablename='payments' AND indexname='uq_payments_request_key'
+      ) AS index_ready
+    `);
+    if (!schema.column_ready || !schema.index_ready) {
+      throw new Error('Run node scripts/prepare-supplier-request-key-test-db.js on local kora_test first');
+    }
     apId = ap.id;
     process.env.SUPPLIER_EGP_PILOT = 'true';
     service = new SupplierEgpPilotService(db);
@@ -180,6 +193,9 @@ describe('Supplier EGP pilot (local PostgreSQL integration)', () => {
   it('replays an identical request without creating another payment or journal', async () => {
     const input = args();
     const original = await service.create(input);
+    const [stored] = await db.query('SELECT request_key, reference FROM public.payments WHERE id = $1', [original.paymentId]);
+    expect(stored.request_key).toBe(input.requestKey);
+    expect(stored.reference).toBe(`SUP-PAY-${original.paymentId}`);
     const replay = await service.create(input);
     expect(replay).toEqual({ ...original, replayed: true });
     expect(await db.getRepository(Payment).countBy({ invoiceId })).toBe(1);
@@ -243,10 +259,23 @@ describe('Supplier EGP pilot (local PostgreSQL integration)', () => {
     const invoice = await db.getRepository(Invoice).findOneByOrFail({ id: invoiceId });
     expect(invoice.status).toBe('partially_paid');
     const savedPayment = await db.getRepository(Payment).findOneByOrFail({ invoiceId });
-    const rejectedInput = savedPayment.reference === 'SEGP-' + first.requestKey
-      ? second : first;
+    const [savedKey] = await db.query('SELECT request_key FROM public.payments WHERE id = $1', [savedPayment.id]);
+    const rejectedInput = savedKey.request_key === first.requestKey ? second : first;
     await expect(service.create(rejectedInput)).rejects.toThrow();
     expect(await db.getRepository(Payment).countBy({ invoiceId })).toBe(1);
+  });
+
+  it('enforces UUID uniqueness at the PostgreSQL index even when bypassing the service', async () => {
+    const created = await service.create(args());
+    // A duplicate assignment to a separate row must fail at the database,
+    // proving the invariant does not depend solely on application locks.
+    const second = await service.create(args());
+    const [firstRow] = await db.query('SELECT request_key FROM public.payments WHERE id = $1', [created.paymentId]);
+    await expect(db.query(
+      'UPDATE public.payments SET request_key = $1::uuid WHERE id = $2',
+      [firstRow.request_key, second.paymentId],
+    )).rejects.toMatchObject({ code: '23505' });
+    expect(await db.getRepository(Payment).countBy({ invoiceId })).toBe(2);
   });
 
   it('rolls back payment, journal, and invoice status when a transaction fails after writing', async () => {
