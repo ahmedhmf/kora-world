@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { DataSource, EntityManager } from 'typeorm';
+import { DataSource, EntityManager, In } from 'typeorm';
 import { User } from '../users/entities/user.entity';
 import { AccountingAccount } from './entities/accounting-account.entity';
 import { JournalEntry, JournalEntryType } from './entities/journal-entry.entity';
@@ -86,6 +86,21 @@ export class JournalWorkflowService {
     });
     if (!journal) throw new NotFoundException('Journal not found');
     return journal;
+  }
+
+  async listVisible(userId: number): Promise<JournalEntry[]> {
+    const actor = await this.actor(this.db.manager, userId);
+    const privileged = ['accountant', 'admin'].includes(actor.role);
+    return this.db.getRepository(JournalEntry).find({
+      ...(privileged ? {} : {
+        where: [
+          { createdById: userId },
+          { postingStatus: In(['posted', 'reversed']) },
+        ],
+      }),
+      relations: { lines: { account: true } },
+      order: { date: 'DESC', createdAt: 'DESC', id: 'DESC' },
+    });
   }
 
   async createDraft(event: Omit<PostAccountingEvent, 'sourceEventKey' | 'type'>, userId: number) {
