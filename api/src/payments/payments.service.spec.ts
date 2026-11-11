@@ -227,6 +227,17 @@ describe('PaymentsService', () => {
   });
 
   describe('remove', () => {
+    it('refuses hard deletion of a supplier pilot payment and preserves its journal', async () => {
+      const pilot = {
+        id: 55, invoiceId: 10, reference: 'SUP-PAY-55', amount: 100, currency: 'EGP',
+      } as Payment;
+      mockPaymentRepo.findOne.mockResolvedValue(pilot);
+      await expect(service.remove(55)).rejects.toThrow('must be reversed');
+      expect(mockPaymentRepo.remove).not.toHaveBeenCalled();
+      expect(mockAccountingService.deleteJournalEntryByReference).not.toHaveBeenCalled();
+      expect(mockInvoicesService.update).not.toHaveBeenCalled();
+    });
+
     it('should successfully remove a payment, delete journal entry, and recalculate invoice status', async () => {
       const mockPayment = {
         id: 1,
