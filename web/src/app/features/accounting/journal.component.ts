@@ -1,199 +1,289 @@
-import { Component, inject, OnInit, signal, computed } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { finalize } from 'rxjs';
 import { AccountingStore } from '../../store/accounting.store';
-import { JournalEntry } from '../../core/services/accounting-api.service';
+import {
+  AccountingApiService,
+  JournalEntry,
+  AccountingAccount,
+} from '../../core/services/accounting-api.service';
+import { AuthService } from '../../core/services/auth.service';
 import { ApiService } from '../../core/services/api.service';
-import { LucideAngularModule } from 'lucide-angular';
+
+type JournalFilter = 'all' | 'draft' | 'pending_approval' | 'posted' | 'reversed';
+type EntryLine = { accountId: number; debit: number | null; credit: number | null };
 
 @Component({
   selector: 'app-journal',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule],
+  imports: [CommonModule, FormsModule],
   templateUrl: './journal.component.html',
 })
 export class JournalComponent implements OnInit {
   readonly store = inject(AccountingStore);
+  readonly accounting = inject(AccountingApiService);
+  readonly auth = inject(AuthService);
   readonly apiService = inject(ApiService);
 
-  expandedEntries = signal<Record<number, boolean>>({});
-  isCreateModalOpen = signal(false);
-  isUploading = signal(false);
-  attachmentName = signal('');
+  readonly entries = signal<JournalEntry[]>([]);
+  readonly loading = signal(false);
+  readonly busy = signal(false);
+  readonly error = signal('');
+  readonly success = signal('');
+  readonly filter = signal<JournalFilter>('all');
+  readonly expandedEntries = signal<Record<number, boolean>>({});
+  readonly isCreateModalOpen = signal(false);
+  readonly reversingId = signal<number | null>(null);
+  reversalReason = '';
 
-  newEntry = {
-    date: new Date().toISOString().split('T')[0],
-    reference: '',
-    description: '',
-    type: 'manual',
-    attachment: '' as string | undefined,
-    lines: [] as Array<{
-      accountId: number;
-      debit?: number;
-      credit?: number;
-      currency: string;
-      exchangeRate?: number;
-    }>
-  };
+  newEntry: { date: string; reference: string; description: string; lines: EntryLine[] } =
+    this.emptyEntry();
 
-  ngOnInit() {
-    this.store.loadJournalEntries();
+  readonly currentUserId = computed(() => Number(this.auth.currentUser()?.id ?? this.auth.currentUser()?.sub ?? 0));
+  readonly isAccountant = computed(() =>
+    ['admin', 'accountant'].includes(String(this.auth.currentUser()?.role ?? '').toLowerCase()),
+  );
+  readonly filteredEntries = computed(() => {
+    const selected = this.filter();
+    return this.entries().filter(entry =>
+      selected === 'all' || (entry.postingStatus ?? 'posted') === selected,
+    );
+  });
+  readonly pendingCount = computed(() =>
+    this.entries().filter(entry => entry.postingStatus === 'pending_approval').length,
+  );
+  readonly accountsForEntry = computed(() => {
+    const accounts = this.store.accounts();
+    const parents = new Set(accounts.map(a => a.parentId).filter((id): id is number => id != null));
+    return accounts.filter(a => a.isActive && a.currency.toUpperCase() === 'EGP' && !parents.has(a.id));
+  });
+
+  ngOnInit(): void {
     this.store.loadAccounts();
+    this.refresh();
   }
 
-  toggleExpand(id: number) {
-    this.expandedEntries.update(map => ({
-      ...map,
-      [id]: !map[id]
-    }));
+  private emptyEntry() {
+    return {
+      date: new Date().toISOString().slice(0, 10),
+      reference: '',
+      description: '',
+      lines: [
+        { accountId: 0, debit: null, credit: null },
+        { accountId: 0, debit: null, credit: null },
+      ] as EntryLine[],
+    };
+  }
+
+  refresh(): void {
+    this.loading.set(true);
+    this.error.set('');
+    this.accounting.getJournalEntries()
+      .pipe(finalize(() => this.loading.set(false)))
+      .subscribe({
+        next: entries => this.entries.set(entries),
+        error: err => this.error.set(this.message(err)),
+      });
+  }
+
+  setFilter(value: JournalFilter): void {
+    this.filter.set(value);
+  }
+
+  toggleExpand(id: number): void {
+    this.expandedEntries.update(state => ({ ...state, [id]: !state[id] }));
   }
 
   isExpanded(id: number): boolean {
     return !!this.expandedEntries()[id];
   }
 
-  getTypeClass(type: string): string {
-    switch (type.toLowerCase()) {
-      case 'manual':  return 'bg-zinc-850 text-zinc-300 border-zinc-700';
-      case 'po':      return 'bg-blue-950/35 text-blue-400 border-blue-900/40';
-      case 'invoice': return 'bg-emerald-950/35 text-emerald-400 border-emerald-900/40';
-      case 'payment': return 'bg-purple-950/35 text-purple-400 border-purple-900/40';
-      default:        return 'bg-zinc-800 text-zinc-400 border-zinc-700';
+  canSubmit(entry: JournalEntry): boolean {
+    return entry.type === 'manual' && entry.postingStatus === 'draft' &&
+      this.currentUserId() > 0 && entry.createdById === this.currentUserId();
+  }
+
+  canApprove(entry: JournalEntry): boolean {
+    return this.isAccountant() && entry.type === 'manual' &&
+      entry.postingStatus === 'pending_approval' &&
+      entry.createdById != null && entry.createdById !== this.currentUserId() &&
+      entry.submittedById !== this.currentUserId();
+  }
+
+  canReverse(entry: JournalEntry): boolean {
+    return this.isAccountant() && entry.type === 'manual' &&
+      entry.postingStatus === 'posted' && !entry.reversalOfId;
+  }
+
+  totalDebit(entry: JournalEntry): number {
+    // Use EGP base amounts rather than incorrectly summing unrelated currencies.
+    return entry.lines.reduce((sum, line) => sum + Math.max(0, Number(line.amountBase)), 0);
+  }
+
+  totalCredit(entry: JournalEntry): number {
+    return entry.lines.reduce((sum, line) => sum + Math.max(0, -Number(line.amountBase)), 0);
+  }
+
+  getStatus(entry: JournalEntry): string {
+    return entry.postingStatus ?? 'posted';
+  }
+
+  getStatusClass(entry: JournalEntry): string {
+    switch (this.getStatus(entry)) {
+      case 'draft': return 'text-zinc-300 border-zinc-700 bg-zinc-900';
+      case 'pending_approval': return 'text-amber-300 border-amber-900 bg-amber-950/40';
+      case 'posted': return 'text-emerald-300 border-emerald-900 bg-emerald-950/40';
+      case 'reversed': return 'text-purple-300 border-purple-900 bg-purple-950/40';
+      default: return 'text-zinc-300 border-zinc-700 bg-zinc-900';
     }
   }
 
-  getEntryTotalDebit(entry: JournalEntry): number {
-    return entry.lines.reduce((sum, line) => sum + (line.debit > 0 ? Number(line.debit) : 0), 0);
-  }
-
-  getEntryTotalCredit(entry: JournalEntry): number {
-    return entry.lines.reduce((sum, line) => sum + (line.credit > 0 ? Number(line.credit) : 0), 0);
-  }
-
-  openCreateModal() {
-    this.attachmentName.set('');
-    this.newEntry = {
-      date: new Date().toISOString().split('T')[0],
-      reference: '',
-      description: '',
-      type: 'manual',
-      attachment: undefined,
-      lines: [
-        { accountId: 0, debit: undefined, credit: undefined, currency: 'EGP', exchangeRate: 1 },
-        { accountId: 0, debit: undefined, credit: undefined, currency: 'EGP', exchangeRate: 1 }
-      ]
-    };
+  openCreateModal(): void {
+    this.newEntry = this.emptyEntry();
+    this.error.set('');
     this.isCreateModalOpen.set(true);
   }
 
-  onFileSelected(event: any) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    this.isUploading.set(true);
-    this.apiService.uploadFile(file).subscribe({
-      next: (res) => {
-        this.newEntry.attachment = res.path;
-        this.attachmentName.set(res.name);
-        this.isUploading.set(false);
-      },
-      error: () => {
-        alert('File upload failed.');
-        this.isUploading.set(false);
-      }
-    });
+  addNewLine(): void {
+    this.newEntry.lines.push({ accountId: 0, debit: null, credit: null });
   }
 
-  addNewLine() {
-    this.newEntry.lines.push({
-      accountId: 0,
-      debit: undefined,
-      credit: undefined,
-      currency: 'EGP',
-      exchangeRate: 1
-    });
+  removeLine(index: number): void {
+    if (this.newEntry.lines.length > 2) this.newEntry.lines.splice(index, 1);
   }
 
-  removeLine(idx: number) {
-    this.newEntry.lines.splice(idx, 1);
+  onAmountInput(index: number, type: 'debit' | 'credit'): void {
+    const line = this.newEntry.lines[index];
+    if (type === 'debit' && Number(line.debit) > 0) line.credit = null;
+    if (type === 'credit' && Number(line.credit) > 0) line.debit = null;
   }
 
-  onAmountInput(idx: number, type: 'debit' | 'credit') {
-    const line = this.newEntry.lines[idx];
-    if (type === 'debit' && line.debit !== undefined && line.debit > 0) {
-      line.credit = undefined;
-    } else if (type === 'credit' && line.credit !== undefined && line.credit > 0) {
-      line.debit = undefined;
-    }
+  private toCents(value: number | null): number | null {
+    const n = Number(value ?? 0);
+    if (!Number.isFinite(n) || n < 0) return null;
+    const scaled = Math.round(n * 100);
+    if (!Number.isSafeInteger(scaled) || Math.abs(n * 100 - scaled) > 0.000001) return null;
+    return scaled;
   }
 
   calculatedTotals() {
-    let debit = 0;
-    let credit = 0;
-    for (const l of this.newEntry.lines) {
-      const rate = l.exchangeRate || 1;
-      const deb = l.debit || 0;
-      const cred = l.credit || 0;
-      debit += deb * rate;
-      credit += cred * rate;
+    let debitCents = 0;
+    let creditCents = 0;
+    for (const line of this.newEntry.lines) {
+      debitCents += this.toCents(line.debit) ?? 0;
+      creditCents += this.toCents(line.credit) ?? 0;
     }
-    return {
-      debit,
-      credit,
-      difference: Number(Math.abs(debit - credit).toFixed(2))
-    };
+    return { debit: debitCents / 100, credit: creditCents / 100, difference: (debitCents - creditCents) / 100 };
   }
 
-  validationError() {
-    const lines = this.newEntry.lines;
-    if (lines.length < 2) return 'A journal entry must have at least 2 lines.';
-    
-    let hasEmptyAccount = false;
-    let hasLineWithoutAmount = false;
-    for (const l of lines) {
-      if (!l.accountId || Number(l.accountId) === 0) hasEmptyAccount = true;
-      if ((l.debit === undefined || l.debit <= 0) && (l.credit === undefined || l.credit <= 0)) {
-        hasLineWithoutAmount = true;
-      }
+  validationError(): string | null {
+    if (!this.newEntry.description.trim()) return 'Description is required.';
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(this.newEntry.date) ||
+      Number.isNaN(Date.parse(this.newEntry.date)) ||
+      new Date(this.newEntry.date).toISOString().slice(0, 10) !== this.newEntry.date) {
+      return 'Enter a valid date.';
     }
-
-    if (hasEmptyAccount) return 'All lines must specify an account.';
-    if (hasLineWithoutAmount) return 'All lines must specify either a debit or credit amount greater than 0.';
-    
-    const totals = this.calculatedTotals();
-    if (totals.difference > 0.02) {
-      return `Total Debits and Credits must balance in EUR. Current difference is ${totals.difference} EUR.`;
+    if (this.newEntry.reference.length > 100) return 'Reference must be 100 characters or fewer.';
+    if (this.newEntry.lines.length < 2) return 'At least two lines are required.';
+    const allowed = new Set(this.accountsForEntry().map(account => account.id));
+    let debit = 0;
+    let credit = 0;
+    for (const line of this.newEntry.lines) {
+      if (!allowed.has(Number(line.accountId))) return 'Select an active EGP posting account for every line.';
+      const d = this.toCents(line.debit);
+      const c = this.toCents(line.credit);
+      if (d === null || c === null) return 'Amounts must be nonnegative with at most two decimal places.';
+      if ((d > 0) === (c > 0)) return 'Each line must have exactly one debit or one credit amount.';
+      debit += d;
+      credit += c;
+      if (!Number.isSafeInteger(debit) || !Number.isSafeInteger(credit)) return 'Amount is too large.';
     }
-
+    if (debit !== credit) return 'Debits and credits must balance exactly in EGP.';
     return null;
   }
 
-  submitManualEntry() {
-    if (this.validationError()) return;
-
-    // Build lines to match API
-    const linesDto = this.newEntry.lines.map(l => ({
-      accountId: Number(l.accountId),
-      debit: l.debit || 0,
-      credit: l.credit || 0,
-      currency: l.currency,
-      exchangeRate: l.exchangeRate || 1
-    }));
-
-    const dto = {
+  createDraft(): void {
+    const validation = this.validationError();
+    if (validation || this.busy()) {
+      if (validation) this.error.set(validation);
+      return;
+    }
+    this.busy.set(true);
+    this.error.set('');
+    this.success.set('');
+    this.accounting.createManualDraft({
       date: this.newEntry.date,
-      reference: this.newEntry.reference || undefined,
-      description: this.newEntry.description || undefined,
-      type: 'manual',
-      attachment: this.newEntry.attachment || undefined,
-      lines: linesDto
-    };
-
-    this.store.createManualJournalEntry({
-      dto,
-      onSuccess: () => {
+      reference: this.newEntry.reference.trim() || undefined,
+      description: this.newEntry.description.trim(),
+      lines: this.newEntry.lines.map(line => ({
+        accountId: Number(line.accountId),
+        debitCents: this.toCents(line.debit)!,
+        creditCents: this.toCents(line.credit)!,
+      })),
+    }).pipe(finalize(() => this.busy.set(false))).subscribe({
+      next: () => {
         this.isCreateModalOpen.set(false);
-      }
+        this.success.set('Draft created. Submit it when ready for accountant approval.');
+        this.refresh();
+      },
+      error: err => this.error.set(this.message(err)),
     });
+  }
+
+  submit(entry: JournalEntry): void {
+    if (!this.canSubmit(entry) || this.busy()) return;
+    this.execute(() => this.accounting.submitManualDraft(entry.id),
+      'Journal submitted for accountant approval.');
+  }
+
+  approve(entry: JournalEntry): void {
+    if (!this.canApprove(entry) || this.busy()) return;
+    this.execute(() => this.accounting.approveManualJournal(entry.id),
+      'Journal approved and posted.');
+  }
+
+  startReversal(entry: JournalEntry): void {
+    if (!this.canReverse(entry)) return;
+    this.reversingId.set(entry.id);
+    this.reversalReason = '';
+    this.error.set('');
+  }
+
+  cancelReversal(): void {
+    this.reversingId.set(null);
+    this.reversalReason = '';
+  }
+
+  confirmReversal(): void {
+    const id = this.reversingId();
+    if (id == null || this.busy() || !this.reversalReason.trim()) {
+      this.error.set('A reversal reason is required.');
+      return;
+    }
+    const entry = this.entries().find(item => item.id === id);
+    if (!entry || !this.canReverse(entry)) return;
+    this.execute(() => this.accounting.reverseManualJournal(id, this.reversalReason.trim()),
+      'Reversal posted. The original entry remains in the audit trail.', () => this.cancelReversal());
+  }
+
+  private execute(operation: () => import('rxjs').Observable<JournalEntry>,
+    confirmation: string, onSuccess?: () => void): void {
+    this.busy.set(true);
+    this.error.set('');
+    this.success.set('');
+    operation().pipe(finalize(() => this.busy.set(false))).subscribe({
+      next: () => {
+        onSuccess?.();
+        this.success.set(confirmation);
+        this.refresh();
+      },
+      error: err => this.error.set(this.message(err)),
+    });
+  }
+
+  private message(error: any): string {
+    const message = error?.error?.message ?? error?.message ?? 'Request failed.';
+    return Array.isArray(message) ? message.join(', ') : String(message);
   }
 }
