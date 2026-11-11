@@ -9,8 +9,11 @@ import {
   UseGuards,
   ParseIntPipe,
   GoneException,
+  Req,
 } from '@nestjs/common';
 import { AccountingService } from './accounting.service';
+import { JournalWorkflowService } from './journal-workflow.service';
+import type { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
 import { AuthGuard } from '../auth/auth.guard';
 import { CreateAccountingAccountDto } from './dto/create-accounting-account.dto';
 import { UpdateAccountingAccountDto } from './dto/update-accounting-account.dto';
@@ -20,7 +23,10 @@ import { CreateExchangeRateDto } from './dto/create-exchange-rate.dto';
 @Controller('accounting')
 @UseGuards(AuthGuard)
 export class AccountingController {
-  constructor(private readonly accountingService: AccountingService) {}
+  constructor(
+    private readonly accountingService: AccountingService,
+    private readonly journalWorkflow: JournalWorkflowService,
+  ) {}
 
   // --- Accounts ---
   @Post('accounts')
@@ -76,8 +82,8 @@ export class AccountingController {
   }
 
   @Get('journal-entries')
-  findAllJournalEntries() {
-    return this.accountingService.findAllJournalEntries();
+  findAllJournalEntries(@Req() req: AuthenticatedRequest) {
+    return this.journalWorkflow.listVisible(req.user.sub);
   }
 
   @Get('journal-entries/:id')
