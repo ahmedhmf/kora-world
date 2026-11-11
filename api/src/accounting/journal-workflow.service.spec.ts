@@ -70,6 +70,57 @@ describe('JournalWorkflowService', () => {
     await expect(service.approveAndPost(5, 1)).rejects.toThrow(ForbiddenException);
   });
 
+  it('allows an administrator to approve their own submitted journal', async () => {
+    manager.findOne.mockImplementation(async (cls, opts) => {
+      if (cls.name === 'User') return { id: opts.where.id, role: 'admin' };
+      if (cls.name === 'AccountingAccount') {
+        return { id: opts.where.id, currency: 'EGP', isActive: true };
+      }
+      if (cls.name === 'JournalEntry') {
+        return {
+          id: opts.where.id, type: JournalEntryType.MANUAL,
+          postingStatus: 'pending_approval', createdById: 4, submittedById: 4,
+          date: '2026-11-11', description: 'Administrator test journal',
+        };
+      }
+      return null;
+    });
+    const result = await service.approveAndPost(5, 4);
+    expect(result.postingStatus).toBe('posted');
+    expect(result.approvedById).toBe(4);
+    expect(result.sourceEventKey).toBe('manual:journal:5:posted:v1');
+  });
+
+  it('allows an administrator to submit a draft created by another employee', async () => {
+    manager.findOne.mockImplementation(async (cls, opts) => {
+      if (cls.name === 'User') return { id: opts.where.id, role: 'admin' };
+      if (cls.name === 'JournalEntry') {
+        return {
+          id: opts.where.id, type: JournalEntryType.MANUAL,
+          postingStatus: 'draft', createdById: 1,
+        };
+      }
+      return null;
+    });
+    const result = await service.submit(5, 4);
+    expect(result.postingStatus).toBe('pending_approval');
+    expect(result.submittedById).toBe(4);
+  });
+
+  it('prevents an accountant from approving a journal they submitted for someone else', async () => {
+    manager.findOne.mockImplementation(async (cls, opts) => {
+      if (cls.name === 'User') return { id: opts.where.id, role: 'accountant' };
+      if (cls.name === 'JournalEntry') {
+        return {
+          id: opts.where.id, type: JournalEntryType.MANUAL,
+          postingStatus: 'pending_approval', createdById: 1, submittedById: 2,
+        };
+      }
+      return null;
+    });
+    await expect(service.approveAndPost(5, 2)).rejects.toThrow(ForbiddenException);
+  });
+
   it('refuses approval by a non-accountant', async () => {
     manager.findOne.mockImplementation(async (cls, opts) => {
       if (cls.name === 'User') return { id: opts.where.id, role: 'employee' };
