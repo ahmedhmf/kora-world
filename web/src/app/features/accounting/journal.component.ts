@@ -40,6 +40,9 @@ export class JournalComponent implements OnInit {
     this.emptyEntry();
 
   readonly currentUserId = computed(() => Number(this.auth.currentUser()?.id ?? this.auth.currentUser()?.sub ?? 0));
+  readonly isAdmin = computed(() =>
+    String(this.auth.currentUser()?.role ?? '').toLowerCase() === 'admin',
+  );
   readonly isAccountant = computed(() =>
     ['admin', 'accountant'].includes(String(this.auth.currentUser()?.role ?? '').toLowerCase()),
   );
@@ -100,14 +103,16 @@ export class JournalComponent implements OnInit {
 
   canSubmit(entry: JournalEntry): boolean {
     return entry.type === 'manual' && entry.postingStatus === 'draft' &&
-      this.currentUserId() > 0 && entry.createdById === this.currentUserId();
+      this.currentUserId() > 0 && (this.isAdmin() || entry.createdById === this.currentUserId());
   }
 
   canApprove(entry: JournalEntry): boolean {
     return this.isAccountant() && entry.type === 'manual' &&
       entry.postingStatus === 'pending_approval' &&
-      entry.createdById != null && entry.createdById !== this.currentUserId() &&
-      entry.submittedById !== this.currentUserId();
+      (this.isAdmin() || (
+        entry.createdById != null && entry.createdById !== this.currentUserId() &&
+        entry.submittedById !== this.currentUserId()
+      ));
   }
 
   canReverse(entry: JournalEntry): boolean {
