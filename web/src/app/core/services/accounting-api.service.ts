@@ -36,6 +36,16 @@ export interface JournalEntry {
   invoiceId?: number | null;
   attachment?: string | null;
   createdAt: string;
+  postingStatus?: 'draft' | 'pending_approval' | 'posted' | 'reversed';
+  createdById?: number | null;
+  submittedById?: number | null;
+  submittedAt?: string | null;
+  approvedById?: number | null;
+  postedAt?: string | null;
+  reversedById?: number | null;
+  reversedAt?: string | null;
+  reversalOfId?: number | null;
+  sourceEventKey?: string | null;
   lines: JournalLine[];
 }
 
@@ -125,6 +135,28 @@ export class AccountingApiService {
 
   createManualJournalEntry(dto: any): Observable<JournalEntry> {
     return this.http.post<JournalEntry>(`${this.base}/accounting/journal/manual`, dto);
+  }
+
+  // New controlled manual journal workflow; amounts use integer EGP cents.
+  createManualDraft(dto: {
+    date: string;
+    reference?: string;
+    description: string;
+    lines: Array<{ accountId: number; debitCents: number; creditCents: number }>;
+  }): Observable<JournalEntry> {
+    return this.http.post<JournalEntry>(`${this.base}/accounting/manual-journals/drafts`, dto);
+  }
+
+  submitManualDraft(id: number): Observable<JournalEntry> {
+    return this.http.post<JournalEntry>(`${this.base}/accounting/manual-journals/${id}/submit`, {});
+  }
+
+  approveManualJournal(id: number): Observable<JournalEntry> {
+    return this.http.post<JournalEntry>(`${this.base}/accounting/manual-journals/${id}/approve`, {});
+  }
+
+  reverseManualJournal(id: number, reason: string): Observable<JournalEntry> {
+    return this.http.post<JournalEntry>(`${this.base}/accounting/manual-journals/${id}/reverse`, { reason });
   }
 
   getExchangeRate(from: string, to: string, date: string): Observable<number> {
