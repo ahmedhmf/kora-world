@@ -150,13 +150,13 @@ export class JournalWorkflowService {
 
   async submit(id: number, userId: number) {
     return this.db.transaction(async (m) => {
-      await this.actor(m, userId);
+      const actor = await this.actor(m, userId);
       const journal = await this.lockedJournal(m, id);
       if (journal.type !== JournalEntryType.MANUAL || journal.postingStatus !== 'draft') {
         throw new BadRequestException('Only draft manual journals can be submitted');
       }
-      if (journal.createdById !== userId) {
-        throw new ForbiddenException('Only the draft creator can submit it');
+      if (actor.role !== 'admin' && journal.createdById !== userId) {
+        throw new ForbiddenException('Only the draft creator or an administrator can submit it');
       }
       journal.postingStatus = 'pending_approval';
       journal.submittedById = userId;
@@ -167,13 +167,14 @@ export class JournalWorkflowService {
 
   async approveAndPost(id: number, userId: number) {
     return this.db.transaction(async (m) => {
-      await this.actor(m, userId, true);
+      const actor = await this.actor(m, userId, true);
       const journal = await this.lockedJournal(m, id);
       if (journal.type !== JournalEntryType.MANUAL || journal.postingStatus !== 'pending_approval') {
         throw new BadRequestException('Journal is not awaiting approval');
       }
-      if (journal.createdById === userId || journal.submittedById === userId) {
-        throw new ForbiddenException('Creator and submitter cannot approve their own journal');
+      // Administrators may perform any workflow action; accountants retain maker-checker separation.
+      if (actor.role !== 'admin' && (journal.createdById === userId || journal.submittedById === userId)) {
+        throw new ForbiddenException('Accountants cannot approve a journal they created or submitted');
       }
       const lines = await m.find(JournalLine, { where: { journalEntryId: id }, order: { id: 'ASC' } });
       const cents = (value: number) => {
