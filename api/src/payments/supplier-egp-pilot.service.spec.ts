@@ -50,12 +50,14 @@ describe('SupplierEgpPilotService — disabled-by-default EGP transaction path',
       }
       return null;
     }),
-    find: jest.fn(async (type: { name: string }) => {
+    find: jest.fn(async (type: { name: string }, opts: any) => {
       if (type.name === 'JournalEntry') {
-        // Invoice booking is present; payment journals come from state.
-        return state.journalEntries.filter(j => j.type === 'payment').length === 0
-          ? [{ id: 1, type: 'invoice', postingStatus: 'posted' }]
-          : state.journalEntries.filter(j => j.type === 'payment');
+        if (opts.where.type === 'invoice') {
+          return [{ id: 1, type: 'invoice', postingStatus: 'posted' }];
+        }
+        if (opts.where.type === 'payment') {
+          return state.journalEntries.filter(j => j.type === 'payment');
+        }
       }
       if (type.name === 'Payment') return state.payments;
       return [];
