@@ -65,8 +65,10 @@ export class SimpleAccountingService {
       const account = await this.db.getRepository(AccountingAccount).findOneBy({ id: entry.id });
       if (!account || account.type !== entry.type ||
         !account.isActive || account.currency.toUpperCase() !== 'EGP' ||
+        (entry.id === input.cashAccountId && !account.code.startsWith('11')) ||
+        (input.kind === 'transfer' && entry.id === input.destinationAccountId && !account.code.startsWith('11')) ||
         await this.db.getRepository(AccountingAccount).existsBy({ parentId: entry.id })) {
-        throw new BadRequestException('Selected account is not an eligible active leaf EGP account of the required type');
+        throw new BadRequestException('Selected account is not eligible: choose a cash/bank account (11xx) and an active leaf EGP category account of the correct type');
       }
     }
     const amount = input.amountCents;
