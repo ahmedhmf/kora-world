@@ -106,6 +106,51 @@ describe('PaymentsService', () => {
       expect(result).toEqual(mockPayment);
     });
 
+    it('characterizes the double-posting risk: invoice PAID update and payment journal are both triggered', async () => {
+      const dto = {
+        invoiceId: 10,
+        date: '2026-11-11',
+        amount: 100,
+        currency: 'EGP',
+        exchangeRate: 1,
+        method: 'bank_transfer',
+        reference: 'PAY-TEST-10',
+        paidFromAccountId: 101,
+        categoryAccountId: 102,
+      };
+      const invoice = {
+        id: 10, type: 'incoming', currency: 'EGP',
+        total: 100, status: InvoiceStatus.SENT,
+      } as Invoice;
+      const payment = {
+        id: 77, invoiceId: 10, amount: 100,
+        currency: 'EGP', exchangeRate: 1,
+        paidFromAccountId: 101, categoryAccountId: 102,
+        reference: 'PAY-TEST-10', date: new Date(dto.date),
+      } as Payment;
+      mockInvoicesService.findOne.mockResolvedValue(invoice);
+      mockPaymentRepo.create.mockReturnValue(payment);
+      mockPaymentRepo.save.mockResolvedValue(payment);
+      mockPaymentRepo.find.mockResolvedValue([payment]);
+
+      await service.create(dto);
+
+      // InvoicesService.update(status=PAID) separately invokes its synthetic
+      // invoice-payment journal path. PaymentsService ALSO creates a journal.
+      // This is a characterization test, not approval of the accounting behavior.
+      expect(mockInvoicesService.update).toHaveBeenCalledWith(10, {
+        status: InvoiceStatus.PAID,
+      });
+      expect(mockAccountingService.createJournalEntry).toHaveBeenCalledWith(
+        expect.objectContaining({
+          reference: 'PAY-TEST-10',
+          invoiceId: 10,
+        }),
+      );
+      expect(mockInvoicesService.update.mock.invocationCallOrder[0])
+        .toBeLessThan(mockAccountingService.createJournalEntry.mock.invocationCallOrder[0]);
+    });
+
     it('should throw NotFoundException if invoiceId is provided but not found', async () => {
       const dto = {
         invoiceId: 999,
