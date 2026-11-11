@@ -65,6 +65,7 @@ export class LayoutComponent {
       route: '/accounting',
       icon: 'landmark',
       subItems: [
+        { label: 'Simple Accounting', route: '/accounting/simple', icon: 'wallet' },
         { label: 'Chart of Accounts', route: '/accounting/chart-of-accounts', icon: 'bar-chart-3' },
         { label: 'Journal Entries', route: '/accounting/journal', icon: 'book-open' },
         { label: 'Invoices', route: '/accounting/invoices', icon: 'receipt' },
