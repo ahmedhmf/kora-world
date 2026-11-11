@@ -5,37 +5,24 @@ import * as path from 'path';
 dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 import { ConflictException } from '@nestjs/common';
-import { DataSource, EntityManager, EntitySchema } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { AccountingPostingService } from './accounting-posting.service';
 import { AccountingAccount } from './entities/accounting-account.entity';
 import { JournalEntry, JournalEntryType } from './entities/journal-entry.entity';
 import { JournalLine } from './entities/journal-line.entity';
 import { Invoice } from '../invoices/entities/invoice.entity';
 import { PurchaseOrder } from '../purchase-orders/entities/purchase-order.entity';
+import { Supplier } from '../suppliers/entities/supplier.entity';
+import { SupplierContact } from '../suppliers/entities/supplier-contact.entity';
+import { Product } from '../products/entities/product.entity';
+import { PurchaseOrderLineItem } from '../purchase-orders/entities/purchase-order-line-item.entity';
+import { InvoiceLine } from '../invoices/entities/invoice-line.entity';
 
 /**
- * Real PostgreSQL integration tests. Never run against the application database.
- *
- * Prerequisites:
- *   DATABASE_NAME=kora_test
- *   Existing application migrations already applied to kora_test, including
- *   AddAccountingPostingFoundation1794355200000.
- *
- * Minimal EntitySchemas for the two referenced document types avoid loading
- * application modules or accidentally running their startup migrations.
+ * Real PostgreSQL integration tests; do not start NestJS AppModule.
+ * Related document entities are loaded only so TypeORM can resolve
+ * JournalEntry's actual runtime relation targets.
  */
-const invoiceReference = new EntitySchema<Invoice>({
-  name: 'Invoice',
-  target: Invoice,
-  tableName: 'invoices',
-  columns: { id: { type: Number, primary: true } },
-});
-const purchaseOrderReference = new EntitySchema<PurchaseOrder>({
-  name: 'PurchaseOrder',
-  target: PurchaseOrder,
-  tableName: 'purchase_orders',
-  columns: { id: { type: Number, primary: true } },
-});
 
 describe('AccountingPostingService (PostgreSQL integration)', () => {
   let db: DataSource;
@@ -76,7 +63,11 @@ describe('AccountingPostingService (PostgreSQL integration)', () => {
       username: dbUser,
       password: dbPassword,
       database: 'kora_test',
-      entities: [AccountingAccount, JournalEntry, JournalLine, invoiceReference, purchaseOrderReference],
+      entities: [
+        AccountingAccount, JournalEntry, JournalLine,
+        Invoice, InvoiceLine, PurchaseOrder, PurchaseOrderLineItem,
+        Supplier, SupplierContact, Product,
+      ],
       synchronize: false,
       migrationsRun: false,
       logging: false,
