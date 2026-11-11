@@ -5,7 +5,6 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
-import { randomUUID } from 'crypto';
 import { User } from '../users/entities/user.entity';
 import { AccountingAccount } from './entities/accounting-account.entity';
 import { JournalEntry, JournalEntryType } from './entities/journal-entry.entity';
