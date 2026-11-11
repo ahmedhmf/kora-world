@@ -7,6 +7,8 @@ import { ExchangeRate } from './entities/exchange-rate.entity';
 import { AccountingService } from './accounting.service';
 import { AccountingPostingService } from './accounting-posting.service';
 import { JournalWorkflowService } from './journal-workflow.service';
+import { SimpleAccountingService } from './simple-accounting.service';
+import { SimpleAccountingController } from './simple-accounting.controller';
 import { ManualJournalsController } from './manual-journals.controller';
 import { AccountingController } from './accounting.controller';
 import { JournalService } from './journal.service';
@@ -27,8 +29,8 @@ import { PaymentsModule } from '../payments/payments.module';
     forwardRef(() => InvoicesModule),
     forwardRef(() => PaymentsModule),
   ],
-  controllers: [AccountingController, JournalController, ReportsController, ManualJournalsController],
-  providers: [AccountingService, AccountingPostingService, JournalWorkflowService, JournalService, ReportsService],
+  controllers: [AccountingController, JournalController, ReportsController, ManualJournalsController, SimpleAccountingController],
+  providers: [AccountingService, AccountingPostingService, JournalWorkflowService, SimpleAccountingService, JournalService, ReportsService],
   exports: [AccountingService, AccountingPostingService, JournalWorkflowService, JournalService, ReportsService, TypeOrmModule],
 })
 export class AccountingModule {}
