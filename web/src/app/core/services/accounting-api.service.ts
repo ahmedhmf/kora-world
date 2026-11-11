@@ -141,6 +141,20 @@ export class AccountingApiService {
     return this.http.get<JournalEntry[]>(`${this.base}/accounting/manual-journals`);
   }
 
+  createSimpleTransaction(dto: {
+    kind: 'expense' | 'income' | 'transfer';
+    date: string;
+    description: string;
+    amountCents: number;
+    cashAccountId: number;
+    categoryAccountId?: number;
+    destinationAccountId?: number;
+  }): Observable<{ journalId: number; status: 'posted' | 'pending_approval' }> {
+    return this.http.post<{ journalId: number; status: 'posted' | 'pending_approval' }>(
+      `${this.base}/accounting/simple/transactions`, dto,
+    );
+  }
+
   // New controlled manual journal workflow; amounts use integer EGP cents.
   createManualDraft(dto: {
     date: string;
