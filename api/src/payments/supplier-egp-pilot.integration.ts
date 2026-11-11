@@ -242,9 +242,10 @@ describe('Supplier EGP pilot (local PostgreSQL integration)', () => {
     })).toBe(1);
     const invoice = await db.getRepository(Invoice).findOneByOrFail({ id: invoiceId });
     expect(invoice.status).toBe('partially_paid');
-    await expect(service.create(first.requestKey ===
-      (await db.getRepository(Payment).findOneByOrFail({ invoiceId })).reference?.replace('SEGP-', '')
-      ? second : first)).rejects.toThrow();
+    const savedPayment = await db.getRepository(Payment).findOneByOrFail({ invoiceId });
+    const rejectedInput = savedPayment.reference === 'SEGP-' + first.requestKey
+      ? second : first;
+    await expect(service.create(rejectedInput)).rejects.toThrow();
     expect(await db.getRepository(Payment).countBy({ invoiceId })).toBe(1);
   });
 
