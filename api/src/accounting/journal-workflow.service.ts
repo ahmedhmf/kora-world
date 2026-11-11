@@ -123,7 +123,10 @@ export class JournalWorkflowService {
   async createDraft(event: Omit<PostAccountingEvent, 'sourceEventKey' | 'type'>, userId: number) {
     this.validate({ ...event, sourceEventKey: '', type: JournalEntryType.MANUAL });
     return this.db.transaction(async (m) => {
-      await this.actor(m, userId);
+      const actor = await this.actor(m, userId);
+      if (!['employee', 'accountant', 'admin'].includes(actor.role)) {
+        throw new ForbiddenException('Your role cannot create manual journals');
+      }
       await this.checkAccounts(m, event.lines);
       return m.save(JournalEntry, m.create(JournalEntry, {
         date: event.date,
@@ -151,6 +154,9 @@ export class JournalWorkflowService {
   async submit(id: number, userId: number) {
     return this.db.transaction(async (m) => {
       const actor = await this.actor(m, userId);
+      if (!['employee', 'accountant', 'admin'].includes(actor.role)) {
+        throw new ForbiddenException('Your role cannot submit manual journals');
+      }
       const journal = await this.lockedJournal(m, id);
       if (journal.type !== JournalEntryType.MANUAL || journal.postingStatus !== 'draft') {
         throw new BadRequestException('Only draft manual journals can be submitted');
