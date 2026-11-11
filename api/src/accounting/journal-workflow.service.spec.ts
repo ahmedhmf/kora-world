@@ -86,6 +86,53 @@ describe('JournalWorkflowService', () => {
     await expect(service.approveAndPost(5, 2)).rejects.toThrow(BadRequestException);
   });
 
+  it('allows the creator to submit a draft for approval', async () => {
+    manager.findOne.mockImplementation(async (cls, opts) => {
+      if (cls.name === 'User') return { id: 1, role: 'employee' };
+      if (cls.name === 'JournalEntry') {
+        return { id: opts.where.id, type: JournalEntryType.MANUAL, postingStatus: 'draft', createdById: 1 };
+      }
+      return null;
+    });
+    const result = await service.submit(5, 1);
+    expect(result.postingStatus).toBe('pending_approval');
+    expect(result.submittedById).toBe(1);
+    expect(result.submittedAt).toBeInstanceOf(Date);
+  });
+
+  it('rejects draft submission by another employee', async () => {
+    manager.findOne.mockImplementation(async (cls, opts) => {
+      if (cls.name === 'User') return { id: opts.where.id, role: 'employee' };
+      if (cls.name === 'JournalEntry') {
+        return { id: opts.where.id, type: JournalEntryType.MANUAL, postingStatus: 'draft', createdById: 1 };
+      }
+      return null;
+    });
+    await expect(service.submit(5, 3)).rejects.toThrow(ForbiddenException);
+  });
+
+  it('reverses a posted journal with opposite lines and marks the original reversed', async () => {
+    manager.findOne.mockImplementation(async (cls, opts) => {
+      if (cls.name === 'User') return { id: opts.where.id, role: 'accountant' };
+      if (cls.name === 'JournalEntry' && opts.where.reversalOfId) return null;
+      if (cls.name === 'JournalEntry') {
+        return { id: opts.where.id, type: JournalEntryType.MANUAL, postingStatus: 'posted', createdById: 1 };
+      }
+      return null;
+    });
+    manager.find.mockResolvedValue([
+      { journalEntryId: 5, accountId: 1, debit: 12.34, credit: 0, amountBase: 12.34, amountEgp: 12.34, currency: 'EGP', exchangeRate: 1 },
+      { journalEntryId: 5, accountId: 2, debit: 0, credit: 12.34, amountBase: -12.34, amountEgp: -12.34, currency: 'EGP', exchangeRate: 1 },
+    ]);
+    const reversal = await service.reverse(5, 2, 'Correction');
+    expect(reversal.reversalOfId).toBe(5);
+    expect(reversal.lines[0].credit).toBe(12.34);
+    expect(reversal.lines[1].debit).toBe(12.34);
+    expect(reversal.lines[0].amountBase).toBe(-12.34);
+    expect(manager.save).toHaveBeenCalledTimes(2);
+    expect(manager.save.mock.calls[1][1].postingStatus).toBe('reversed');
+  });
+
   it('refuses reversal without an explanation', async () => {
     await expect(service.reverse(5, 2, ' ')).rejects.toThrow(BadRequestException);
   });
