@@ -47,6 +47,18 @@ export class JournalEntry {
   @Column({ type: 'varchar', length: 500, nullable: true })
   attachment?: string | null;
 
+  @Column({ name: 'posting_status', type: 'varchar', length: 32, default: 'posted' })
+  postingStatus: 'draft' | 'pending_approval' | 'posted' | 'reversed';
+
+  @Column({ name: 'source_event_key', type: 'varchar', length: 255, nullable: true })
+  sourceEventKey?: string | null;
+
+  @Column({ name: 'posted_at', type: 'timestamptz', nullable: true })
+  postedAt?: Date | null;
+
+  @Column({ name: 'reversal_of_id', type: 'integer', nullable: true })
+  reversalOfId?: number | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 
