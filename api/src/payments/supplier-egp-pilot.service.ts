@@ -305,6 +305,8 @@ export class SupplierEgpPilotService {
       }
       throw error;
     });
+  }
+
   async reverse(paymentId: number, actorId: number, reason: string): Promise<{
     paymentId: number; originalJournalId: number; reversalJournalId: number;
     status: string; remainingCents: number;
@@ -407,6 +409,5 @@ export class SupplierEgpPilotService {
         status: invoice.status, remainingCents: total - remainingPaid,
       };
     }));
-  }
   }
 }
