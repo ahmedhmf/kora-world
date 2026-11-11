@@ -8,6 +8,8 @@ dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 const dbName = process.env.DATABASE_NAME;
+const dbUser = process.env.DATABASE_USER || process.env.DB_USER;
+const dbPassword = process.env.DATABASE_PASSWORD || process.env.DB_PASSWORD;
 const host = process.env.DATABASE_HOST || '127.0.0.1';
 const port = Number(process.env.DATABASE_PORT || 5432);
 
@@ -20,16 +22,16 @@ if (!['localhost', '127.0.0.1', '::1'].includes(host)) {
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
   throw new Error('Invalid test PostgreSQL port');
 }
-if (!process.env.DATABASE_USER || !process.env.DATABASE_PASSWORD) {
-  throw new Error('DATABASE_USER and DATABASE_PASSWORD must be set for the test database');
+if (!dbUser || !dbPassword) {
+  throw new Error('Set DATABASE_USER/DATABASE_PASSWORD or DB_USER/DB_PASSWORD for the test database');
 }
 
 const db = new DataSource({
   type: 'postgres',
   host,
   port,
-  username: process.env.DATABASE_USER,
-  password: process.env.DATABASE_PASSWORD,
+  username: dbUser,
+  password: dbPassword,
   database: 'kora_test',
   entities: [],
   migrations: [path.resolve(__dirname, '../src/migrations/*{.ts,.js}')],
