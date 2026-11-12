@@ -33,6 +33,143 @@ export class InvoicesComponent implements OnInit {
     return (host === 'localhost' || host === '127.0.0.1') &&
       (role === 'admin' || role === 'accountant');
   });
+  readonly pilotCanCreate = computed(() => this.canViewSupplierPilot() &&
+    this.auth.currentUser()?.role === 'admin');
+  readonly pilotBanks = computed(() => {
+    const accounts = this.store.accounts();
+    return accounts.filter(a => a.isActive && a.currency === 'EGP' &&
+      a.type === 'asset' && a.code.startsWith('11') &&
+      !accounts.some(child => child.parentId === a.id));
+  });
+  readonly pilotWriteBusy = signal(false);
+  readonly pilotWriteError = signal<string | null>(null);
+  readonly pilotWriteSuccess = signal<string | null>(null);
+  readonly pilotConfirmReverseId = signal<number | null>(null);
+  pilotReverseReason = '';
+  pilotPaymentAmount = '';
+  pilotPaymentDate = new Date().toISOString().slice(0, 10);
+  pilotPaymentBankId = 0;
+  pilotPaymentDescription = '';
+  // Retain the exact payload/UUID after an uncertain failure. A retry must
+  // never create a new UUID or apply changed fields.
+  private pilotPendingPayment: {
+    invoiceId: number; bankAccountId: number; amountCents: number;
+    date: string; requestKey: string; description?: string;
+  } | null = null;
+  readonly pilotRetryPending = signal(false);
+
+  private readPilotAmountCents(): number | null {
+    const raw = this.pilotPaymentAmount.trim();
+    if (!/^(?:0|[1-9]\\d*)(?:\\.\\d{1,2})?$/.test(raw)) return null;
+    const [whole, fraction = ''] = raw.split('.');
+    const amount = Number(whole) * 100 + Number(fraction.padEnd(2, '0'));
+    return Number.isSafeInteger(amount) && amount > 0 ? amount : null;
+  }
+
+  submitSupplierPilotPayment() {
+    const balance = this.pilotBalance();
+    if (!this.pilotCanCreate() || !balance || this.pilotWriteBusy() ||
+        this.pilotBalanceLoading() || balance.outstandingCents <= 0) return;
+    let dto = this.pilotPendingPayment;
+    if (!dto) {
+      const amountCents = this.readPilotAmountCents();
+      const bankId = Number(this.pilotPaymentBankId);
+      if (!amountCents || amountCents > balance.outstandingCents ||
+          !this.pilotBanks().some(a => a.id === bankId) ||
+          !/^\\d{4}-\\d{2}-\\d{2}$/.test(this.pilotPaymentDate) ||
+          Number.isNaN(Date.parse(this.pilotPaymentDate)) ||
+          new Date(this.pilotPaymentDate).toISOString().slice(0, 10) !== this.pilotPaymentDate ||
+          this.pilotPaymentDescription.length > 255) {
+        this.pilotWriteError.set('Enter a valid amount within the outstanding balance, date and active EGP bank account.');
+        return;
+      }
+      // A fresh UUID is generated only for a NEW submission, not retries.
+      dto = {
+        invoiceId: balance.invoiceId, bankAccountId: bankId,
+        amountCents, date: this.pilotPaymentDate,
+        requestKey: crypto.randomUUID(),
+        description: this.pilotPaymentDescription.trim() || undefined,
+      };
+      this.pilotPendingPayment = dto;
+      this.pilotRetryPending.set(false);
+    }
+    if (dto.invoiceId !== balance.invoiceId) return;
+    this.pilotWriteBusy.set(true);
+    this.pilotWriteError.set(null);
+    this.accountingApi.createSupplierPilotPayment(dto).subscribe({
+      next: result => {
+        this.pilotWriteBusy.set(false);
+        this.pilotPendingPayment = null;
+        this.pilotRetryPending.set(false);
+        this.pilotPaymentAmount = '';
+        this.pilotPaymentDescription = '';
+        this.pilotWriteSuccess.set(result.replayed
+          ? `Previous payment #${result.paymentId} confirmed; no duplicate created.`
+          : `Payment #${result.paymentId} recorded successfully.`);
+        this.store.loadInvoices();
+        this.refreshSupplierPilotBalance();
+      },
+      error: () => {
+        this.pilotWriteBusy.set(false);
+        this.pilotRetryPending.set(true);
+        this.pilotWriteError.set('Submission could not be confirmed. Retry the SAME request without changing its details, or verify the payment history before starting another payment.');
+      },
+    });
+  }
+
+  // Discarding after a network failure can risk duplicates; require confirmation.
+  discardSupplierPilotRetry() {
+    if (this.pilotWriteBusy() || !this.pilotPendingPayment) return;
+    if (!confirm('An earlier request may have succeeded. Check payment history before making a NEW payment. Discard this retry identity?')) return;
+    this.pilotPendingPayment = null;
+    this.pilotRetryPending.set(false);
+    this.pilotWriteError.set(null);
+    this.refreshSupplierPilotBalance();
+  }
+
+  selectSupplierPilotReversal(paymentId: number) {
+    if (!this.canViewSupplierPilot() || this.pilotWriteBusy() || this.pilotRetryPending()) return;
+    this.pilotConfirmReverseId.set(paymentId);
+    this.pilotReverseReason = '';
+    this.pilotWriteError.set(null);
+    this.pilotWriteSuccess.set(null);
+  }
+
+  cancelSupplierPilotReversal() {
+    if (this.pilotWriteBusy()) return;
+    this.pilotConfirmReverseId.set(null);
+    this.pilotReverseReason = '';
+  }
+
+  confirmSupplierPilotReversal() {
+    const id = this.pilotConfirmReverseId();
+    const reason = this.pilotReverseReason.trim();
+    if (!this.canViewSupplierPilot() || !this.pilotBalance() ||
+        this.pilotWriteBusy() || this.pilotRetryPending() || id === null) return;
+    if (!reason || reason.length > 500) {
+      this.pilotWriteError.set('A reversal reason of 1–500 characters is required.');
+      return;
+    }
+    if (!this.pilotBalance()!.payments.some(p => p.paymentId === id && p.status === 'active')) return;
+    this.pilotWriteBusy.set(true);
+    this.pilotWriteError.set(null);
+    this.accountingApi.reverseSupplierPilotPayment(id, reason).subscribe({
+      next: result => {
+        this.pilotWriteBusy.set(false);
+        this.pilotConfirmReverseId.set(null);
+        this.pilotReverseReason = '';
+        this.pilotWriteSuccess.set(`Payment #${result.paymentId} reversed by journal #${result.reversalJournalId}.`);
+        this.store.loadInvoices();
+        this.refreshSupplierPilotBalance();
+      },
+      error: () => {
+        this.pilotWriteBusy.set(false);
+        this.pilotWriteError.set('Reversal could not be confirmed. Refresh history before retrying; do not submit a new payment to compensate.');
+        this.refreshSupplierPilotBalance();
+      },
+    });
+  }
+
   readonly pilotBalanceInvoice = signal<Invoice | null>(null);
   readonly pilotBalance = signal<SupplierPilotInvoiceBalance | null>(null);
   readonly pilotBalanceLoading = signal(false);
@@ -42,6 +179,16 @@ export class InvoicesComponent implements OnInit {
   openSupplierPilotBalance(invoice: Invoice) {
     if (!this.canViewSupplierPilot() || invoice.type !== 'incoming' || invoice.currency !== 'EGP') return;
     const request = ++this.pilotBalanceRequest;
+    if (this.pilotBalanceInvoice()?.id !== invoice.id) {
+      this.pilotPendingPayment = null;
+      this.pilotRetryPending.set(false);
+      this.pilotPaymentAmount = '';
+      this.pilotPaymentDescription = '';
+      this.pilotPaymentBankId = 0;
+      this.pilotConfirmReverseId.set(null);
+      this.pilotWriteError.set(null);
+      this.pilotWriteSuccess.set(null);
+    }
     this.pilotBalanceInvoice.set(invoice);
     this.pilotBalance.set(null);
     this.pilotBalanceError.set(null);
@@ -63,11 +210,15 @@ export class InvoicesComponent implements OnInit {
   }
 
   closeSupplierPilotBalance() {
+    if (this.pilotWriteBusy()) return;
     ++this.pilotBalanceRequest;
     this.pilotBalanceInvoice.set(null);
     this.pilotBalance.set(null);
     this.pilotBalanceError.set(null);
     this.pilotBalanceLoading.set(false);
+    this.pilotPendingPayment = null;
+    this.pilotRetryPending.set(false);
+    this.pilotConfirmReverseId.set(null);
   }
 
   refreshSupplierPilotBalance() {
@@ -105,6 +256,7 @@ export class InvoicesComponent implements OnInit {
 
   ngOnInit() {
     this.store.loadInvoices();
+    this.store.loadAccounts();
     this.suppliersStore.loadSuppliers();
     this.poStore.loadPurchaseOrders();
     this.productsStore.loadProducts({});
