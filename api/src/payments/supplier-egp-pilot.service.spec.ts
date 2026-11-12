@@ -133,6 +133,18 @@ describe('SupplierEgpPilotService — disabled-by-default EGP transaction path',
     expect(manager.save).not.toHaveBeenCalled();
   });
 
+  it('keeps pilot balance and AP reporting disabled by default', async () => {
+    delete process.env.SUPPLIER_EGP_PILOT;
+    await expect(service.getInvoiceBalance(7)).rejects.toThrow(ForbiddenException);
+    await expect(service.getPilotAccountsPayable()).rejects.toThrow(ForbiddenException);
+    expect(db.transaction).not.toHaveBeenCalled();
+  });
+
+  it('rejects an invalid invoice ID before attempting a report transaction', async () => {
+    await expect(service.getInvoiceBalance(0)).rejects.toThrow(BadRequestException);
+    expect(db.transaction).not.toHaveBeenCalled();
+  });
+
   it('requires a reason and authenticated user ID for supplier reversal', async () => {
     await expect(service.reverse(99, 1, ' ')).rejects.toThrow(BadRequestException);
     await expect(service.reverse(99, 0, 'Incorrect payment')).rejects.toThrow(BadRequestException);
