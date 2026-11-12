@@ -128,6 +128,114 @@ export class SupplierEgpPilotService {
     return { paidCents, payments, originals };
   }
 
+  /**
+   * Reversal-aware reporting uses the exact same verified journal-to-payment
+   * mapping as create/reverse. A reversed payment is visible, but not counted.
+   * Queries run inside a single repeatable-read, READ ONLY snapshot.
+   */
+  private async invoiceBalance(m: EntityManager, invoice: Invoice) {
+    if (invoice.type !== InvoiceType.INCOMING || invoice.currency !== 'EGP') {
+      throw new BadRequestException('EGP supplier invoices only');
+    }
+    const history = await this.settlementHistory(m, invoice.id);
+    const totalCents = SupplierEgpPilotService.cents(invoice.total, 'Invoice total');
+    const payments = history.payments.map(p => {
+      const journal = history.originals.find(j =>
+        j.sourceEventKey === `supplier-payment:${p.id}:posted:v1`)!;
+      return { payment: p, journal };
+    });
+    const entries = await m.find(JournalEntry, {
+      where: { invoiceId: invoice.id, type: JournalEntryType.PAYMENT },
+    });
+    const records = payments.map(({ payment, journal }) => {
+      const reversal = entries.find(j => j.reversalOfId === journal.id);
+      return {
+        paymentId: payment.id,
+        reference: payment.reference || null,
+        date: String(payment.date).slice(0, 10),
+        amountCents: SupplierEgpPilotService.cents(payment.amount, 'Payment'),
+        status: reversal ? 'reversed' as const : 'active' as const,
+        originalJournalId: journal.id,
+        reversal: reversal ? {
+          journalId: reversal.id,
+          byUserId: journal.reversedById || reversal.createdById || null,
+          at: journal.reversedAt ? new Date(journal.reversedAt).toISOString() : null,
+          reason: (reversal.description || '').split(': ').slice(1).join(': ') || null,
+        } : null,
+      };
+    }).sort((a, b) => a.paymentId - b.paymentId);
+    const reversedCents = records
+      .filter(r => r.status === 'reversed')
+      .reduce((sum, r) => sum + r.amountCents, 0);
+    if (history.paidCents > totalCents) {
+      throw new ConflictException('Supplier invoice payments exceed invoice total');
+    }
+    return {
+      invoiceId: invoice.id,
+      invoiceNumber: invoice.number,
+      supplierId: invoice.supplierId || null,
+      currency: 'EGP' as const,
+      invoiceStatus: invoice.status,
+      totalCents,
+      paidCents: history.paidCents,
+      reversedCents,
+      outstandingCents: totalCents - history.paidCents,
+      payments: records,
+    };
+  }
+
+  private async readOnlySnapshot<T>(work: (m: EntityManager) => Promise<T>): Promise<T> {
+    this.ensurePilotEnabled();
+    return this.db.transaction('REPEATABLE READ', async m => {
+      await m.query('SET TRANSACTION READ ONLY');
+      const [identity] = await m.query('SELECT current_database() AS database_name');
+      if (identity?.database_name !== 'kora_test') {
+        throw new ForbiddenException('Supplier pilot reporting only supports local kora_test');
+      }
+      return work(m);
+    });
+  }
+
+  async getInvoiceBalance(invoiceId: number) {
+    if (!Number.isSafeInteger(invoiceId) || invoiceId <= 0) {
+      throw new BadRequestException('Invalid invoice ID');
+    }
+    return this.readOnlySnapshot(async m => {
+      const invoice = await m.findOne(Invoice, { where: { id: invoiceId } });
+      if (!invoice) throw new NotFoundException('Supplier invoice not found');
+      return this.invoiceBalance(m, invoice);
+    });
+  }
+
+  /**
+   * Pilot-only AP report includes invoices with at least one dedicated request
+   * key, not unrelated legacy/FX invoices. Inconsistent history fails closed.
+   */
+  async getPilotAccountsPayable() {
+    return this.readOnlySnapshot(async m => {
+      const rows: Array<{ invoice_id: number }> = await m.query(
+        `SELECT DISTINCT invoice_id FROM public.payments
+         WHERE request_key IS NOT NULL AND invoice_id IS NOT NULL
+         ORDER BY invoice_id`,
+      );
+      const balances = [];
+      for (const row of rows) {
+        const invoice = await m.findOne(Invoice, { where: { id: Number(row.invoice_id) } });
+        if (!invoice) throw new ConflictException('Pilot payment has no invoice');
+        balances.push(await this.invoiceBalance(m, invoice));
+      }
+      return {
+        currency: 'EGP' as const,
+        invoiceCount: balances.length,
+        totalCents: balances.reduce((sum, b) => sum + b.totalCents, 0),
+        paidCents: balances.reduce((sum, b) => sum + b.paidCents, 0),
+        reversedCents: balances.reduce((sum, b) => sum + b.reversedCents, 0),
+        outstandingCents: balances.reduce((sum, b) => sum + b.outstandingCents, 0),
+        invoices: balances,
+      };
+    });
+  }
+
   async create(input: CreateSupplierEgpPilotPayment): Promise<{
     paymentId: number; journalId: number; status: string; remainingCents: number; replayed: boolean;
   }> {
