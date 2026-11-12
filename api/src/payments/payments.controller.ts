@@ -52,6 +52,22 @@ export class PaymentsController {
     return this.supplierEgpPilot.reverse(id, req.user.sub, body?.reason || '');
   }
 
+  /**
+   * Test-only, reversal-aware supplier balances; never changes legacy reports.
+   * A static path must precede the parameterized invoice detail route.
+   */
+  @Get('supplier-egp-pilot/accounts-payable')
+  @Roles('accountant', 'admin')
+  pilotAccountsPayable() {
+    return this.supplierEgpPilot.getPilotAccountsPayable();
+  }
+
+  @Get('supplier-egp-pilot/invoices/:id/balance')
+  @Roles('accountant', 'admin')
+  pilotInvoiceBalance(@Param('id', ParseIntPipe) id: number) {
+    return this.supplierEgpPilot.getInvoiceBalance(id);
+  }
+
   @Post()
   create(@Body() dto: CreatePaymentDto) {
     return this.paymentsService.create(dto);
