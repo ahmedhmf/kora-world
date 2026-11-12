@@ -84,6 +84,14 @@
                   </td>
                   <td class="p-4 text-center">
                     <div class="flex items-center justify-center gap-2">
+                      @if (canViewSupplierPilot() && inv.type === 'incoming' && inv.currency === 'EGP') {
+                        <button
+                          type="button"
+                          (click)="openSupplierPilotBalance(inv)"
+                          class="px-2 py-1.5 bg-blue-950/30 border border-blue-900/60 text-blue-300 hover:text-blue-100 rounded text-[10px] font-semibold cursor-pointer"
+                          title="Local pilot: verified EGP payment history only"
+                        >Pilot balance</button>
+                      }
                       <button
                         (click)="openEditModal(inv)"
                         class="p-1.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white rounded transition-colors cursor-pointer flex items-center justify-center"
@@ -112,6 +120,94 @@
           </table>
         </div>
       </div>
+
+      <!-- Phase 2H: local-only, read-only supplier pilot balance and audit history. -->
+      @if (pilotBalanceInvoice(); as selected) {
+        <div class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="pilot-balance-heading">
+          <div class="bg-zinc-950 border border-zinc-700 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div class="p-5 border-b border-zinc-800 flex items-center justify-between gap-3">
+              <div>
+                <div class="text-[10px] uppercase tracking-widest text-blue-400 font-bold">Local EGP supplier pilot — read only</div>
+                <h2 id="pilot-balance-heading" class="text-lg font-bold text-white mt-1">Invoice {{ selected.number }} — Payment history</h2>
+              </div>
+              <button type="button" (click)="closeSupplierPilotBalance()" aria-label="Close payment history"
+                class="text-zinc-300 hover:text-white px-3 py-1.5 border border-zinc-700 rounded-md cursor-pointer">Close</button>
+            </div>
+            <div class="p-5 space-y-5">
+              @if (pilotBalanceLoading()) {
+                <p class="text-sm text-zinc-400" role="status">Loading verified supplier payment history…</p>
+              } @else if (pilotBalanceError(); as message) {
+                <div class="border border-amber-900/60 bg-amber-950/20 rounded-lg p-4 text-sm text-amber-200" role="alert">
+                  {{ message }}
+                </div>
+              } @else if (pilotBalance(); as balance) {
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div class="border border-zinc-800 rounded-lg p-3">
+                    <div class="text-xs text-zinc-400">Invoice total</div>
+                    <div class="text-lg font-bold text-white">{{ egpCents(balance.totalCents) | currency:'EGP':'code':'1.2-2' }}</div>
+                  </div>
+                  <div class="border border-zinc-800 rounded-lg p-3">
+                    <div class="text-xs text-zinc-400">Effective paid</div>
+                    <div class="text-lg font-bold text-emerald-400">{{ egpCents(balance.paidCents) | currency:'EGP':'code':'1.2-2' }}</div>
+                  </div>
+                  <div class="border border-zinc-800 rounded-lg p-3">
+                    <div class="text-xs text-zinc-400">Reversed</div>
+                    <div class="text-lg font-bold text-amber-400">{{ egpCents(balance.reversedCents) | currency:'EGP':'code':'1.2-2' }}</div>
+                  </div>
+                  <div class="border border-zinc-800 rounded-lg p-3">
+                    <div class="text-xs text-zinc-400">Outstanding</div>
+                    <div class="text-lg font-bold text-white">{{ egpCents(balance.outstandingCents) | currency:'EGP':'code':'1.2-2' }}</div>
+                  </div>
+                </div>
+                <div class="flex flex-wrap gap-3 items-center justify-between">
+                  <p class="text-xs text-zinc-400">Invoice status: {{ balance.invoiceStatus }} · Only verified pilot payments are included.</p>
+                  <button type="button" (click)="refreshSupplierPilotBalance()"
+                    class="text-xs px-3 py-2 rounded border border-zinc-700 text-zinc-200 hover:bg-zinc-800 cursor-pointer">Refresh</button>
+                </div>
+                <div class="overflow-x-auto border border-zinc-800 rounded-lg">
+                  <table class="w-full text-left text-xs">
+                    <thead class="bg-zinc-900 text-zinc-400 uppercase tracking-wider text-[10px]">
+                      <tr>
+                        <th class="p-3">Date / Reference</th>
+                        <th class="p-3 text-right">Amount</th>
+                        <th class="p-3">Status</th>
+                        <th class="p-3">Accounting / reversal audit</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-zinc-800">
+                      @for (payment of balance.payments; track payment.paymentId) {
+                        <tr>
+                          <td class="p-3 text-zinc-200">
+                            <div>{{ payment.date }}</div>
+                            <div class="font-mono text-zinc-500 mt-1">{{ payment.reference || '—' }}</div>
+                          </td>
+                          <td class="p-3 text-right font-mono text-white">{{ egpCents(payment.amountCents) | currency:'EGP':'code':'1.2-2' }}</td>
+                          <td class="p-3">
+                            <span [class]="payment.status === 'active' ? 'text-emerald-400' : 'text-amber-400'">
+                              {{ payment.status }}
+                            </span>
+                          </td>
+                          <td class="p-3 text-zinc-300">
+                            <div>Original journal #{{ payment.originalJournalId }}</div>
+                            @if (payment.reversal; as reversal) {
+                              <div class="mt-1">Reversal journal #{{ reversal.journalId }}</div>
+                              <div>By user #{{ reversal.byUserId ?? 'unknown' }} · {{ reversal.at ? (reversal.at | date:'medium') : 'date unknown' }}</div>
+                              <div class="mt-1 whitespace-pre-wrap break-words">Reason: {{ reversal.reason || 'Not provided' }}</div>
+                            }
+                          </td>
+                        </tr>
+                      } @empty {
+                        <tr><td colspan="4" class="p-6 text-center text-zinc-500">No pilot payments recorded for this invoice.</td></tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              }
+              <p class="text-[11px] text-zinc-500">Test database only. This view does not modify payments or replace company-wide Accounts Payable reporting.</p>
+            </div>
+          </div>
+        </div>
+      }
 
       <!-- Create/Edit Modal -->
       @if (isFormModalOpen()) {
