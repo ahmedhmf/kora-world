@@ -69,7 +69,7 @@ export class InvoicesComponent implements OnInit {
   submitSupplierPilotPayment() {
     const balance = this.pilotBalance();
     if (!this.pilotCanCreate() || !balance || this.pilotWriteBusy() ||
-        this.pilotBalanceLoading() || balance.outstandingCents <= 0) return;
+        this.pilotBalanceLoading() || (balance.outstandingCents <= 0 && !this.pilotRetryPending())) return;
     let dto = this.pilotPendingPayment;
     if (!dto) {
       const amountCents = this.readPilotAmountCents();
