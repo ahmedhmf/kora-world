@@ -5,8 +5,9 @@ import { AccountingStore } from '../../store/accounting.store';
 import { SuppliersStore } from '../../store/suppliers.store';
 import { PurchaseOrdersStore } from '../../store/purchase-orders.store';
 import { ProductsStore } from '../../store/products.store';
-import { Invoice, InvoiceLine, AccountingApiService } from '../../core/services/accounting-api.service';
+import { Invoice, InvoiceLine, SupplierPilotInvoiceBalance, AccountingApiService } from '../../core/services/accounting-api.service';
 import { ApiService } from '../../core/services/api.service';
+import { AuthService } from '../../core/services/auth.service';
 import { LucideAngularModule } from 'lucide-angular';
 
 @Component({
@@ -22,6 +23,61 @@ export class InvoicesComponent implements OnInit {
   readonly productsStore = inject(ProductsStore);
   readonly accountingApi = inject(AccountingApiService);
   readonly apiService = inject(ApiService);
+  readonly auth = inject(AuthService);
+
+  // Local-only presentation. The server separately enforces the pilot flag,
+  // verified kora_test identity and accountant/admin authorization.
+  readonly canViewSupplierPilot = computed(() => {
+    const host = window.location.hostname;
+    const role = this.auth.currentUser()?.role;
+    return (host === 'localhost' || host === '127.0.0.1') &&
+      (role === 'admin' || role === 'accountant');
+  });
+  readonly pilotBalanceInvoice = signal<Invoice | null>(null);
+  readonly pilotBalance = signal<SupplierPilotInvoiceBalance | null>(null);
+  readonly pilotBalanceLoading = signal(false);
+  readonly pilotBalanceError = signal<string | null>(null);
+  private pilotBalanceRequest = 0;
+
+  openSupplierPilotBalance(invoice: Invoice) {
+    if (!this.canViewSupplierPilot() || invoice.type !== 'incoming' || invoice.currency !== 'EGP') return;
+    const request = ++this.pilotBalanceRequest;
+    this.pilotBalanceInvoice.set(invoice);
+    this.pilotBalance.set(null);
+    this.pilotBalanceError.set(null);
+    this.pilotBalanceLoading.set(true);
+    this.accountingApi.getSupplierPilotInvoiceBalance(invoice.id).subscribe({
+      next: balance => {
+        if (request !== this.pilotBalanceRequest) return;
+        this.pilotBalance.set(balance);
+        this.pilotBalanceLoading.set(false);
+      },
+      error: () => {
+        if (request !== this.pilotBalanceRequest) return;
+        this.pilotBalanceError.set(
+          'Pilot balance is unavailable. This invoice may not belong to the local EGP pilot, or pilot access is disabled. No legacy payment totals were substituted.',
+        );
+        this.pilotBalanceLoading.set(false);
+      },
+    });
+  }
+
+  closeSupplierPilotBalance() {
+    ++this.pilotBalanceRequest;
+    this.pilotBalanceInvoice.set(null);
+    this.pilotBalance.set(null);
+    this.pilotBalanceError.set(null);
+    this.pilotBalanceLoading.set(false);
+  }
+
+  refreshSupplierPilotBalance() {
+    const invoice = this.pilotBalanceInvoice();
+    if (invoice) this.openSupplierPilotBalance(invoice);
+  }
+
+  egpCents(cents: number): number {
+    return cents / 100;
+  }
 
   numberLoading = signal(false);
 
