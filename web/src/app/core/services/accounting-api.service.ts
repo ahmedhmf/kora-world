@@ -95,6 +95,35 @@ export interface Payment {
   invoice?: Invoice | null;
 }
 
+/** Local EGP supplier pilot reporting. All monetary fields are integer cents. */
+export interface SupplierPilotPaymentHistory {
+  paymentId: number;
+  reference: string | null;
+  date: string;
+  amountCents: number;
+  status: 'active' | 'reversed';
+  originalJournalId: number;
+  reversal: {
+    journalId: number;
+    byUserId: number | null;
+    at: string | null;
+    reason: string | null;
+  } | null;
+}
+
+export interface SupplierPilotInvoiceBalance {
+  invoiceId: number;
+  invoiceNumber: string;
+  supplierId: number | null;
+  currency: 'EGP';
+  invoiceStatus: string;
+  totalCents: number;
+  paidCents: number;
+  reversedCents: number;
+  outstandingCents: number;
+  payments: SupplierPilotPaymentHistory[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class AccountingApiService {
   private readonly http = inject(HttpClient);
@@ -217,6 +246,13 @@ export class AccountingApiService {
 
   deletePayment(id: number): Observable<void> {
     return this.http.delete<void>(`${this.base}/payments/${id}`);
+  }
+
+  /** Read-only and test-only: API rejects requests unless on local kora_test. */
+  getSupplierPilotInvoiceBalance(id: number): Observable<SupplierPilotInvoiceBalance> {
+    return this.http.get<SupplierPilotInvoiceBalance>(
+      `${this.base}/payments/supplier-egp-pilot/invoices/${id}/balance`,
+    );
   }
 
   // Reports
