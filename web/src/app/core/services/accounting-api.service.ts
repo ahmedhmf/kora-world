@@ -255,6 +255,34 @@ export class AccountingApiService {
     );
   }
 
+  /** Pilot writes remain server-restricted to local kora_test. */
+  createSupplierPilotPayment(dto: {
+    invoiceId: number;
+    bankAccountId: number;
+    amountCents: number;
+    date: string;
+    requestKey: string;
+    description?: string;
+  }): Observable<{
+    paymentId: number; journalId: number; status: string;
+    remainingCents: number; replayed: boolean;
+  }> {
+    return this.http.post<{
+      paymentId: number; journalId: number; status: string;
+      remainingCents: number; replayed: boolean;
+    }>(`${this.base}/payments/supplier-egp-pilot`, dto);
+  }
+
+  reverseSupplierPilotPayment(paymentId: number, reason: string): Observable<{
+    paymentId: number; originalJournalId: number; reversalJournalId: number;
+    status: string; remainingCents: number;
+  }> {
+    return this.http.post<{
+      paymentId: number; originalJournalId: number; reversalJournalId: number;
+      status: string; remainingCents: number;
+    }>(`${this.base}/payments/supplier-egp-pilot/${paymentId}/reverse`, { reason });
+  }
+
   // Reports
   getProfitAndLoss(startDate: string, endDate: string, currency?: string): Observable<any> {
     let url = `${this.base}/accounting/reports/profit-loss?startDate=${startDate}&endDate=${endDate}`;
