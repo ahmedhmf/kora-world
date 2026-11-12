@@ -164,6 +164,8 @@ export class InvoicesComponent implements OnInit {
       },
       error: () => {
         this.pilotWriteBusy.set(false);
+        this.pilotConfirmReverseId.set(null);
+        this.pilotReverseReason = '';
         this.pilotWriteError.set('Reversal could not be confirmed. Refresh history before retrying; do not submit a new payment to compensate.');
         this.refreshSupplierPilotBalance();
       },
@@ -177,7 +179,8 @@ export class InvoicesComponent implements OnInit {
   private pilotBalanceRequest = 0;
 
   openSupplierPilotBalance(invoice: Invoice) {
-    if (!this.canViewSupplierPilot() || invoice.type !== 'incoming' || invoice.currency !== 'EGP') return;
+    if (!this.canViewSupplierPilot() || invoice.type !== 'incoming' || invoice.currency !== 'EGP' ||
+        (this.pilotRetryPending() && this.pilotBalanceInvoice()?.id !== invoice.id)) return;
     const request = ++this.pilotBalanceRequest;
     if (this.pilotBalanceInvoice()?.id !== invoice.id) {
       this.pilotPendingPayment = null;
@@ -210,7 +213,10 @@ export class InvoicesComponent implements OnInit {
   }
 
   closeSupplierPilotBalance() {
-    if (this.pilotWriteBusy()) return;
+    if (this.pilotWriteBusy() || this.pilotRetryPending()) {
+      if (this.pilotRetryPending()) this.pilotWriteError.set('Resolve the unconfirmed payment request or explicitly discard its retry identity before closing.');
+      return;
+    }
     ++this.pilotBalanceRequest;
     this.pilotBalanceInvoice.set(null);
     this.pilotBalance.set(null);
