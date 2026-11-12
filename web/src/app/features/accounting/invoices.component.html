@@ -127,10 +127,10 @@
           <div class="bg-zinc-950 border border-zinc-700 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
             <div class="p-5 border-b border-zinc-800 flex items-center justify-between gap-3">
               <div>
-                <div class="text-[10px] uppercase tracking-widest text-blue-400 font-bold">Local EGP supplier pilot — read only</div>
+                <div class="text-[10px] uppercase tracking-widest text-blue-400 font-bold">Local EGP supplier pilot — test database only</div>
                 <h2 id="pilot-balance-heading" class="text-lg font-bold text-white mt-1">Invoice {{ selected.number }} — Payment history</h2>
               </div>
-              <button type="button" (click)="closeSupplierPilotBalance()" aria-label="Close payment history"
+              <button type="button" (click)="closeSupplierPilotBalance()" [disabled]="pilotWriteBusy()" aria-label="Close payment history"
                 class="text-zinc-300 hover:text-white px-3 py-1.5 border border-zinc-700 rounded-md cursor-pointer">Close</button>
             </div>
             <div class="p-5 space-y-5">
@@ -164,6 +164,81 @@
                   <button type="button" (click)="refreshSupplierPilotBalance()"
                     class="text-xs px-3 py-2 rounded border border-zinc-700 text-zinc-200 hover:bg-zinc-800 cursor-pointer">Refresh</button>
                 </div>
+                @if (pilotWriteError(); as warning) {
+                  <div role="alert" class="p-3 rounded-lg border border-amber-800 text-amber-200 bg-amber-950/30 text-xs">{{ warning }}</div>
+                }
+                @if (pilotWriteSuccess(); as notice) {
+                  <div role="status" class="p-3 rounded-lg border border-emerald-800 text-emerald-200 bg-emerald-950/30 text-xs">{{ notice }}</div>
+                }
+
+                @if (pilotCanCreate() && balance.outstandingCents > 0) {
+                  <form (ngSubmit)="submitSupplierPilotPayment()" class="border border-zinc-800 rounded-lg p-4 space-y-3">
+                    <div class="text-sm font-bold text-white">Record supplier payment — local pilot</div>
+                    <p class="text-xs text-zinc-400">Admin-only. Pay from an active, leaf EGP bank/cash account. Payments are posted immediately.</p>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <label class="text-xs text-zinc-400 flex flex-col gap-1">
+                        Amount (EGP)
+                        <input type="text" inputmode="decimal" name="pilotAmount" [(ngModel)]="pilotPaymentAmount"
+                          [disabled]="pilotWriteBusy() || pilotRetryPending()" placeholder="e.g. 500.00"
+                          class="bg-zinc-950 border border-zinc-700 p-2 rounded text-white"/>
+                      </label>
+                      <label class="text-xs text-zinc-400 flex flex-col gap-1">
+                        Payment date
+                        <input type="date" name="pilotDate" [(ngModel)]="pilotPaymentDate"
+                          [disabled]="pilotWriteBusy() || pilotRetryPending()"
+                          class="bg-zinc-950 border border-zinc-700 p-2 rounded text-white"/>
+                      </label>
+                      <label class="text-xs text-zinc-400 flex flex-col gap-1">
+                        Paid from (EGP)
+                        <select name="pilotBank" [(ngModel)]="pilotPaymentBankId"
+                          [disabled]="pilotWriteBusy() || pilotRetryPending()"
+                          class="bg-zinc-950 border border-zinc-700 p-2 rounded text-white">
+                          <option [ngValue]="0">Choose an account</option>
+                          @for (account of pilotBanks(); track account.id) {
+                            <option [ngValue]="account.id">{{ account.code }} — {{ account.name }}</option>
+                          }
+                        </select>
+                      </label>
+                    </div>
+                    <label class="text-xs text-zinc-400 flex flex-col gap-1">
+                      Description (optional, max 255 characters)
+                      <input type="text" name="pilotDescription" [(ngModel)]="pilotPaymentDescription"
+                        maxlength="255" [disabled]="pilotWriteBusy() || pilotRetryPending()"
+                        class="bg-zinc-950 border border-zinc-700 p-2 rounded text-white"/>
+                    </label>
+                    @if (pilotRetryPending()) {
+                      <p class="text-xs text-amber-300">The previous submission is unconfirmed. Retry the exact same payment with its original request ID, or inspect history before discarding it.</p>
+                    }
+                    <div class="flex flex-wrap gap-2">
+                      <button type="submit" [disabled]="pilotWriteBusy() || pilotBalanceLoading() || !!pilotConfirmReverseId() || pilotBanks().length === 0"
+                        class="px-4 py-2 rounded bg-blue-700 disabled:opacity-50 text-white text-xs font-semibold cursor-pointer">
+                        {{ pilotWriteBusy() ? 'Submitting…' : pilotRetryPending() ? 'Retry same payment request' : 'Record payment' }}
+                      </button>
+                      @if (pilotRetryPending()) {
+                        <button type="button" (click)="discardSupplierPilotRetry()" [disabled]="pilotWriteBusy()"
+                          class="px-3 py-2 border border-zinc-700 rounded text-zinc-200 text-xs">Discard retry after checking history</button>
+                      }
+                    </div>
+                  </form>
+                }
+
+                @if (pilotConfirmReverseId(); as paymentToReverse) {
+                  <div class="border border-amber-800/70 rounded-lg p-4 space-y-3">
+                    <h3 class="font-bold text-amber-200 text-sm">Reverse payment #{{ paymentToReverse }}</h3>
+                    <p class="text-xs text-zinc-400">This posts an equal and opposite journal; the original remains in history. Only reverse a confirmed incorrect payment.</p>
+                    <label class="text-xs text-zinc-300 flex flex-col gap-1">
+                      Reversal reason (required)
+                      <textarea [(ngModel)]="pilotReverseReason" maxlength="500" rows="2"
+                        [disabled]="pilotWriteBusy()" class="bg-zinc-950 border border-zinc-700 p-2 rounded text-white"></textarea>
+                    </label>
+                    <div class="flex gap-2">
+                      <button type="button" [disabled]="pilotWriteBusy()" (click)="confirmSupplierPilotReversal()"
+                        class="bg-amber-700 disabled:opacity-50 text-white px-4 py-2 rounded text-xs font-semibold">Confirm reversal</button>
+                      <button type="button" [disabled]="pilotWriteBusy()" (click)="cancelSupplierPilotReversal()"
+                        class="border border-zinc-700 text-zinc-200 px-4 py-2 rounded text-xs">Cancel</button>
+                    </div>
+                  </div>
+                }
                 <div class="overflow-x-auto border border-zinc-800 rounded-lg">
                   <table class="w-full text-left text-xs">
                     <thead class="bg-zinc-900 text-zinc-400 uppercase tracking-wider text-[10px]">
@@ -186,6 +261,13 @@
                             <span [class]="payment.status === 'active' ? 'text-emerald-400' : 'text-amber-400'">
                               {{ payment.status }}
                             </span>
+                            @if (payment.status === 'active' && canViewSupplierPilot()) {
+                              <button type="button" (click)="selectSupplierPilotReversal(payment.paymentId)"
+                                [disabled]="pilotWriteBusy() || pilotBalanceLoading() || pilotRetryPending()"
+                                class="block mt-2 text-[10px] font-semibold text-amber-300 hover:text-amber-100 disabled:opacity-50 underline">
+                                Reverse
+                              </button>
+                            }
                           </td>
                           <td class="p-3 text-zinc-300">
                             <div>Original journal #{{ payment.originalJournalId }}</div>
@@ -203,7 +285,7 @@
                   </table>
                 </div>
               }
-              <p class="text-[11px] text-zinc-500">Test database only. This view does not modify payments or replace company-wide Accounts Payable reporting.</p>
+              <p class="text-[11px] text-zinc-500">Test database only. Payment actions post real changes to disposable kora_test. This panel does not replace company-wide Accounts Payable reporting.</p>
             </div>
           </div>
         </div>
