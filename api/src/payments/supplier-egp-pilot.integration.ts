@@ -392,6 +392,61 @@ describe('Supplier EGP pilot (local PostgreSQL integration)', () => {
     expect(invoice.status).toBe('sent');
   });
 
+  it('shows active, reversed and replacement payments with correct invoice balance', async () => {
+    const reversedPayment = await service.create(args(randomUUID(), 40000));
+    await service.reverse(reversedPayment.paymentId, accountantId, 'Incorrect bank transfer');
+    const activePayment = await service.create(args(randomUUID(), 20000));
+    const replacement = await service.create(args(randomUUID(), 30000));
+    const balance = await service.getInvoiceBalance(invoiceId);
+
+    expect(balance).toEqual(expect.objectContaining({
+      invoiceId, currency: 'EGP', totalCents: 100000,
+      paidCents: 50000, reversedCents: 40000, outstandingCents: 50000,
+    }));
+    expect(balance.payments).toHaveLength(3);
+    const reversed = balance.payments.find(p => p.paymentId === reversedPayment.paymentId);
+    expect(reversed).toEqual(expect.objectContaining({
+      status: 'reversed', amountCents: 40000,
+    }));
+    expect(reversed?.reversal?.byUserId).toBe(accountantId);
+    expect(reversed?.reversal?.reason).toBe('Incorrect bank transfer');
+    expect(reversed?.reversal?.journalId).toEqual(expect.any(Number));
+    expect(balance.payments.find(p => p.paymentId === activePayment.paymentId)?.status)
+      .toBe('active');
+    expect(balance.payments.find(p => p.paymentId === replacement.paymentId)?.status)
+      .toBe('active');
+
+    const report = await service.getPilotAccountsPayable();
+    expect(report).toEqual(expect.objectContaining({
+      currency: 'EGP', invoiceCount: 1, totalCents: 100000,
+      paidCents: 50000, reversedCents: 40000, outstandingCents: 50000,
+    }));
+    expect(report.invoices).toHaveLength(1);
+    expect(report.invoices[0].invoiceId).toBe(invoiceId);
+  });
+
+  it('reports a fully reversed invoice as entirely outstanding without erasing history', async () => {
+    const paid = await service.create(args(randomUUID(), 100000));
+    await service.reverse(paid.paymentId, accountantId, 'Transfer rejected by bank');
+    const report = await service.getPilotAccountsPayable();
+    expect(report).toEqual(expect.objectContaining({
+      invoiceCount: 1, paidCents: 0, reversedCents: 100000,
+      outstandingCents: 100000,
+    }));
+    expect(report.invoices[0].payments).toHaveLength(1);
+    expect(report.invoices[0].payments[0].status).toBe('reversed');
+  });
+
+  it('refuses reporting inconsistent journals instead of showing misleading balances', async () => {
+    const paid = await service.create(args());
+    await db.query(
+      'UPDATE journal_entries SET posting_status = $1 WHERE id = $2',
+      ['draft', paid.journalId],
+    );
+    await expect(service.getInvoiceBalance(invoiceId)).rejects.toThrow(ConflictException);
+    await expect(service.getPilotAccountsPayable()).rejects.toThrow(ConflictException);
+  });
+
   it('rolls back payment, journal, and invoice status when a transaction fails after writing', async () => {
     const failingDb = {
       transaction: (
