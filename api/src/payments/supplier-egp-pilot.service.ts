@@ -218,7 +218,7 @@ export class SupplierEgpPilotService {
          WHERE request_key IS NOT NULL AND invoice_id IS NOT NULL
          ORDER BY invoice_id`,
       );
-      const balances = [];
+      const balances: Array<Awaited<ReturnType<SupplierEgpPilotService['invoiceBalance']>>> = [];
       for (const row of rows) {
         const invoice = await m.findOne(Invoice, { where: { id: Number(row.invoice_id) } });
         if (!invoice) throw new ConflictException('Pilot payment has no invoice');
