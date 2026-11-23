@@ -1,0 +1,156 @@
+<div class="p-6 md:p-8 max-w-7xl mx-auto text-zinc-100 space-y-6">
+  <div class="flex flex-wrap justify-between items-start gap-4">
+    <div>
+      <a routerLink="/calendar" class="text-sm text-zinc-400 hover:text-white print:hidden">← Calendar</a>
+      <h1 class="text-2xl font-bold mt-2">{{ eventId === null ? 'Kora Experience Library' : 'Event Experience Checklist' }}</h1>
+      <p class="text-zinc-400 text-sm mt-1">
+        {{ eventId === null ? 'Create reusable activations and their required materials.' : eventTitle() }}
+      </p>
+    </div>
+    <div class="flex gap-2 print:hidden">
+      <a routerLink="/experiences" class="px-4 py-2 rounded-lg border border-zinc-700 text-sm">Experience Library</a>
+      @if (eventId === null) {
+        <button type="button" (click)="startNew()" class="px-4 py-2 rounded-lg bg-white text-zinc-900 font-semibold text-sm">+ New Experience</button>
+      } @else {
+        <button type="button" (click)="print()" class="px-4 py-2 rounded-lg border border-zinc-700 text-sm">Print / Save PDF</button>
+      }
+    </div>
+  </div>
+
+  @if (error()) { <div role="alert" class="border border-red-800 bg-red-950/40 text-red-300 rounded-lg p-3 text-sm">{{ error() }}</div> }
+  @if (message()) { <div role="status" class="border border-emerald-800 bg-emerald-950/30 text-emerald-300 rounded-lg p-3 text-sm print:hidden">{{ message() }}</div> }
+
+  @if (eventId === null) {
+    <div class="grid md:grid-cols-2 gap-4 print:hidden">
+      @for (experience of experiences(); track experience.id) {
+        <article class="rounded-xl border border-zinc-800 bg-zinc-900 p-5 space-y-3">
+          <div class="flex justify-between gap-3">
+            <div>
+              <h2 class="font-bold">{{ experience.name }}</h2>
+              <p class="text-xs text-zinc-400 mt-1">{{ experience.description }}</p>
+            </div>
+            <span class="text-xs" [class.text-emerald-400]="experience.active" [class.text-zinc-500]="!experience.active">
+              {{ experience.active ? 'Active' : 'Inactive' }}
+            </span>
+          </div>
+          <p class="text-sm text-zinc-400">{{ experience.items.length }} required items</p>
+          <div class="flex gap-2">
+            <button type="button" (click)="startEdit(experience)" class="px-3 py-1.5 rounded border border-zinc-700 text-sm">Edit</button>
+            <button type="button" (click)="removeExperience(experience)" class="px-3 py-1.5 rounded border border-red-900 text-red-400 text-sm">Delete</button>
+          </div>
+        </article>
+      } @empty {
+        <p class="text-zinc-400">No experiences yet. Create your first Kora Experience.</p>
+      }
+    </div>
+    @if (editing()) {
+      <section class="bg-zinc-900 border border-zinc-700 rounded-xl p-5 space-y-4 print:hidden">
+        <h2 class="text-lg font-bold">{{ editId === null ? 'New Kora Experience' : 'Edit Kora Experience' }}</h2>
+        <label class="block text-sm">Name *
+          <input [(ngModel)]="formName" class="mt-1 w-full bg-zinc-950 border border-zinc-700 rounded p-2" maxlength="160" />
+        </label>
+        <label class="block text-sm">Description
+          <textarea [(ngModel)]="formDescription" class="mt-1 w-full bg-zinc-950 border border-zinc-700 rounded p-2"></textarea>
+        </label>
+        <label class="flex gap-2 items-center text-sm"><input type="checkbox" [(ngModel)]="formActive" /> Active</label>
+        <h3 class="font-semibold">Equipment & Materials</h3>
+        @for (item of formItems; track $index) {
+          <div class="grid grid-cols-2 md:grid-cols-7 gap-2 items-end border-t border-zinc-800 pt-3">
+            <label class="col-span-2 text-xs">Item name *
+              <input [(ngModel)]="item.name" class="mt-1 w-full bg-zinc-950 border border-zinc-700 rounded p-2" />
+            </label>
+            <label class="text-xs">Quantity
+              <input type="number" min="1" step="1" [(ngModel)]="item.quantity" class="mt-1 w-full bg-zinc-950 border border-zinc-700 rounded p-2" />
+            </label>
+            <label class="text-xs">Unit
+              <input [(ngModel)]="item.unit" class="mt-1 w-full bg-zinc-950 border border-zinc-700 rounded p-2" />
+            </label>
+            <label class="text-xs">Category
+              <input [(ngModel)]="item.category" class="mt-1 w-full bg-zinc-950 border border-zinc-700 rounded p-2" />
+            </label>
+            <label class="text-xs">Combine
+              <select [(ngModel)]="item.mode" class="mt-1 w-full bg-zinc-950 border border-zinc-700 rounded p-2">
+                <option value="sum">Add quantities</option><option value="shared">Shared (max)</option>
+              </select>
+            </label>
+            <button type="button" (click)="removeRequirement($index)" class="text-red-400 text-sm border border-red-900 rounded p-2">Remove</button>
+            <label class="col-span-2 md:col-span-7 text-xs">Notes (optional)
+              <input [(ngModel)]="item.notes" class="mt-1 w-full bg-zinc-950 border border-zinc-700 rounded p-2" />
+            </label>
+          </div>
+        }
+        <button type="button" (click)="addRequirement()" class="border border-zinc-700 rounded px-3 py-2 text-sm">+ Add required item</button>
+        <div class="flex gap-3">
+          <button type="button" [disabled]="busy()" (click)="saveExperience()" class="bg-white text-zinc-900 font-semibold rounded px-4 py-2 text-sm disabled:opacity-50">Save Experience</button>
+          <button type="button" (click)="editing.set(false)" class="border border-zinc-700 rounded px-4 py-2 text-sm">Cancel</button>
+        </div>
+      </section>
+    }
+  } @else {
+    <section class="rounded-xl border border-zinc-800 bg-zinc-900 p-5 space-y-4 print:hidden">
+      <div>
+        <h2 class="font-bold">Experiences at this Event</h2>
+        <p class="text-zinc-400 text-sm">Select your activations, then generate the packing checklist. Generating saves the selection.</p>
+      </div>
+      <div class="grid sm:grid-cols-2 gap-3">
+        @for (experience of experiences(); track experience.id) {
+          <label class="flex items-start gap-3 border border-zinc-800 rounded-lg p-3" [class.opacity-50]="!experience.active && !selectedIds().includes(experience.id)">
+            <input type="checkbox" class="mt-1" [checked]="selectedIds().includes(experience.id)"
+              [disabled]="!experience.active && !selectedIds().includes(experience.id)"
+              (change)="toggleSelection(experience.id, $any($event.target).checked)" />
+            <span><span class="font-semibold">{{ experience.name }}</span>
+              <span class="block text-xs text-zinc-400">{{ experience.items.length }} items</span></span>
+          </label>
+        } @empty {
+          <p class="text-sm text-zinc-400">There are no experience templates yet. Create one in the library.</p>
+        }
+      </div>
+      <button type="button" [disabled]="busy()" (click)="generate()" class="bg-white text-zinc-900 font-semibold px-4 py-2 rounded-lg text-sm disabled:opacity-50">
+        Generate / Refresh Packing Checklist
+      </button>
+      <p class="text-xs text-amber-300">Refreshing recalculates template quantities. Existing packed ticks and event-only items are kept where possible.</p>
+    </section>
+
+    <section class="rounded-xl border border-zinc-800 bg-zinc-900 p-5 space-y-4">
+      <div class="flex justify-between items-center">
+        <div>
+          <h2 class="text-lg font-bold">Event Master Packing List</h2>
+          <p class="text-zinc-400 text-sm">{{ packedCount() }} of {{ checklist().length }} lines packed</p>
+        </div>
+      </div>
+      @for (item of checklist(); track item.key) {
+        <label class="flex items-start gap-3 border-b border-zinc-800 pb-3">
+          <input type="checkbox" class="mt-1 print:hidden" [checked]="item.packed" (change)="togglePacked(item, $any($event.target).checked)" />
+          <span class="hidden print:inline">{{ item.packed ? '☑' : '☐' }}</span>
+          <span class="flex-1">
+            <span class="font-semibold" [class.line-through]="item.packed">{{ item.name }} — {{ item.quantity }} {{ item.unit }}</span>
+            <span class="block text-xs text-zinc-400">{{ item.category }} · {{ item.sources.join(', ') }}</span>
+            @if (item.notes) { <span class="block text-xs text-zinc-500">{{ item.notes }}</span> }
+          </span>
+        </label>
+      } @empty {
+        <p class="text-zinc-400 text-sm">No packing list generated yet. Select experiences and generate the checklist above.</p>
+      }
+    </section>
+
+    <section class="rounded-xl border border-zinc-800 bg-zinc-900 p-5 space-y-3 print:hidden">
+      <h2 class="font-bold">Additional Items for this Event</h2>
+      <p class="text-xs text-zinc-400">Add something needed for this event without changing the reusable experience template.</p>
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <label class="col-span-2 text-xs">Item
+          <input [(ngModel)]="extra.name" class="mt-1 w-full bg-zinc-950 border border-zinc-700 rounded p-2" />
+        </label>
+        <label class="text-xs">Quantity
+          <input type="number" min="1" step="1" [(ngModel)]="extra.quantity" class="mt-1 w-full bg-zinc-950 border border-zinc-700 rounded p-2" />
+        </label>
+        <label class="text-xs">Unit
+          <input [(ngModel)]="extra.unit" class="mt-1 w-full bg-zinc-950 border border-zinc-700 rounded p-2" />
+        </label>
+        <label class="text-xs">Category
+          <input [(ngModel)]="extra.category" class="mt-1 w-full bg-zinc-950 border border-zinc-700 rounded p-2" />
+        </label>
+      </div>
+      <button type="button" [disabled]="busy()" (click)="addExtra()" class="px-4 py-2 rounded-lg border border-zinc-600 text-sm disabled:opacity-50">+ Add to Event Checklist</button>
+    </section>
+  }
+</div>
