@@ -161,6 +161,12 @@
                 </button>
               </div>
 
+              @if (drawerMode() === 'edit' && eventId !== null) {
+                <a [routerLink]="['/calendar', eventId, 'experiences']" class="block w-full text-center bg-emerald-900/40 text-emerald-200 border border-emerald-700 rounded-lg p-3 font-semibold text-sm hover:bg-emerald-900/60">
+                  Manage Kora Experiences &amp; Packing List
+                </a>
+              }
+
               <!-- Form Inputs -->
               <form class="space-y-4 text-sm">
                 <!-- Title -->
