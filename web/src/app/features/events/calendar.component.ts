@@ -1,6 +1,7 @@
 import { Component, inject, OnInit, signal, computed } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { EventsStore } from '../../store/events.store';
 import { CalendarEvent, EventCategory } from '../../core/models/event.model';
 import { AuthService } from '../../core/services/auth.service';
@@ -9,7 +10,7 @@ import { DialogService } from '../../core/services/dialog.service';
 @Component({
   selector: 'app-calendar',
   standalone: true,
-  imports: [CommonModule, FormsModule, DatePipe],
+  imports: [CommonModule, FormsModule, DatePipe, RouterLink],
   templateUrl: './calendar.component.html',
   styles: [`
     /* Custom simple hide scrollbar */
