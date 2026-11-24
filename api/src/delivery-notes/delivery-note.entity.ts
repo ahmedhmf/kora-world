@@ -35,6 +35,24 @@ export class DeliveryNote {
   @Column({ name: 'signed_file_name', type: 'varchar', length: 255, nullable: true })
   signedFileName?: string | null;
 
+  @Column({ name: 'delivery_source', type: 'varchar', length: 20 })
+  deliverySource: 'legacy' | 'warehouse' | 'supplier' | 'external';
+
+  @Column({ name: 'source_details', type: 'varchar', length: 200, nullable: true })
+  sourceDetails: string | null;
+
+  @Column({ name: 'warehouse_id', type: 'int', nullable: true })
+  warehouseId: number | null;
+
+  @Column({ name: 'location_id', type: 'int', nullable: true })
+  locationId: number | null;
+
+  @Column({ name: 'dispatched_at', type: 'timestamptz', nullable: true })
+  dispatchedAt: Date | null;
+
+  @Column({ name: 'dispatched_by_id', type: 'int', nullable: true })
+  dispatchedById: number | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 }
