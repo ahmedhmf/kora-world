@@ -39,6 +39,7 @@ export class ApiService {
   getEquipmentMovements(id:number) { return this.http.get<{id:string;code:string;name:string;locationCode:string;quantityChange:number;type:string;reference:string|null;notes:string|null;createdAt:string;performedById:number|null}[]>(`${this.base}/equipment/warehouse/${id}/movements`); }
   recordEquipment(id:number,dto:{equipmentId:number;locationId:number;toLocationId:number;quantity:number;action:string;reference:string;notes:string}) { return this.http.post<unknown>(`${this.base}/equipment/warehouse/${id}/movements`,dto); }
 
+  getWarehouseReport(id:number){return this.http.get<{stock:{kind:string;itemId:number;code:string;name:string;locationCode:string;physical:number;reservedPeak:number;dispatched:number}[];events:{eventId:number;title:string;status:string;name:string;quantity:number;startsAt:string;endsAt:string;returned:number|null;damaged:number|null;missing:number|null;consumed:number|null;notes:string|null}[]}>(`${this.base}/warehouses/${id}/report`);}
   // Warehouse
   getWarehouses() { return this.http.get<WarehouseSite[]>(`${this.base}/warehouses`); }
   createWarehouse(dto: { code: string; name: string; address?: string }) { return this.http.post<WarehouseSite>(`${this.base}/warehouses`, dto); }
