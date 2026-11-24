@@ -5,9 +5,12 @@ import { KoraExperience, EventKoraExperience, EventKoraChecklist } from './exper
 import { ExperiencesService } from './experiences.service';
 import { ExperiencesController, EventExperiencesController } from './experiences.controller';
 
+import { EventReservationsService } from './event-reservations.service';
+import { EventReservationsController } from './event-reservations.controller';
+
 @Module({
   imports: [TypeOrmModule.forFeature([Event, KoraExperience, EventKoraExperience, EventKoraChecklist])],
-  providers: [ExperiencesService],
-  controllers: [ExperiencesController, EventExperiencesController],
+  providers: [ExperiencesService, EventReservationsService],
+  controllers: [ExperiencesController, EventExperiencesController, EventReservationsController],
 })
 export class ExperiencesModule {}
