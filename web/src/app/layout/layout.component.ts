@@ -72,6 +72,7 @@ export class LayoutComponent {
         { label: 'Financial Reports', route: '/accounting/reports', icon: 'trending-up' },
       ],
     },
+    { label: 'Warehouse', route: '/warehouse', icon: 'package', roles: ['admin', 'employee'] },
     { label: 'Calendar', route: '/calendar', icon: 'calendar' },
     { label: 'Contacts', route: '/contacts', icon: 'contact' },
     { label: 'Employees', route: '/users', icon: 'users', roles: ['admin'] },
