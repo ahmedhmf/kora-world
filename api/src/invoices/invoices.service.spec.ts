@@ -89,6 +89,67 @@ describe('InvoicesService', () => {
     });
   });
 
+  describe('Phase 2I: legacy supplier invoice transition guard', () => {
+    const previous = {
+      flag: process.env.SUPPLIER_EGP_PILOT,
+      name: process.env.DATABASE_NAME,
+      host: process.env.DATABASE_HOST,
+    };
+    beforeEach(() => {
+      process.env.SUPPLIER_EGP_PILOT = 'true';
+      process.env.DATABASE_NAME = 'kora_test';
+      process.env.DATABASE_HOST = '127.0.0.1';
+    });
+    afterEach(() => {
+      if (previous.flag === undefined) delete process.env.SUPPLIER_EGP_PILOT;
+      else process.env.SUPPLIER_EGP_PILOT = previous.flag;
+      if (previous.name === undefined) delete process.env.DATABASE_NAME;
+      else process.env.DATABASE_NAME = previous.name;
+      if (previous.host === undefined) delete process.env.DATABASE_HOST;
+      else process.env.DATABASE_HOST = previous.host;
+    });
+
+    it('rejects creating an already-paid supplier invoice before saving', async () => {
+      await expect(service.create({
+        type: InvoiceType.INCOMING, currency: 'EGP',
+        date: '2026-11-11', dueDate: '2026-12-11',
+        status: InvoiceStatus.PAID, lines: [],
+      })).rejects.toThrow('controlled supplier workflow');
+      expect(mockInvoiceRepo.save).not.toHaveBeenCalled();
+      expect(mockAccountingService.createJournalEntry).not.toHaveBeenCalled();
+    });
+
+    it('rejects manual paid transition without writing a synthetic payment journal', async () => {
+      mockInvoiceRepo.findOne.mockResolvedValue({
+        id: 10, type: InvoiceType.INCOMING, currency: 'EGP',
+        status: InvoiceStatus.SENT, lines: [], total: 100,
+      } as Invoice);
+      await expect(service.update(10, { status: InvoiceStatus.PAID }))
+        .rejects.toThrow('controlled supplier workflow');
+      expect(mockInvoiceRepo.save).not.toHaveBeenCalled();
+      expect(mockAccountingService.createJournalEntry).not.toHaveBeenCalled();
+    });
+
+    it('rejects editing booked supplier invoice amounts', async () => {
+      mockInvoiceRepo.findOne.mockResolvedValue({
+        id: 10, type: InvoiceType.INCOMING, currency: 'EGP',
+        status: InvoiceStatus.SENT, lines: [], total: 100,
+      } as Invoice);
+      await expect(service.update(10, { tax: 5 }))
+        .rejects.toThrow('controlled supplier workflow');
+      expect(mockLineRepo.delete).not.toHaveBeenCalled();
+      expect(mockInvoiceRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('rejects deleting incoming EGP supplier invoices', async () => {
+      mockInvoiceRepo.findOne.mockResolvedValue({
+        id: 10, type: InvoiceType.INCOMING, currency: 'EGP',
+      } as Invoice);
+      await expect(service.remove(10)).rejects.toThrow('controlled supplier workflow');
+      expect(mockInvoiceRepo.remove).not.toHaveBeenCalled();
+    });
+  });
+
   describe('create', () => {
     it('should successfully create an invoice and generate journal entry if SENT', async () => {
       const dto = {
