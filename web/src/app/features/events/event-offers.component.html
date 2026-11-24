@@ -28,6 +28,31 @@
         <p class="text-sm text-zinc-300">{{ offer.quantity }} {{ offer.unit }} × {{ money(offer.unitRateCents) }} {{ offer.currency }}</p>
         <p class="font-bold">{{ money(offer.totalCents) }} {{ offer.currency }} total</p>
         @if (offer.notes) { <p class="text-sm text-zinc-400">{{ offer.notes }}</p> }
+        @if (offer.type === 'supplier') {
+          <div class="border-t border-zinc-700 pt-3 space-y-2">
+            <h3 class="font-semibold text-sm">Supplier quotation documents</h3>
+            <p class="text-xs text-zinc-400">PDF, JPG, PNG, WEBP, DOCX or XLSX — maximum 15 MB each.</p>
+            <label class="block text-sm">
+              <span class="sr-only">Upload a supplier quotation document</span>
+              <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.docx,.xlsx"
+                [disabled]="fileBusy() === offer.id"
+                (change)="uploadQuote(offer, $any($event.target))"
+                class="block w-full text-xs text-zinc-300 file:mr-3 file:rounded file:border-0 file:bg-emerald-800 file:px-3 file:py-2 file:text-white" />
+            </label>
+            @if (fileBusy() === offer.id) { <p class="text-xs text-emerald-300">Uploading document...</p> }
+            @for (file of filesByOffer()[offer.id] || []; track file.id) {
+              <div class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-700 p-2">
+                <span class="text-xs break-all">{{ file.originalName }}</span>
+                <div class="flex gap-2">
+                  <button type="button" (click)="downloadQuote(offer.id, file)"
+                    class="text-xs text-emerald-400 hover:text-emerald-300">Download</button>
+                  <button type="button" (click)="deleteQuote(offer.id, file)"
+                    class="text-xs text-red-400 hover:text-red-300">Remove</button>
+                </div>
+              </div>
+            }
+          </div>
+        }
         <div class="flex gap-2">
           <button type="button" (click)="edit(offer)" class="text-sm px-3 py-1.5 rounded border border-zinc-700">Edit / Status</button>
           <button type="button" (click)="remove(offer)" class="text-sm px-3 py-1.5 rounded border border-red-900 text-red-400">Delete</button>
