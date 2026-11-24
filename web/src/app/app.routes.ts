@@ -19,6 +19,14 @@ export const routes: Routes = [
     children: [
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
       {
+        path: 'warehouse/equipment',
+        canActivate: [() => {
+          const role = inject(AuthService).currentUser()?.role;
+          return role === 'admin' || role === 'employee' || inject(Router).createUrlTree(['/dashboard']);
+        }],
+        loadComponent: () => import('./features/warehouse/equipment.component').then(m => m.EquipmentComponent),
+      },
+      {
         path: 'warehouse',
         canActivate: [() => {
           const role = inject(AuthService).currentUser()?.role;
