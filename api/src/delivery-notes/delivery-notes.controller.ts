@@ -80,11 +80,19 @@ export class DeliveryNotesController {
     return this.service.get(id);
   }
 
+  @Roles('admin', 'employee')
   @Post('account/:accountId')
-  create(@Param('accountId', ParseIntPipe) accountId: number, @Body() dto: { deliveryDate: string; remarks?: string; items: Array<{ productId: number; quantity: number }> }) {
+  create(@Param('accountId', ParseIntPipe) accountId: number, @Body() dto: Parameters<DeliveryNotesService['create']>[1]) {
     return this.service.create(accountId, dto);
   }
 
+  @Roles('admin', 'employee')
+  @Post(':id/dispatch')
+  dispatch(@Param('id', ParseIntPipe) id: number, @Req() req: AuthenticatedRequest) {
+    return this.service.dispatch(id, req.user.sub);
+  }
+
+  @Roles('admin', 'employee')
   @Patch(':id/signed-copy')
   attachSignedCopy(@Param('id', ParseIntPipe) id: number, @Body() dto: { path: string; name: string }) {
     return this.service.attachSignedCopy(id, dto);
