@@ -140,13 +140,13 @@ export class WarehouseService {
         INSERT INTO warehouse_stock (location_id, product_id, quantity) VALUES ($1,$2,0)
         ON CONFLICT (location_id, product_id) DO NOTHING
       `, [id, dto.productId]);
-      const rows = [];
+      const rows: Array<{ location_id: number; quantity: number }> = [];
       for (const id of sorted) rows.push((await manager.query(
         'SELECT location_id, quantity FROM warehouse_stock WHERE location_id = $1 AND product_id = $2 FOR UPDATE',
         [id, dto.productId],
       ))[0]);
       const source = rows.find(x => x.location_id === dto.fromLocationId);
-      if (source.quantity < dto.quantity) throw new BadRequestException('Insufficient stock for transfer');
+      if (!source || source.quantity < dto.quantity) throw new BadRequestException('Insufficient stock for transfer');
       await manager.query(
         'UPDATE warehouse_stock SET quantity = quantity - $3 WHERE location_id = $1 AND product_id = $2',
         [dto.fromLocationId, dto.productId, dto.quantity],
