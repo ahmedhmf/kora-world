@@ -6,7 +6,7 @@ import type { AuthenticatedRequest } from '../auth/interfaces/authenticated-requ
 import { AuthGuard } from '../auth/auth.guard';
 import { EventDocumentsService } from './event-documents.service';
 import { EventReportsService } from './event-reports.service';
-import { EventsService } from './events.service';
+import { EventDuplicateService } from './event-duplicate.service';
 import type { OfferUpload } from './event-offer-files.service';
 
 @Controller('events/:eventId')
@@ -15,7 +15,7 @@ export class EventOperationsController {
   constructor(
     private readonly documents: EventDocumentsService,
     private readonly reports: EventReportsService,
-    private readonly events: EventsService,
+    private readonly duplicator: EventDuplicateService,
   ) {}
 
   @Get('documents')
@@ -64,6 +64,6 @@ export class EventOperationsController {
 
   @Post('duplicate')
   duplicate(@Param('eventId', ParseIntPipe) id: number, @Req() req: AuthenticatedRequest) {
-    return this.events.duplicate(id, req.user?.sub);
+    return this.duplicator.duplicate(id, req.user?.sub);
   }
 }
