@@ -8,6 +8,7 @@ import { AuthService } from '../../core/services/auth.service';
 import { DialogService } from '../../core/services/dialog.service';
 import { eventOccursOnLocalDay } from './event-date-range';
 import { switchMap } from 'rxjs';
+import { HttpClient } from '@angular/common/http';
 import { ExperiencesApiService, KoraExperience, PackingItem } from '../experiences/experiences-api.service';
 
 @Component({
@@ -31,6 +32,8 @@ export class CalendarComponent implements OnInit {
   readonly authService = inject(AuthService);
   private readonly dialogService = inject(DialogService);
   private readonly experiencesApi = inject(ExperiencesApiService);
+  private readonly http = inject(HttpClient);
+  readonly duplicating = signal(false);
 
   readonly experienceLibrary = signal<KoraExperience[]>([]);
   readonly eventExperienceIds = signal<number[]>([]);
@@ -363,6 +366,29 @@ export class CalendarComponent implements OnInit {
     }
 
     this.closeDrawer();
+  }
+
+  async duplicateEvent(): Promise<void> {
+    if (this.eventId === null || this.duplicating()) return;
+    const confirmed = await this.dialogService.confirm('Duplicate Event',
+      'Create a new event one week later with the same setup and Kora Experiences? Packing flags will be reset. Offers, files and reports will not be copied.');
+    if (!confirmed) return;
+    const id = this.eventId;
+    this.duplicating.set(true);
+    const local = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+    const base = local ? 'http://localhost:3000' : '/api';
+    this.http.post<CalendarEvent>(`${base}/events/${id}/duplicate`, {}).subscribe({
+      next: event => {
+        this.duplicating.set(false);
+        this.closeDrawer();
+        this.currentMonth.set(new Date(event.startDate));
+        this.store.loadEvents();
+      },
+      error: () => {
+        this.duplicating.set(false);
+        void this.dialogService.alert('Duplicate Event', 'Could not duplicate this event.');
+      },
+    });
   }
 
   async deleteEvent(): Promise<void> {
