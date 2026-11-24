@@ -22,8 +22,9 @@ describe('ExperiencesService packing list generation', () => {
       create: jest.fn().mockImplementation(data => data),
       save: jest.fn().mockImplementation(async data => data),
     };
-    const service = new ExperiencesService(events as any, experiences as any, assignments as any, checklists as any, {} as any);
-    return { service, checklists };
+    const dataSource = { query: jest.fn().mockResolvedValue([]) };
+    const service = new ExperiencesService(events as any, experiences as any, assignments as any, checklists as any, dataSource as any);
+    return { service, checklists, dataSource };
   }
 
   it('adds consumable quantities and shares common equipment', async () => {
@@ -44,6 +45,14 @@ describe('ExperiencesService packing list generation', () => {
     const rows = await service.generate(10);
     expect(rows.find(x => x.key === 'footballs|pcs')?.packed).toBe(true);
     expect(rows.find(x => x.key === 'water|bottles')?.quantity).toBe(20);
+  });
+
+  it('prevents regeneration while stock is reserved or dispatched', async () => {
+    const { service, checklists, dataSource } = setup();
+    dataSource.query.mockResolvedValueOnce([{ id: 42 }]);
+    await expect(service.generate(10)).rejects.toThrow('Cancel the active reservation');
+    expect(checklists.save).not.toHaveBeenCalled();
+    expect(dataSource.query).toHaveBeenCalledWith(expect.stringContaining("'active','dispatched','reconciled'"), [10]);
   });
 
   it('rejects invalid experience requirements', async () => {
