@@ -25,7 +25,11 @@ export class WarehouseComponent implements OnInit {
   readonly success = signal('');
   readonly search = signal('');
   readonly locationFilter = signal(0);
-  readonly tab = signal<'stock' | 'movements' | 'locations'>('stock');
+  readonly tab = signal<'stock' | 'movements' | 'locations' | 'report'>('stock');
+  readonly report = signal<{stock:{kind:string;itemId:number;code:string;name:string;locationCode:string;physical:number;reservedPeak:number;dispatched:number}[];events:{eventId:number;title:string;status:string;name:string;quantity:number;startsAt:string;endsAt:string;returned:number|null;damaged:number|null;missing:number|null;consumed:number|null;notes:string|null}[]} | null>(null);
+  async loadReport(){this.tab.set('report');this.report.set(null);try{this.report.set(await firstValueFrom(this.api.getWarehouseReport(this.selectedId())));}catch(e){this.error.set(this.message(e));}}
+  exportReport(){const data=this.report();if(!data)return;const quote=(value:unknown)=>{let s=String(value??'');if(/^[=+@\-\t\r]/.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"';};const rows=[['Type','Code','Item','Location','Physical','Peak reserved','Dispatched','Uncommitted'],...data.stock.map(r=>[r.kind,r.code,r.name,r.locationCode,r.physical,r.reservedPeak,r.dispatched,Math.max(0,r.physical-r.reservedPeak)]),[],['Event','Title','Status','Item','Quantity','Starts','Ends','Returned','Damaged','Missing','Consumed','Notes'],...data.events.map(r=>[r.eventId,r.title,r.status,r.name,r.quantity,r.startsAt,r.endsAt,r.returned,r.damaged,r.missing,r.consumed,r.notes])];const url=URL.createObjectURL(new Blob([rows.map(r=>r.map(quote).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='warehouse-'+this.selectedId()+'-report.csv';a.click();URL.revokeObjectURL(url);}
+
   readonly selected = computed(() => this.sites().find(s => s.id === this.selectedId()));
   readonly total = computed(() => this.stock().reduce((sum, row) => sum + row.quantity, 0));
   readonly productCount = computed(() => new Set(this.stock().filter(r => r.quantity > 0).map(r => r.productId)).size);
@@ -52,6 +56,7 @@ export class WarehouseComponent implements OnInit {
   }
   private async loadSite(id: number): Promise<void> {
     this.selectedId.set(id);
+    this.report.set(null); if(this.tab()==='report') this.tab.set('stock');
     this.locations.set([]); this.stock.set([]); this.movements.set([]);
     this.locationFilter.set(0);
     this.movement.locationId = 0; this.movement.toLocationId = 0;
