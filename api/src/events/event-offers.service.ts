@@ -41,7 +41,7 @@ export class EventOffersService {
     const v = value as OfferInput;
     if (v.type !== 'staff' && v.type !== 'supplier') throw new BadRequestException('Invalid offer type');
     const type = v.type as EventOfferType;
-    if (!Number.isSafeInteger(v.quantity) || (v.quantity as number) < 1 || (v.quantity as number) > 100000) {
+    if (typeof v.quantity !== 'number' || !Number.isSafeInteger(v.quantity) || v.quantity < 1 || v.quantity > 100000) {
       throw new BadRequestException('Quantity must be an integer between 1 and 100000');
     }
     const quantity = v.quantity as number;
@@ -54,7 +54,7 @@ export class EventOffersService {
     if (!['draft', 'sent', 'accepted', 'rejected'].includes(status)) throw new BadRequestException('Invalid offer status');
     let supplierId: number | null = null;
     if (type === 'supplier' && v.supplierId != null) {
-      if (!Number.isSafeInteger(v.supplierId) || (v.supplierId as number) < 1) throw new BadRequestException('Invalid supplier ID');
+      if (typeof v.supplierId !== 'number' || !Number.isSafeInteger(v.supplierId) || v.supplierId < 1) throw new BadRequestException('Invalid supplier ID');
       supplierId = v.supplierId as number;
       if (!await this.suppliers.exist({ where: { id: supplierId } })) throw new BadRequestException('Supplier not found');
     }
