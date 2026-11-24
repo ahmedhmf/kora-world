@@ -194,7 +194,6 @@ export class AccountDeliveryNotesComponent implements OnInit {
         nameLines.forEach((line, j) => text(state.page, line, left + 135, state.y - j * 13, 9));
         text(state.page, item.quantity, right - 35, state.y, 9);
         state.y -= height;
-        // No horizontal row separator: it can visually strike through subsequent item text.
       }
       const consignment = note.paymentModel === 'Consignment' || note.paymentModel === 'Consignment (Monthly Settlement)';
       const ack = consignment
