@@ -121,8 +121,9 @@ export class DeliveryNotesService {
   }
 
   async adjustInventory(accountId: number, dto: { productId: number; quantity: number; reason: string; notes: string }, user: ActiveUser) {
+    if (dto.reason === 'return') throw new BadRequestException('Use Customer returns to warehouse for physical returns');
     if (!Number.isInteger(dto.productId) || !Number.isInteger(dto.quantity) || dto.quantity === 0 ||
-      Math.abs(dto.quantity) > 100000 || !['return', 'damage', 'loss', 'stocktake', 'other'].includes(dto.reason) ||
+      Math.abs(dto.quantity) > 100000 || !['damage', 'loss', 'stocktake', 'other'].includes(dto.reason) ||
       !dto.notes?.trim() || dto.notes.length > 2000) {
       throw new BadRequestException('Choose a product, non-zero quantity, reason and explanation');
     }
