@@ -2,6 +2,9 @@ import { Routes } from '@angular/router';
 import { LayoutComponent } from './layout/layout.component';
 import { authGuard } from './core/guards/auth.guard';
 import { roleGuard } from './core/guards/role.guard';
+import { inject } from '@angular/core';
+import { Router } from '@angular/router';
+import { AuthService } from './core/services/auth.service';
 
 export const routes: Routes = [
   {
@@ -15,6 +18,15 @@ export const routes: Routes = [
     canActivate: [authGuard],
     children: [
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
+      {
+        path: 'warehouse',
+        canActivate: [() => {
+          const role = inject(AuthService).currentUser()?.role;
+          return role === 'admin' || role === 'employee' || inject(Router).createUrlTree(['/dashboard']);
+        }],
+        loadComponent: () =>
+          import('./features/warehouse/warehouse.component').then(m => m.WarehouseComponent),
+      },
       {
         path: 'users',
         canActivate: [roleGuard],
