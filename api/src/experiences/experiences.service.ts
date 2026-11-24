@@ -97,8 +97,8 @@ export class ExperiencesService {
   }
 
   private async requireUnreserved(id: number) {
-    const [r] = await this.dataSource.query("SELECT id FROM event_stock_reservations WHERE event_id=$1 AND status='active' LIMIT 1",[id]);
-    if(r) throw new BadRequestException('Cancel the stock reservation before editing the checklist');
+    const [r] = await this.dataSource.query("SELECT id FROM event_stock_reservations WHERE event_id=$1 AND status IN ('active','dispatched','reconciled') LIMIT 1",[id]);
+    if(r) throw new BadRequestException('Cancel the active reservation before editing; dispatched checklists are locked');
   }
 
   private async requireEvent(id: number) {
