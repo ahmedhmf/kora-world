@@ -56,6 +56,10 @@
         <h3 class="font-semibold">Equipment & Materials</h3>
         @for (item of formItems; track $index) {
           <div class="grid grid-cols-2 md:grid-cols-7 gap-2 items-end border-t border-zinc-800 pt-3">
+            <div class="col-span-2 md:col-span-full grid sm:grid-cols-2 gap-2">
+<label class="text-xs">Inventory source<select [ngModel]="item.inventoryKind" (ngModelChange)="changeKind(item,$event)" class="block w-full bg-zinc-950 border border-zinc-700 rounded p-2"><option [ngValue]="undefined">Manual checklist item</option><option value="product">Product catalogue</option><option value="equipment">Equipment catalogue</option></select></label>
+@if(item.inventoryKind){<label class="text-xs">Inventory item<select [ngModel]="item.inventoryId" (ngModelChange)="changeInventory(item,$event)" class="block w-full bg-zinc-950 border border-zinc-700 rounded p-2"><option [ngValue]="undefined">Select inventory item</option>@if(item.inventoryKind==='product'){@for(p of inventoryProducts();track p.id){<option [ngValue]="p.id">{{p.articleNumber}} — {{p.name}}</option>}}@else{@for(e of inventoryEquipment();track e.id){<option [ngValue]="e.id">{{e.code}} — {{e.name}}</option>}}</select></label>}
+</div>
             <label class="col-span-2 text-xs">Item name *
               <input [(ngModel)]="item.name" class="mt-1 w-full bg-zinc-950 border border-zinc-700 rounded p-2" />
             </label>
@@ -105,7 +109,7 @@
           <p class="text-sm text-zinc-400">There are no experience templates yet. Create one in the library.</p>
         }
       </div>
-      <button type="button" [disabled]="busy()" (click)="generate()" class="bg-white text-zinc-900 font-semibold px-4 py-2 rounded-lg text-sm disabled:opacity-50">
+      <button type="button" [disabled]="busy() || logisticsLocked()" (click)="generate()" class="bg-white text-zinc-900 font-semibold px-4 py-2 rounded-lg text-sm disabled:opacity-50">
         Generate / Refresh Packing Checklist
       </button>
       <p class="text-xs text-amber-300">Refreshing recalculates template quantities. Existing packed ticks and event-only items are kept where possible.</p>
@@ -125,6 +129,7 @@
           <span class="flex-1">
             <span class="font-semibold" [class.line-through]="item.packed">{{ item.name }} — {{ item.quantity }} {{ item.unit }}</span>
             <span class="block text-xs text-zinc-400">{{ item.category }} · {{ item.sources.join(', ') }}</span>
+            @if(item.inventoryKind){<span class="block text-xs text-blue-300">Linked {{item.inventoryKind}} #{{item.inventoryId}}</span>}@else{<span class="block text-xs text-zinc-500">Manual item — not reserved</span>}
             @if (item.notes) { <span class="block text-xs text-zinc-500">{{ item.notes }}</span> }
           </span>
         </label>
@@ -133,10 +138,58 @@
       }
     </section>
 
+    <section class="rounded-xl border border-zinc-800 bg-zinc-900 p-5 space-y-4">
+      <h2 class="font-bold">Event stock reservations</h2>
+      <p class="text-sm text-zinc-400">Reserve linked items for preparation, event and expected return dates. Physical stock stays unchanged.</p>
+      @if(logisticsLocked()){<p class="text-zinc-400 text-sm">Reservation and dispatch history is locked. Active reservations can be cancelled before dispatch.</p>}
+      @else{
+      <fieldset [disabled]="busy()" class="space-y-3 print:hidden">
+        <div class="grid sm:grid-cols-2 gap-3">
+          <label class="text-xs">Warehouse<select [ngModel]="warehouseId" (ngModelChange)="selectWarehouse($event)" class="block w-full bg-zinc-950 border border-zinc-700 rounded p-2"><option [ngValue]="0">Select warehouse</option>@for(w of warehouses();track w.id){<option [ngValue]="w.id">{{w.name}}</option>}</select></label>
+          <label class="text-xs">Location<select [(ngModel)]="locationId" (ngModelChange)="availability.set(null)" class="block w-full bg-zinc-950 border border-zinc-700 rounded p-2"><option [ngValue]="0">Select location</option>@for(l of locations();track l.id){<option [ngValue]="l.id">{{l.code}} — {{l.name}}</option>}</select></label>
+          <label class="text-xs">Preparation from<input type="datetime-local" [(ngModel)]="startsAt" (ngModelChange)="availability.set(null)" class="block w-full bg-zinc-950 border border-zinc-700 rounded p-2"></label>
+          <label class="text-xs">Expected return by<input type="datetime-local" [(ngModel)]="endsAt" (ngModelChange)="availability.set(null)" class="block w-full bg-zinc-950 border border-zinc-700 rounded p-2"></label>
+        </div>
+        <button type="button" (click)="checkAvailability()" class="border border-zinc-600 rounded px-3 py-2 text-sm">Check availability</button>
+        @if(availability();as rows){
+        <div class="overflow-x-auto"><table class="w-full text-sm text-left"><thead class="text-zinc-400"><tr><th>Item</th><th>Required</th><th>Physical</th><th>Reserved by others</th><th>Available</th><th>Missing</th></tr></thead><tbody>@for(row of rows;track row.key){<tr class="border-t border-zinc-800"><td class="py-2">{{row.name}}</td><td>{{row.quantity}}</td><td>{{row.physical}}</td><td>{{row.reservedByOthers}}</td><td>{{row.available}}</td><td [class.text-red-400]="row.missing>0">{{row.missing}}</td></tr>}@empty{<tr><td colspan="6">No linked inventory items.</td></tr>}</tbody></table></div>
+        <button type="button" (click)="reserveStock()" class="bg-white text-zinc-900 font-semibold rounded px-4 py-2 text-sm">Reserve stock</button>
+        }
+      </fieldset>}
+      <h3 class="font-semibold">Reservation history</h3>
+      @for(r of reservations();track r.id){<div class="border border-zinc-800 rounded p-3 text-sm"><strong>{{r.name}} — {{r.quantity}}</strong> · {{r.status}}<p class="text-zinc-400">{{r.warehouseName}} / {{r.locationCode}} · {{r.startsAt|date:'short'}} to {{r.endsAt|date:'short'}}</p></div>}@empty{<p class="text-sm text-zinc-500">No reservations yet.</p>}
+      @if(activeReservation()){<button type="button" (click)="dispatchEvent()" [disabled]="busy() || packedCount()!==checklist().length" class="bg-white text-zinc-900 font-semibold rounded px-4 py-2 text-sm print:hidden">Confirm event dispatch</button>}
+      @if(dispatchedRows().length){
+        <h3 class="font-semibold">Post-event reconciliation</h3>
+        <p class="text-sm text-zinc-400">Account for all dispatched units. Only serviceable returned items go back into stock; damaged, missing and consumed quantities stay out of usable inventory.</p>
+        <fieldset [disabled]="busy()" class="space-y-3">
+        @for(row of dispatchedRows();track row.id){
+          @if(reconciliation[row.id];as line){
+          <div class="border border-zinc-800 rounded p-3 space-y-2">
+            <p class="font-semibold">{{row.name}} — {{row.quantity}} dispatched</p>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+            <label class="text-xs">Serviceable return<input type="number" min="0" step="1" [(ngModel)]="line.returned" class="block w-full bg-zinc-950 border border-zinc-700 rounded p-2"></label>
+            <label class="text-xs">Damaged<input type="number" min="0" step="1" [(ngModel)]="line.damaged" class="block w-full bg-zinc-950 border border-zinc-700 rounded p-2"></label>
+            <label class="text-xs">Missing<input type="number" min="0" step="1" [(ngModel)]="line.missing" class="block w-full bg-zinc-950 border border-zinc-700 rounded p-2"></label>
+            @if(row.inventoryKind==='product'){<label class="text-xs">Consumed<input type="number" min="0" step="1" [(ngModel)]="line.consumed" class="block w-full bg-zinc-950 border border-zinc-700 rounded p-2"></label>}
+            </div>
+            <label class="text-xs">Explanation (required for exceptions)<input [(ngModel)]="line.notes" maxlength="2000" class="block w-full bg-zinc-950 border border-zinc-700 rounded p-2"></label>
+          </div>}
+        }
+        <button type="button" (click)="reconcileEvent()" class="bg-white text-zinc-900 font-semibold rounded px-4 py-2 text-sm">Finalize event reconciliation</button>
+        </fieldset>
+      }
+      @for(row of reservations();track row.id){@if(row.status==='reconciled'){<p class="text-sm">{{row.name}}: {{row.returned}} returned · {{row.damaged}} damaged · {{row.missing}} missing · {{row.consumed}} consumed. {{row.reconciliationNotes}}</p>}}
+      @if(activeReservation()){<button type="button" (click)="cancelStock()" [disabled]="busy()" class="text-red-400 border border-red-900 rounded px-3 py-2 text-sm print:hidden">Cancel reservation</button>}
+    </section>
     <section class="rounded-xl border border-zinc-800 bg-zinc-900 p-5 space-y-3 print:hidden">
       <h2 class="font-bold">Additional Items for this Event</h2>
       <p class="text-xs text-zinc-400">Add something needed for this event without changing the reusable experience template.</p>
       <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div class="col-span-2 md:col-span-full grid sm:grid-cols-2 gap-2">
+<label class="text-xs">Inventory source<select [ngModel]="extra.inventoryKind" (ngModelChange)="changeKind(extra,$event)" class="block w-full bg-zinc-950 border border-zinc-700 rounded p-2"><option [ngValue]="undefined">Manual checklist item</option><option value="product">Product catalogue</option><option value="equipment">Equipment catalogue</option></select></label>
+@if(extra.inventoryKind){<label class="text-xs">Inventory item<select [ngModel]="extra.inventoryId" (ngModelChange)="changeInventory(extra,$event)" class="block w-full bg-zinc-950 border border-zinc-700 rounded p-2"><option [ngValue]="undefined">Select inventory item</option>@if(extra.inventoryKind==='product'){@for(p of inventoryProducts();track p.id){<option [ngValue]="p.id">{{p.articleNumber}} — {{p.name}}</option>}}@else{@for(e of inventoryEquipment();track e.id){<option [ngValue]="e.id">{{e.code}} — {{e.name}}</option>}}</select></label>}
+</div>
         <label class="col-span-2 text-xs">Item
           <input [(ngModel)]="extra.name" class="mt-1 w-full bg-zinc-950 border border-zinc-700 rounded p-2" />
         </label>
@@ -150,7 +203,7 @@
           <input [(ngModel)]="extra.category" class="mt-1 w-full bg-zinc-950 border border-zinc-700 rounded p-2" />
         </label>
       </div>
-      <button type="button" [disabled]="busy()" (click)="addExtra()" class="px-4 py-2 rounded-lg border border-zinc-600 text-sm disabled:opacity-50">+ Add to Event Checklist</button>
+      <button type="button" [disabled]="busy() || logisticsLocked()" (click)="addExtra()" class="px-4 py-2 rounded-lg border border-zinc-600 text-sm disabled:opacity-50">+ Add to Event Checklist</button>
     </section>
   }
 </div>

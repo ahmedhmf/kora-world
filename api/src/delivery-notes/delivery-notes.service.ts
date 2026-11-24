@@ -70,14 +70,60 @@ export class DeliveryNotesService {
     return [...inventory.values()].sort((a, b) => a.articleNumber.localeCompare(b.articleNumber));
   }
 
+  async listCustomerReturns(accountId: number) {
+    return this.dataSource.query(`SELECT r.id, r.product_id AS "productId", p.name AS "productName", r.quantity,
+      w.name AS "warehouseName", l.code AS "locationCode", r.notes, r.created_at AS "createdAt"
+      FROM warehouse_customer_returns r JOIN products p ON p.id=r.product_id
+      JOIN warehouse_sites w ON w.id=r.warehouse_id JOIN warehouse_locations l ON l.id=r.location_id
+      WHERE r.account_id=$1 ORDER BY r.id DESC`,[accountId]);
+  }
+
+  async returnToWarehouse(accountId: number, dto: { productId: number; quantity: number; warehouseId: number; locationId: number; notes: string; requestKey: string }, user: ActiveUser) {
+    if (![accountId,dto?.productId,dto?.quantity,dto?.warehouseId,dto?.locationId].every(n=>Number.isSafeInteger(n)&&n>0&&n<=2147483647) ||
+      dto.quantity>100000 || typeof dto.notes!=='string' || !dto.notes.trim() || dto.notes.length>2000 ||
+      typeof dto.requestKey!=='string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(dto.requestKey))
+      throw new BadRequestException('Enter valid return details and explanation');
+    return this.dataSource.transaction(async manager=>{
+      const account = await manager.findOne(Account,{where:{id:accountId},lock:{mode:'pessimistic_write'}});
+      if (!account) throw new NotFoundException('Account not found');
+      const [existing] = await manager.query('SELECT * FROM warehouse_customer_returns WHERE request_key=$1',[dto.requestKey]);
+      if (existing) {
+        if (existing.account_id!==accountId || existing.product_id!==dto.productId || existing.quantity!==dto.quantity ||
+          existing.warehouse_id!==dto.warehouseId || existing.location_id!==dto.locationId || existing.notes!==dto.notes.trim())
+          throw new BadRequestException('Return request key already used for different details');
+        return {id:existing.id,duplicate:true};
+      }
+      const balance=await this.stockBalance(manager,accountId);
+      if ((balance.get(dto.productId)??0)<dto.quantity) throw new BadRequestException('Insufficient customer inventory');
+      const product=await manager.findOne(Product,{where:{id:dto.productId}});
+      if (!product) throw new NotFoundException('Product not found');
+      const [location]=await manager.query('SELECT l.id FROM warehouse_locations l JOIN warehouse_sites w ON w.id=l.warehouse_id WHERE w.id=$1 AND l.id=$2 AND w.is_active AND l.is_active',[dto.warehouseId,dto.locationId]);
+      if (!location) throw new BadRequestException('Select an active warehouse location');
+      const adjustment=await manager.save(InventoryAdjustment,manager.create(InventoryAdjustment,{
+        accountId,productId:product.id,articleNumber:product.articleNumber,productName:product.name,
+        quantity:-dto.quantity,reason:'return',notes:dto.notes.trim(),createdById:user.sub,createdByName:user.name||user.email
+      }));
+      const [receipt]=await manager.query(`INSERT INTO warehouse_customer_returns
+        (account_id,adjustment_id,warehouse_id,location_id,product_id,quantity,request_key,notes,performed_by_id)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
+        [accountId,adjustment.id,dto.warehouseId,dto.locationId,product.id,dto.quantity,dto.requestKey,dto.notes.trim(),user.sub]);
+      await manager.query(`INSERT INTO warehouse_stock(location_id,product_id,quantity) VALUES($1,$2,$3)
+        ON CONFLICT(location_id,product_id) DO UPDATE SET quantity=warehouse_stock.quantity+EXCLUDED.quantity`,[dto.locationId,product.id,dto.quantity]);
+      await manager.query(`INSERT INTO warehouse_movements(warehouse_id,location_id,product_id,quantity_change,movement_type,reference,notes,performed_by_id)
+        VALUES($1,$2,$3,$4,'return',$5,$6,$7)`,[dto.warehouseId,dto.locationId,product.id,dto.quantity,'CR-'+String(receipt.id).padStart(6,'0'),dto.notes.trim(),user.sub]);
+      return {id:receipt.id,duplicate:false};
+    });
+  }
+
   async listAdjustments(accountId: number) {
     if (!await this.accounts.exists({ where: { id: accountId } })) throw new NotFoundException('Account not found');
     return this.adjustments.find({ where: { accountId }, order: { id: 'DESC' } });
   }
 
   async adjustInventory(accountId: number, dto: { productId: number; quantity: number; reason: string; notes: string }, user: ActiveUser) {
+    if (dto.reason === 'return') throw new BadRequestException('Use Customer returns to warehouse for physical returns');
     if (!Number.isInteger(dto.productId) || !Number.isInteger(dto.quantity) || dto.quantity === 0 ||
-      Math.abs(dto.quantity) > 100000 || !['return', 'damage', 'loss', 'stocktake', 'other'].includes(dto.reason) ||
+      Math.abs(dto.quantity) > 100000 || !['damage', 'loss', 'stocktake', 'other'].includes(dto.reason) ||
       !dto.notes?.trim() || dto.notes.length > 2000) {
       throw new BadRequestException('Choose a product, non-zero quantity, reason and explanation');
     }
@@ -239,7 +285,7 @@ export class DeliveryNotesService {
     return note;
   }
 
-  async create(accountId: number, dto: { deliveryDate: string; remarks?: string; items: Array<{ productId: number; quantity: number }> }) {
+  async create(accountId: number, dto: { deliveryDate: string; remarks?: string; items: Array<{ productId: number; quantity: number }>; deliverySource?: 'warehouse' | 'supplier' | 'external'; warehouseId?: number; locationId?: number; sourceDetails?: string }) {
     const account = await this.accounts.findOneBy({ id: accountId });
     if (!account) throw new NotFoundException('Account not found');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dto.deliveryDate || '') || !Number.isFinite(Date.parse(dto.deliveryDate))) {
@@ -259,27 +305,72 @@ export class DeliveryNotesService {
       if (!product) throw new BadRequestException('One of the selected products does not exist');
       items.push({ productId: product.id, articleNumber: product.articleNumber, productName: product.name, quantity: item.quantity });
     }
+    const deliverySource = dto.deliverySource ?? 'warehouse';
+    if (!['warehouse','supplier','external'].includes(deliverySource)) throw new BadRequestException('Invalid delivery source');
+    const warehouseId = deliverySource === 'warehouse' ? dto.warehouseId : null;
+    const locationId = deliverySource === 'warehouse' ? dto.locationId : null;
+    const sourceDetails = deliverySource === 'warehouse' ? null : typeof dto.sourceDetails === 'string' ? dto.sourceDetails.trim() : '';
+    if (deliverySource === 'warehouse') {
+      if (!Number.isInteger(warehouseId) || !Number.isInteger(locationId)) throw new BadRequestException('Select warehouse and location');
+      const [location] = await this.dataSource.query(
+        'SELECT l.id FROM warehouse_locations l JOIN warehouse_sites w ON w.id=l.warehouse_id WHERE w.id=$1 AND l.id=$2 AND w.is_active AND l.is_active', [warehouseId,locationId]);
+      if (!location) throw new BadRequestException('Select an active warehouse location');
+      for (const item of items) {
+        const [stock] = await this.dataSource.query('SELECT quantity FROM warehouse_stock WHERE location_id=$1 AND product_id=$2',[locationId,item.productId]);
+        if ((stock?.quantity ?? 0) < item.quantity) throw new BadRequestException('Insufficient warehouse stock for ' + item.articleNumber);
+      }
+    } else if (!sourceDetails || sourceDetails.length > 200) throw new BadRequestException('Specify the supplier or external stock source');
     // A database sequence-backed ID ensures uniqueness even when users create notes concurrently.
-    const note = await this.notes.save(this.notes.create({
+    return this.dataSource.transaction(async manager => {
+    const note = await manager.save(DeliveryNote, manager.create(DeliveryNote, {
       accountId, noteNumber: 'TMP-' + randomUUID(), deliveryDate: dto.deliveryDate,
       customerName: account.companyName,
       deliveryAddress: [account.shippingStreet, account.shippingZip, account.shippingCity, account.shippingCountry].filter(Boolean).join(', '),
       paymentModel: account.paymentModel, items, remarks: dto.remarks?.slice(0, 2000),
+      deliverySource, warehouseId: warehouseId ?? null, locationId: locationId ?? null, sourceDetails,
     }));
     note.noteNumber = 'DN-' + String(note.id).padStart(6, '0');
-    return this.notes.save(note);
+    return manager.save(DeliveryNote, note);
+    });
+  }
+
+  async dispatch(id: number, userId: number) {
+    return this.dataSource.transaction(async manager => {
+      const note = await manager.findOne(DeliveryNote, { where: { id }, lock: { mode: 'pessimistic_write' } });
+      if (!note) throw new NotFoundException('Delivery note not found');
+      if (note.deliverySource === 'legacy') throw new BadRequestException('Legacy delivery notes cannot be dispatched retroactively');
+      if (note.dispatchedAt) return note;
+      if (note.signedFilePath) throw new BadRequestException('Delivery already signed');
+      if (note.deliverySource === 'warehouse') {
+        const [location] = await manager.query('SELECT l.id FROM warehouse_locations l JOIN warehouse_sites w ON w.id=l.warehouse_id WHERE w.id=$1 AND l.id=$2 AND w.is_active AND l.is_active',[note.warehouseId,note.locationId]);
+        if (!location) throw new BadRequestException('Warehouse location is not active');
+        for (const item of [...note.items].sort((a,b)=>a.productId-b.productId)) {
+          const rows = await manager.query('SELECT quantity FROM warehouse_stock WHERE location_id=$1 AND product_id=$2 FOR UPDATE',[note.locationId,item.productId]);
+          if (!rows.length || rows[0].quantity < item.quantity) throw new BadRequestException('Insufficient warehouse stock for ' + item.articleNumber);
+          await manager.query('UPDATE warehouse_stock SET quantity=quantity-$3 WHERE location_id=$1 AND product_id=$2',[note.locationId,item.productId,item.quantity]);
+          await manager.query(`INSERT INTO warehouse_movements (warehouse_id,location_id,product_id,quantity_change,movement_type,reference,performed_by_id) VALUES ($1,$2,$3,$4,'issue',$5,$6)`,[note.warehouseId,note.locationId,item.productId,-item.quantity,note.noteNumber,userId]);
+        }
+      }
+      note.dispatchedAt = new Date();
+      note.dispatchedById = userId;
+      return manager.save(DeliveryNote,note);
+    });
   }
 
   async attachSignedCopy(id: number, dto: { path: string; name: string }) {
-    const note = await this.get(id);
     if (!dto || !/^\d+-\d+\.(pdf|png|jpg|jpeg)$/i.test(dto.path || '')) {
       throw new BadRequestException('Upload a PDF, PNG, or JPEG signed copy first');
     }
     const file = path.join(process.cwd(), 'uploads', dto.path);
     if (!fs.existsSync(file)) throw new BadRequestException('Uploaded file not found');
     if (dto.name?.length > 255) throw new BadRequestException('File name is too long');
-    note.signedFilePath = dto.path;
-    note.signedFileName = dto.name || dto.path;
-    return this.notes.save(note);
+    return this.dataSource.transaction(async manager => {
+      const note = await manager.findOne(DeliveryNote, { where: { id }, lock: { mode: 'pessimistic_write' } });
+      if (!note) throw new NotFoundException('Delivery note not found');
+      if (note.deliverySource === 'warehouse' && !note.dispatchedAt) throw new BadRequestException('Confirm warehouse dispatch before uploading signed copy');
+      note.signedFilePath = dto.path;
+      note.signedFileName = dto.name || dto.path;
+      return manager.save(DeliveryNote,note);
+    });
   }
 }

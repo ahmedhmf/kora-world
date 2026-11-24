@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { WarehouseSite, WarehouseLocation, WarehouseStock, WarehouseMovement, WarehouseStockInput, WarehouseTransferInput, WarehouseAction } from '../models/warehouse.model';
 import { Supplier, CreateSupplierDto } from '../models/supplier.model';
 import { Product, CreateProductDto } from '../models/product.model';
 import { Sample, CreateSampleDto } from '../models/sample.model';
@@ -18,6 +19,39 @@ export class ApiService {
   private get base(): string {
     const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     return isLocal ? 'http://localhost:3000' : '/api';
+  }
+
+  getGoodsReceipts(id: number) {
+    return this.http.get<{ status: string; legacyReceived: boolean; canReceive: boolean;
+      lines: { poLineId: number; productId: number | null; articleNumber: string; description: string; ordered: number; received: number; remaining: number }[];
+      receipts: { id: number; receiptNumber: string; warehouseName: string; locationCode: string; createdAt: string; supplierReference: string | null; quantity: number }[];
+    }>(`${this.base}/purchase-orders/${id}/goods-receipts`);
+  }
+  receivePurchaseOrder(id: number, dto: { warehouseId: number; locationId: number; requestKey: string; supplierReference: string; notes: string; lines: { poLineId: number; quantity: number }[] }) {
+    return this.http.post<{ id: number; status: string; duplicate: boolean }>(`${this.base}/purchase-orders/${id}/goods-receipts`, dto);
+  }
+
+  getCustomerReturns(id:number) { return this.http.get<{id:number;productName:string;quantity:number;warehouseName:string;locationCode:string;notes:string;createdAt:string}[]>(`${this.base}/delivery-notes/account/${id}/returns`); }
+  returnCustomerStock(id:number,dto:{productId:number;quantity:number;warehouseId:number;locationId:number;notes:string;requestKey:string}) { return this.http.post<{id:number;duplicate:boolean}>(`${this.base}/delivery-notes/account/${id}/returns`,dto); }
+  getEquipment() { return this.http.get<{id:number;code:string;name:string;category:string|null;description:string|null}[]>(`${this.base}/equipment`); }
+  createEquipment(dto:{code:string;name:string;category:string;description:string}) { return this.http.post<unknown>(`${this.base}/equipment`,dto); }
+  getEquipmentStock(id:number) { return this.http.get<{equipmentId:number;code:string;name:string;locationId:number;locationCode:string;quantity:number}[]>(`${this.base}/equipment/warehouse/${id}/stock`); }
+  getEquipmentMovements(id:number) { return this.http.get<{id:string;code:string;name:string;locationCode:string;quantityChange:number;type:string;reference:string|null;notes:string|null;createdAt:string;performedById:number|null}[]>(`${this.base}/equipment/warehouse/${id}/movements`); }
+  recordEquipment(id:number,dto:{equipmentId:number;locationId:number;toLocationId:number;quantity:number;action:string;reference:string;notes:string}) { return this.http.post<unknown>(`${this.base}/equipment/warehouse/${id}/movements`,dto); }
+
+  getWarehouseReport(id:number){return this.http.get<{stock:{kind:string;itemId:number;code:string;name:string;locationCode:string;physical:number;reservedPeak:number;dispatched:number}[];events:{eventId:number;title:string;status:string;name:string;quantity:number;startsAt:string;endsAt:string;returned:number|null;damaged:number|null;missing:number|null;consumed:number|null;notes:string|null}[]}>(`${this.base}/warehouses/${id}/report`);}
+  // Warehouse
+  getWarehouses() { return this.http.get<WarehouseSite[]>(`${this.base}/warehouses`); }
+  createWarehouse(dto: { code: string; name: string; address?: string }) { return this.http.post<WarehouseSite>(`${this.base}/warehouses`, dto); }
+  getWarehouseLocations(id: number) { return this.http.get<WarehouseLocation[]>(`${this.base}/warehouses/${id}/locations`); }
+  createWarehouseLocation(id: number, dto: { code: string; name: string }) { return this.http.post<WarehouseLocation>(`${this.base}/warehouses/${id}/locations`, dto); }
+  getWarehouseStock(id: number) { return this.http.get<WarehouseStock[]>(`${this.base}/warehouses/${id}/stock`); }
+  getWarehouseMovements(id: number) { return this.http.get<WarehouseMovement[]>(`${this.base}/warehouses/${id}/movements`); }
+  recordWarehouseMovement(id: number, action: Exclude<WarehouseAction, 'transfers'>, dto: WarehouseStockInput) {
+    return this.http.post<unknown>(`${this.base}/warehouses/${id}/${action}`, dto);
+  }
+  transferWarehouseStock(id: number, dto: WarehouseTransferInput) {
+    return this.http.post<unknown>(`${this.base}/warehouses/${id}/transfers`, dto);
   }
 
   // Suppliers
@@ -298,9 +332,11 @@ export class ApiService {
     return this.http.post<any>(`${this.base}/delivery-notes/sales/${reportId}/approve`, {});
   }
 
-  createDeliveryNote(accountId: number, dto: { deliveryDate: string; remarks?: string; items: Array<{ productId: number; quantity: number }> }): Observable<any> {
+  createDeliveryNote(accountId: number, dto: { deliveryDate: string; remarks?: string; items: Array<{ productId: number; quantity: number }>; deliverySource?: 'warehouse' | 'supplier' | 'external'; warehouseId?: number; locationId?: number; sourceDetails?: string }): Observable<any> {
     return this.http.post<any>(`${this.base}/delivery-notes/account/${accountId}`, dto);
   }
+
+  dispatchDeliveryNote(id: number) { return this.http.post<unknown>(`${this.base}/delivery-notes/${id}/dispatch`, {}); }
 
   attachDeliveryNoteSignedCopy(noteId: number, file: { path: string; name: string }): Observable<any> {
     return this.http.patch<any>(`${this.base}/delivery-notes/${noteId}/signed-copy`, file);

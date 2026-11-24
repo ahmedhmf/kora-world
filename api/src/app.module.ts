@@ -63,6 +63,7 @@ import { PaymentAllocation } from './delivery-notes/payment-allocation.entity';
 import { InventoryAdjustment } from './delivery-notes/inventory-adjustment.entity';
 import { WeeklySalesReport } from './delivery-notes/weekly-sales-report.entity';
 import { DeliveryNotesModule } from './delivery-notes/delivery-notes.module';
+import { WarehouseModule } from './warehouse/warehouse.module';
 import { DropdownOption } from './dropdown-options/entities/dropdown-option.entity';
 import { DropdownOptionsModule } from './dropdown-options/dropdown-options.module';
 
@@ -73,11 +74,11 @@ import { DropdownOptionsModule } from './dropdown-options/dropdown-options.modul
       imports: [ConfigModule],
       useFactory: (config: ConfigService) => ({
         type: 'postgres',
-        host: config.get('DATABASE_HOST'),
-        port: config.get<number>('DATABASE_PORT'),
-        username: config.get('DATABASE_USER'),
-        password: config.get('DATABASE_PASSWORD'),
-        database: config.get('DATABASE_NAME'),
+        host: config.get<string>('DATABASE_HOST') || 'localhost',
+        port: Number(config.get<string>('DATABASE_PORT') || '5432'),
+        username: config.get<string>('DATABASE_USER') || config.getOrThrow<string>('DB_USER'),
+        password: config.get<string>('DATABASE_PASSWORD') || config.getOrThrow<string>('DB_PASSWORD'),
+        database: config.get<string>('DATABASE_NAME') || config.getOrThrow<string>('DB_NAME'),
         entities: [
           Supplier,
           SupplierContact,
@@ -142,6 +143,7 @@ import { DropdownOptionsModule } from './dropdown-options/dropdown-options.modul
     SourcingModule,
     DropdownOptionsModule,
     DeliveryNotesModule,
+    WarehouseModule,
     ThrottlerModule.forRoot([
       {
         ttl: 60000,

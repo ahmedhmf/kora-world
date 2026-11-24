@@ -72,6 +72,8 @@ export class LayoutComponent {
         { label: 'Financial Reports', route: '/accounting/reports', icon: 'trending-up' },
       ],
     },
+    { label: 'Warehouse', route: '/warehouse', icon: 'package', roles: ['admin', 'employee'] },
+    { label: 'Equipment', route: '/warehouse/equipment', icon: 'package', roles: ['admin', 'employee'] },
     { label: 'Calendar', route: '/calendar', icon: 'calendar' },
     { label: 'Kora Experiences', route: '/experiences', icon: 'clipboard-list' },
     { label: 'Contacts', route: '/contacts', icon: 'contact' },

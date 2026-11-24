@@ -19,6 +19,7 @@ describe('PurchaseOrdersService', () => {
     create: jest.fn(),
     save: jest.fn(),
     remove: jest.fn(),
+    query: jest.fn(),
   };
 
   const mockLineItemRepo = {
@@ -67,6 +68,7 @@ describe('PurchaseOrdersService', () => {
     service = module.get<PurchaseOrdersService>(PurchaseOrdersService);
 
     jest.clearAllMocks();
+    mockPoRepo.query.mockReset().mockResolvedValue([]);
   });
 
   it('should be defined', () => {
@@ -238,6 +240,19 @@ describe('PurchaseOrdersService', () => {
       expect(mockPoRepo.save).toHaveBeenCalledWith(mockPo);
     });
 
+    it('rejects status changes after a goods receipt', async () => {
+      mockPoRepo.findOne.mockResolvedValue({ id: 1, status: POStatus.SENT });
+      mockPoRepo.query.mockResolvedValueOnce([{ id: 42 }]);
+      await expect(service.update(1, { status: POStatus.CANCELLED })).rejects.toThrow(BadRequestException);
+      expect(mockPoRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('rejects manually marking a purchase order received', async () => {
+      mockPoRepo.findOne.mockResolvedValue({ id: 1, status: POStatus.SENT });
+      await expect(service.update(1, { status: POStatus.RECEIVED })).rejects.toThrow(BadRequestException);
+      expect(mockPoRepo.save).not.toHaveBeenCalled();
+    });
+
     it('should throw BadRequestException if supplierId is changed', async () => {
       const mockPo = {
         id: 1,
@@ -266,6 +281,13 @@ describe('PurchaseOrdersService', () => {
   });
 
   describe('remove', () => {
+    it('rejects deletion after a goods receipt', async () => {
+      mockPoRepo.findOne.mockResolvedValue({ id: 1 });
+      mockPoRepo.query.mockResolvedValueOnce([{ id: 42 }]);
+      await expect(service.remove(1)).rejects.toThrow(BadRequestException);
+      expect(mockPoRepo.remove).not.toHaveBeenCalled();
+    });
+
     it('should successfully remove a purchase order', async () => {
       const mockPo = { id: 1 } as PurchaseOrder;
       mockPoRepo.findOne.mockResolvedValue(mockPo);

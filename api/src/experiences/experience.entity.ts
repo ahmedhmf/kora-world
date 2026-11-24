@@ -9,6 +9,8 @@ export interface ExperienceRequirement {
   category: string;
   mode: RequirementMode;
   notes?: string;
+  inventoryKind?: 'product' | 'equipment';
+  inventoryId?: number;
 }
 export interface ChecklistRequirement extends ExperienceRequirement {
   key: string;
