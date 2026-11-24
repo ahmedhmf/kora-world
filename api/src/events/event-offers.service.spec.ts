@@ -2,7 +2,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { EventOffersService } from './event-offers.service';
 
 describe('EventOffersService', () => {
-  const eventRepo = { exist: jest.fn() };
+  const eventRepo = { exists: jest.fn() };
   const offerRepo = {
     create: jest.fn((value: unknown) => value),
     save: jest.fn(async (value: unknown) => ({ id: 5, ...value as object })),
@@ -10,13 +10,13 @@ describe('EventOffersService', () => {
     findOneBy: jest.fn(),
     remove: jest.fn(),
   };
-  const supplierRepo = { exist: jest.fn() };
+  const supplierRepo = { exists: jest.fn() };
   let service: EventOffersService;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    eventRepo.exist.mockResolvedValue(true);
-    supplierRepo.exist.mockResolvedValue(true);
+    eventRepo.exists.mockResolvedValue(true);
+    supplierRepo.exists.mockResolvedValue(true);
     service = new EventOffersService(eventRepo as any, offerRepo as any, supplierRepo as any);
   });
 
@@ -37,7 +37,7 @@ describe('EventOffersService', () => {
     const offer = await service.create(8, { ...staff, type: 'supplier', supplierId: 12, currency: 'USD' });
     expect(offer.supplierId).toBe(12);
     expect(offer.currency).toBe('USD');
-    expect(supplierRepo.exist).toHaveBeenCalledWith({ where: { id: 12 } });
+    expect(supplierRepo.exists).toHaveBeenCalledWith({ where: { id: 12 } });
   });
 
   it('rejects quantities, fractions and invalid statuses', async () => {
