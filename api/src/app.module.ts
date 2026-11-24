@@ -53,6 +53,7 @@ import { PaymentAllocation } from './delivery-notes/payment-allocation.entity';
 import { InventoryAdjustment } from './delivery-notes/inventory-adjustment.entity';
 import { WeeklySalesReport } from './delivery-notes/weekly-sales-report.entity';
 import { DeliveryNotesModule } from './delivery-notes/delivery-notes.module';
+import { WarehouseModule } from './warehouse/warehouse.module';
 import { DropdownOption } from './dropdown-options/entities/dropdown-option.entity';
 import { DropdownOptionsModule } from './dropdown-options/dropdown-options.module';
 
@@ -124,6 +125,7 @@ import { DropdownOptionsModule } from './dropdown-options/dropdown-options.modul
     SourcingModule,
     DropdownOptionsModule,
     DeliveryNotesModule,
+    WarehouseModule,
     ThrottlerModule.forRoot([
       {
         ttl: 60000,
