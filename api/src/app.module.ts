@@ -44,7 +44,11 @@ import { AccountingModule } from './accounting/accounting.module';
 import { InvoicesModule } from './invoices/invoices.module';
 import { PaymentsModule } from './payments/payments.module';
 import { SourcingModule } from './sourcing/sourcing.module';
-import { KoraExperience, EventKoraExperience, EventKoraChecklist } from './experiences/experience.entity';
+import {
+  KoraExperience,
+  EventKoraExperience,
+  EventKoraChecklist,
+} from './experiences/experience.entity';
 import { ExperiencesModule } from './experiences/experiences.module';
 import { DeliveryNote } from './delivery-notes/delivery-note.entity';
 import { CustomerPricingRule } from './delivery-notes/customer-pricing-rule.entity';
@@ -60,7 +64,7 @@ import { DropdownOptionsModule } from './dropdown-options/dropdown-options.modul
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({ isGlobal: true, envFilePath: ['../.env', '.env'] }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (config: ConfigService) => ({
