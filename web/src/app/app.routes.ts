@@ -160,6 +160,22 @@ export const routes: Routes = [
           import('./features/forecasts/forecasts-list.component').then((m) => m.ForecastsListComponent),
       },
       {
+        path: 'experiences',
+        loadComponent: () => import('./features/experiences/experiences.component').then(m => m.ExperiencesComponent),
+      },
+      {
+        path: 'calendar/:id/manage',
+        loadComponent: () => import('./features/events/event-operations.component').then(m => m.EventOperationsComponent),
+      },
+      {
+        path: 'calendar/:id/offers',
+        loadComponent: () => import('./features/events/event-offers.component').then(m => m.EventOffersComponent),
+      },
+      {
+        path: 'calendar/:id/experiences',
+        loadComponent: () => import('./features/experiences/experiences.component').then(m => m.ExperiencesComponent),
+      },
+      {
         path: 'calendar',
         loadComponent: () =>
           import('./features/events/calendar.component').then((m) => m.CalendarComponent),

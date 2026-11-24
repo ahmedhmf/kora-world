@@ -1,15 +1,20 @@
 import { Component, inject, OnInit, signal, computed } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { EventsStore } from '../../store/events.store';
 import { CalendarEvent, EventCategory } from '../../core/models/event.model';
 import { AuthService } from '../../core/services/auth.service';
 import { DialogService } from '../../core/services/dialog.service';
+import { eventOccursOnLocalDay } from './event-date-range';
+import { switchMap } from 'rxjs';
+import { HttpClient } from '@angular/common/http';
+import { ExperiencesApiService, KoraExperience, PackingItem } from '../experiences/experiences-api.service';
 
 @Component({
   selector: 'app-calendar',
   standalone: true,
-  imports: [CommonModule, FormsModule, DatePipe],
+  imports: [CommonModule, FormsModule, DatePipe, RouterLink],
   templateUrl: './calendar.component.html',
   styles: [`
     /* Custom simple hide scrollbar */
@@ -26,6 +31,18 @@ export class CalendarComponent implements OnInit {
   readonly store = inject(EventsStore);
   readonly authService = inject(AuthService);
   private readonly dialogService = inject(DialogService);
+  private readonly experiencesApi = inject(ExperiencesApiService);
+  private readonly http = inject(HttpClient);
+  readonly duplicating = signal(false);
+
+  readonly experienceLibrary = signal<KoraExperience[]>([]);
+  readonly eventExperienceIds = signal<number[]>([]);
+  readonly eventPackingList = signal<PackingItem[]>([]);
+  readonly experienceBusy = signal(false);
+  readonly experienceError = signal('');
+  readonly experienceSuccess = signal('');
+  readonly experienceDirty = signal(false);
+  readonly eventPackedCount = computed(() => this.eventPackingList().filter(item => item.packed).length);
 
   // Month navigation
   currentMonth = signal<Date>(new Date());
@@ -185,16 +202,10 @@ export class CalendarComponent implements OnInit {
   }
 
   getEventsForDate(date: Date): CalendarEvent[] {
-    const dateStr = this.formatLocalDate(date);
-    return this.store.events().filter((e) => {
-      if (!this.activeFilters()[e.category]) return false;
-      try {
-        const eDate = new Date(e.startDate);
-        return this.formatLocalDate(eDate) === dateStr;
-      } catch {
-        return false;
-      }
-    });
+    return this.store.events().filter((event) =>
+      this.activeFilters()[event.category] &&
+      eventOccursOnLocalDay(event.startDate, event.endDate, date),
+    );
   }
 
   getCategoryClass(category: string): string {
@@ -208,6 +219,7 @@ export class CalendarComponent implements OnInit {
   }
 
   openCreateDrawer(date: Date | null): void {
+    this.clearExperiencePanel();
     this.drawerMode.set('create');
     this.eventId = null;
     this.formTitle = '';
@@ -230,6 +242,7 @@ export class CalendarComponent implements OnInit {
     clickEvent.stopPropagation(); // Avoid triggering openCreateDrawer on the day cell
     this.drawerMode.set('edit');
     this.eventId = event.id;
+    this.loadEventExperiences(event.id);
     this.formTitle = event.title;
     this.formDescription = event.description || '';
     this.formCategory = event.category;
@@ -242,6 +255,81 @@ export class CalendarComponent implements OnInit {
 
   closeDrawer(): void {
     this.isDrawerOpen.set(false);
+  }
+
+  private clearExperiencePanel(): void {
+    this.eventExperienceIds.set([]);
+    this.eventPackingList.set([]);
+    this.experienceError.set('');
+    this.experienceSuccess.set('');
+    this.experienceDirty.set(false);
+    this.experienceBusy.set(false);
+  }
+
+  private loadEventExperiences(eventId: number): void {
+    this.clearExperiencePanel();
+    this.experiencesApi.list().subscribe({
+      next: list => {
+        if (this.eventId === eventId && this.isDrawerOpen()) this.experienceLibrary.set(list);
+      },
+      error: () => this.experienceError.set('Could not load the Kora Experiences library.'),
+    });
+    this.experiencesApi.selected(eventId).subscribe({
+      next: ids => { if (this.eventId === eventId) this.eventExperienceIds.set(ids); },
+      error: () => this.experienceError.set('Could not load assigned experiences.'),
+    });
+    this.experiencesApi.checklist(eventId).subscribe({
+      next: items => { if (this.eventId === eventId) this.eventPackingList.set(items); },
+      error: () => this.experienceError.set('Could not load the event checklist.'),
+    });
+  }
+
+  toggleEventExperience(id: number, checked: boolean): void {
+    this.eventExperienceIds.update(ids =>
+      checked ? [...new Set([...ids, id])] : ids.filter(value => value !== id),
+    );
+    this.experienceDirty.set(true);
+    this.experienceSuccess.set('');
+  }
+
+  saveEventExperiences(): void {
+    const id = this.eventId;
+    if (id === null || this.experienceBusy()) return;
+    this.experienceBusy.set(true);
+    this.experienceError.set('');
+    const ids = [...this.eventExperienceIds()];
+    this.experiencesApi.assign(id, ids).pipe(
+      switchMap(() => this.experiencesApi.generate(id)),
+    ).subscribe({
+      next: items => {
+        if (this.eventId === id) {
+          this.eventPackingList.set(items);
+          this.experienceDirty.set(false);
+          this.experienceSuccess.set('Experiences saved to this event. Packing checklist updated.');
+        }
+        this.experienceBusy.set(false);
+      },
+      error: () => {
+        this.experienceError.set('Could not save event experiences. Please try again.');
+        this.experienceBusy.set(false);
+      },
+    });
+  }
+
+  setEventItemPacked(item: PackingItem, packed: boolean): void {
+    const id = this.eventId;
+    if (id === null || this.experienceBusy()) return;
+    this.experienceBusy.set(true);
+    this.experiencesApi.setPacked(id, item.key, packed).subscribe({
+      next: items => {
+        if (this.eventId === id) this.eventPackingList.set(items);
+        this.experienceBusy.set(false);
+      },
+      error: () => {
+        this.experienceError.set('Could not update the packing checklist.');
+        this.experienceBusy.set(false);
+      },
+    });
   }
 
   toDatetimeLocalString(dateStr?: string): string {
@@ -278,6 +366,29 @@ export class CalendarComponent implements OnInit {
     }
 
     this.closeDrawer();
+  }
+
+  async duplicateEvent(): Promise<void> {
+    if (this.eventId === null || this.duplicating()) return;
+    const confirmed = await this.dialogService.confirm('Duplicate Event',
+      'Create a new event one week later with the same setup and Kora Experiences? Packing flags will be reset. Offers, files and reports will not be copied.');
+    if (!confirmed) return;
+    const id = this.eventId;
+    this.duplicating.set(true);
+    const local = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+    const base = local ? 'http://localhost:3000' : '/api';
+    this.http.post<CalendarEvent>(`${base}/events/${id}/duplicate`, {}).subscribe({
+      next: event => {
+        this.duplicating.set(false);
+        this.closeDrawer();
+        this.currentMonth.set(new Date(event.startDate));
+        this.store.loadEvents();
+      },
+      error: () => {
+        this.duplicating.set(false);
+        void this.dialogService.alert('Duplicate Event', 'Could not duplicate this event.');
+      },
+    });
   }
 
   async deleteEvent(): Promise<void> {

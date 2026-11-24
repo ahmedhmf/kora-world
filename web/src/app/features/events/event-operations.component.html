@@ -1,0 +1,102 @@
+<div class="max-w-5xl mx-auto p-6 md:p-8 text-zinc-100 space-y-5">
+  <header class="no-print flex flex-wrap justify-between gap-3 items-center">
+    <div>
+      <a routerLink="/calendar" class="text-sm text-zinc-400 hover:text-white">← Back to Calendar</a>
+      <h1 class="text-2xl font-bold mt-2">Event Documents &amp; Report</h1>
+      <p class="text-sm text-zinc-400">{{ event()?.title }}</p>
+    </div>
+    <a [routerLink]="['/calendar', eventId, 'offers']" class="rounded-lg border border-zinc-700 px-3 py-2 text-sm">Event Offers</a>
+  </header>
+
+  @if (error()) { <p role="alert" class="no-print rounded-lg border border-red-800 bg-red-950/30 text-red-300 p-3">{{ error() }}</p> }
+  @if (feedback()) { <p role="status" class="no-print rounded-lg border border-emerald-800 bg-emerald-950/30 text-emerald-300 p-3">{{ feedback() }}</p> }
+
+  <nav class="no-print flex gap-2">
+    <button type="button" (click)="tab.set('documents')" [class.bg-emerald-800]="tab() === 'documents'"
+      class="rounded-lg px-4 py-2 border border-zinc-700 text-sm">Documents ({{ documents().length }})</button>
+    <button type="button" (click)="tab.set('report')" [class.bg-emerald-800]="tab() === 'report'"
+      class="rounded-lg px-4 py-2 border border-zinc-700 text-sm">Post-Event Report</button>
+  </nav>
+
+  @if (tab() === 'documents') {
+    <section class="no-print rounded-xl border border-zinc-800 bg-zinc-900 p-5 space-y-4">
+      <h2 class="font-bold text-lg">Event documents</h2>
+      <p class="text-sm text-zinc-400">Contracts, venue plans, permits, invoices and photos. PDF, JPG, PNG, WEBP, DOCX or XLSX, up to 15 MB each.</p>
+      <div class="flex flex-wrap gap-3 items-end">
+        <label class="text-sm">Document category
+          <select [(ngModel)]="documentCategory" class="block mt-1 rounded bg-zinc-950 border border-zinc-700 p-2">
+            @for (category of categories; track category.value) {
+              <option [value]="category.value">{{ category.name }}</option>
+            }
+          </select>
+        </label>
+        <label class="text-sm">Upload a document
+          <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.docx,.xlsx" [disabled]="busy()"
+            (change)="upload($any($event.target))"
+            class="block mt-1 text-sm file:mr-2 file:bg-emerald-800 file:text-white file:border-0 file:rounded file:px-3 file:py-2"/>
+        </label>
+      </div>
+      <div class="space-y-2">
+        @for (doc of documents(); track doc.id) {
+          <div class="flex flex-wrap justify-between gap-2 items-center border-t border-zinc-800 py-3">
+            <div>
+              <p class="font-medium text-sm break-all">{{ doc.originalName }}</p>
+              <p class="text-xs text-zinc-400">{{ doc.category }} · {{ doc.sizeBytes / 1024 | number:'1.0-1' }} KB · {{ doc.createdAt | date:'mediumDate' }}</p>
+            </div>
+            <div class="flex gap-2">
+              <button type="button" (click)="download(doc)" class="text-sm text-emerald-400">Download</button>
+              <button type="button" (click)="remove(doc)" class="text-sm text-red-400">Remove</button>
+            </div>
+          </div>
+        } @empty {
+          <p class="text-sm text-zinc-500">No documents attached to this event yet.</p>
+        }
+      </div>
+    </section>
+  }
+
+  @if (tab() === 'report') {
+    <div class="report-print bg-zinc-900 border border-zinc-800 rounded-xl p-6 space-y-5">
+      <header class="space-y-1 border-b border-zinc-700 pb-4">
+        <p class="font-bold tracking-widest text-sm">KORA WORLD</p>
+        <h2 class="text-2xl font-bold">Post-Event Report</h2>
+        <p class="text-sm">{{ event()?.title }}</p>
+        <p class="text-xs">{{ event()?.startDate | date:'mediumDate' }} – {{ event()?.endDate | date:'mediumDate' }} · {{ event()?.location }}</p>
+      </header>
+      @if (reportReady()) {
+        <div class="no-print space-y-4">
+          <label class="block text-sm">Total attendance
+            <input type="number" min="0" step="1" [(ngModel)]="report.attendance" (ngModelChange)="reportSaved.set(false)" [ngModelOptions]="{standalone:true}"
+              class="block mt-1 w-full rounded bg-zinc-950 border border-zinc-700 p-2" />
+          </label>
+          @for (field of ['summary', 'successes', 'problems', 'missingEquipment', 'lessonsLearned', 'nextActions']; track field) {
+            <div>
+              @switch (field) {
+                @case ('summary') { <label class="block text-sm">Event Summary<textarea [(ngModel)]="report.summary" (ngModelChange)="reportSaved.set(false)" rows="3" class="block mt-1 w-full rounded bg-zinc-950 border border-zinc-700 p-2"></textarea></label> }
+                @case ('successes') { <label class="block text-sm">Successes<textarea [(ngModel)]="report.successes" (ngModelChange)="reportSaved.set(false)" rows="3" class="block mt-1 w-full rounded bg-zinc-950 border border-zinc-700 p-2"></textarea></label> }
+                @case ('problems') { <label class="block text-sm">Problems<textarea [(ngModel)]="report.problems" (ngModelChange)="reportSaved.set(false)" rows="3" class="block mt-1 w-full rounded bg-zinc-950 border border-zinc-700 p-2"></textarea></label> }
+                @case ('missingEquipment') { <label class="block text-sm">Missing / Damaged Equipment<textarea [(ngModel)]="report.missingEquipment" (ngModelChange)="reportSaved.set(false)" rows="3" class="block mt-1 w-full rounded bg-zinc-950 border border-zinc-700 p-2"></textarea></label> }
+                @case ('lessonsLearned') { <label class="block text-sm">Lessons Learned<textarea [(ngModel)]="report.lessonsLearned" (ngModelChange)="reportSaved.set(false)" rows="3" class="block mt-1 w-full rounded bg-zinc-950 border border-zinc-700 p-2"></textarea></label> }
+                @case ('nextActions') { <label class="block text-sm">Next Actions<textarea [(ngModel)]="report.nextActions" (ngModelChange)="reportSaved.set(false)" rows="3" class="block mt-1 w-full rounded bg-zinc-950 border border-zinc-700 p-2"></textarea></label> }
+              }
+            </div>
+          }
+          <div class="flex flex-wrap gap-2">
+            <button type="button" (click)="saveReport()" [disabled]="busy()" class="bg-white text-zinc-900 px-4 py-2 rounded font-semibold">Save Report</button>
+            <button type="button" (click)="printReport()" [disabled]="!reportSaved()" class="border border-zinc-600 px-4 py-2 rounded font-semibold">Print / Save PDF</button>
+          </div>
+          <p class="text-xs text-zinc-400">Save the report before printing. In your print dialog choose “Save as PDF”.</p>
+        </div>
+        <div class="hidden print-only space-y-4">
+          <p><strong>Attendance:</strong> {{ report.attendance === null ? 'Not recorded' : report.attendance }}</p>
+          <section><h3 class="font-bold">Event Summary</h3><p class="whitespace-pre-wrap">{{ report.summary || '—' }}</p></section>
+          <section><h3 class="font-bold">Successes</h3><p class="whitespace-pre-wrap">{{ report.successes || '—' }}</p></section>
+          <section><h3 class="font-bold">Problems</h3><p class="whitespace-pre-wrap">{{ report.problems || '—' }}</p></section>
+          <section><h3 class="font-bold">Missing / Damaged Equipment</h3><p class="whitespace-pre-wrap">{{ report.missingEquipment || '—' }}</p></section>
+          <section><h3 class="font-bold">Lessons Learned</h3><p class="whitespace-pre-wrap">{{ report.lessonsLearned || '—' }}</p></section>
+          <section><h3 class="font-bold">Next Actions</h3><p class="whitespace-pre-wrap">{{ report.nextActions || '—' }}</p></section>
+        </div>
+      }
+    </div>
+  }
+</div>
