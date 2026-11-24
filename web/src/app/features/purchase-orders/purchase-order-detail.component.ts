@@ -3,12 +3,13 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { PurchaseOrdersStore } from '../../store/purchase-orders.store';
 import { POStatus } from '../../core/models/purchase-order.model';
+import { GoodsReceiptsComponent } from './goods-receipts.component';
 import { AuthService } from '../../core/services/auth.service';
 
 @Component({
   selector: 'app-purchase-order-detail',
   standalone: true,
-  imports: [RouterLink, DatePipe, DecimalPipe],
+  imports: [RouterLink, DatePipe, DecimalPipe, GoodsReceiptsComponent],
   templateUrl: './purchase-order-detail.component.html',
 })
 export class PurchaseOrderDetailComponent implements OnInit {
