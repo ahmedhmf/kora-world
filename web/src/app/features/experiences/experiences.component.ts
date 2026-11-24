@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { switchMap, forkJoin } from 'rxjs';
-import { ExperienceItem, ExperiencesApiService, KoraExperience, PackingItem, AvailabilityItem, EventReservation, ReservationInput } from './experiences-api.service';
+import { ExperienceItem, ExperiencesApiService, KoraExperience, PackingItem, AvailabilityItem, EventReservation, ReservationInput, ReconcileLine } from './experiences-api.service';
 import { ApiService } from '../../core/services/api.service';
 
 @Component({
@@ -22,6 +22,9 @@ export class ExperiencesComponent implements OnInit {
   readonly locations = signal<{id:number;code:string;name:string;is_active:boolean}[]>([]);
   readonly reservations = signal<EventReservation[]>([]);
   readonly activeReservation = computed(()=>this.reservations().some(r=>r.status==='active'));
+  readonly dispatchedRows = computed(()=>this.reservations().filter(r=>r.status==='dispatched'));
+  readonly logisticsLocked = computed(()=>this.reservations().some(r=>['active','dispatched','reconciled'].includes(r.status)));
+  reconciliation:Record<number,ReconcileLine>={};
   readonly availability = signal<AvailabilityItem[] | null>(null);
   warehouseId=0; locationId=0; startsAt=''; endsAt='';
   readonly experiences = signal<KoraExperience[]>([]);
@@ -65,7 +68,7 @@ export class ExperiencesComponent implements OnInit {
   changeKind(item:ExperienceItem,kind:'product'|'equipment'|undefined) { item.inventoryKind=kind;item.inventoryId=undefined;if(kind)item.unit='pcs'; }
   changeInventory(item:ExperienceItem,id:number) { item.inventoryId=id;const row=item.inventoryKind==='product'?this.inventoryProducts().find(p=>p.id===id):this.inventoryEquipment().find(e=>e.id===id);if(row){item.name=row.name;item.unit='pcs';} }
   selectWarehouse(id:number){this.warehouseId=id;this.locationId=0;this.locations.set([]);this.availability.set(null);if(id)this.eventsApi.getWarehouseLocations(id).subscribe({next:rows=>{if(this.warehouseId===id)this.locations.set(rows.filter(l=>l.is_active));},error:e=>this.fail(e)});}
-  loadReservations(){if(this.eventId!==null)this.api.reservations(this.eventId).subscribe({next:r=>this.reservations.set(r),error:e=>this.fail(e)});}
+  loadReservations(){if(this.eventId!==null)this.api.reservations(this.eventId).subscribe({next:r=>{this.reservations.set(r);for(const row of r.filter(x=>x.status==='dispatched'))this.reconciliation[row.id]??={reservationId:row.id,returned:row.quantity,damaged:0,missing:0,consumed:0,notes:''};},error:e=>this.fail(e)});}
   private reservationInput():ReservationInput|null {
     const start=new Date(this.startsAt),end=new Date(this.endsAt);
     if(!this.warehouseId||!this.locationId||!Number.isFinite(+start)||!Number.isFinite(+end)||end<=start){this.error.set('Choose warehouse, location and valid reservation dates');return null;}
@@ -74,6 +77,8 @@ export class ExperiencesComponent implements OnInit {
   checkAvailability(){if(this.eventId===null||this.busy())return;const dto=this.reservationInput();if(!dto)return;this.busy.set(true);this.error.set('');this.availability.set(null);this.api.previewReservation(this.eventId,dto).subscribe({next:r=>{this.availability.set(r.items);this.busy.set(false);},error:e=>this.fail(e)});}
   reserveStock(){if(this.eventId===null||this.busy()||this.activeReservation())return;const dto=this.reservationInput();if(!dto)return;this.busy.set(true);this.error.set('');this.api.reserve(this.eventId,dto).subscribe({next:()=>{this.busy.set(false);this.availability.set(null);this.message.set('Stock reserved. Physical quantities unchanged.');this.loadReservations();},error:e=>this.fail(e)});}
   cancelStock(){if(this.eventId===null||this.busy()||!window.confirm('Release all reservations for this event?'))return;this.busy.set(true);this.error.set('');this.api.cancelReservation(this.eventId).subscribe({next:()=>{this.busy.set(false);this.availability.set(null);this.message.set('Reservation released');this.loadReservations();},error:e=>this.fail(e)});}
+  dispatchEvent(){if(this.eventId===null||this.busy()||!window.confirm('Confirm the packed inventory has physically left the warehouse?'))return;this.busy.set(true);this.error.set('');this.api.dispatchEvent(this.eventId).subscribe({next:()=>{this.busy.set(false);this.message.set('Event dispatched. Physical stock deducted.');this.loadReservations();},error:e=>this.fail(e)});}
+  reconcileEvent(){if(this.eventId===null||this.busy())return;const lines=this.dispatchedRows().map(r=>this.reconciliation[r.id]);if(lines.some((l,i)=>!l||![l.returned,l.damaged,l.missing,l.consumed].every(n=>Number.isInteger(n)&&n>=0)||l.returned+l.damaged+l.missing+l.consumed!==this.dispatchedRows()[i].quantity)){this.error.set('Account for every dispatched unit before closing the event.');return;}if(!window.confirm('Finalize event reconciliation? Only serviceable returns will be added to stock.'))return;this.busy.set(true);this.error.set('');this.api.reconcileEvent(this.eventId,lines).subscribe({next:()=>{this.busy.set(false);this.message.set('Event reconciled. Serviceable returns added to stock.');this.loadReservations();},error:e=>this.fail(e)});}
   blankItem(): ExperienceItem {
     return { name: '', quantity: 1, unit: 'pcs', category: 'General', mode: 'sum' };
   }
