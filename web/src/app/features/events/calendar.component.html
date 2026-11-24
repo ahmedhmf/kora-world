@@ -239,6 +239,15 @@
               </form>
 
               @if (drawerMode() === 'edit' && eventId !== null) {
+                <section class="border-t border-zinc-800 pt-5 space-y-3" aria-label="Event offers">
+                  <h4 class="text-base font-bold text-white">Staff &amp; Supplier Offers</h4>
+                  <p class="text-xs text-zinc-400">Manage staff rates and supplier quotations for this event. No employee logins required.</p>
+                  <a [routerLink]="['/calendar', eventId, 'offers']"
+                    class="block text-center rounded-lg border border-emerald-700 bg-emerald-950/40 px-4 py-3 text-sm font-semibold text-emerald-200 hover:bg-emerald-950/60">
+                    Manage Event Offers
+                  </a>
+                </section>
+
                 <section class="border-t border-zinc-800 pt-5 space-y-4" aria-label="Kora Experiences assigned to event">
                   <div class="flex justify-between items-start gap-3">
                     <div>
