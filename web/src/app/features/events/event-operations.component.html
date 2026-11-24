@@ -66,18 +66,18 @@
       @if (reportReady()) {
         <div class="no-print space-y-4">
           <label class="block text-sm">Total attendance
-            <input type="number" min="0" step="1" [(ngModel)]="report.attendance" [ngModelOptions]="{standalone:true}"
+            <input type="number" min="0" step="1" [(ngModel)]="report.attendance" (ngModelChange)="reportSaved.set(false)" [ngModelOptions]="{standalone:true}"
               class="block mt-1 w-full rounded bg-zinc-950 border border-zinc-700 p-2" />
           </label>
           @for (field of ['summary', 'successes', 'problems', 'missingEquipment', 'lessonsLearned', 'nextActions']; track field) {
             <div>
               @switch (field) {
-                @case ('summary') { <label class="block text-sm">Event Summary<textarea [(ngModel)]="report.summary" rows="3" class="block mt-1 w-full rounded bg-zinc-950 border border-zinc-700 p-2"></textarea></label> }
-                @case ('successes') { <label class="block text-sm">Successes<textarea [(ngModel)]="report.successes" rows="3" class="block mt-1 w-full rounded bg-zinc-950 border border-zinc-700 p-2"></textarea></label> }
-                @case ('problems') { <label class="block text-sm">Problems<textarea [(ngModel)]="report.problems" rows="3" class="block mt-1 w-full rounded bg-zinc-950 border border-zinc-700 p-2"></textarea></label> }
-                @case ('missingEquipment') { <label class="block text-sm">Missing / Damaged Equipment<textarea [(ngModel)]="report.missingEquipment" rows="3" class="block mt-1 w-full rounded bg-zinc-950 border border-zinc-700 p-2"></textarea></label> }
-                @case ('lessonsLearned') { <label class="block text-sm">Lessons Learned<textarea [(ngModel)]="report.lessonsLearned" rows="3" class="block mt-1 w-full rounded bg-zinc-950 border border-zinc-700 p-2"></textarea></label> }
-                @case ('nextActions') { <label class="block text-sm">Next Actions<textarea [(ngModel)]="report.nextActions" rows="3" class="block mt-1 w-full rounded bg-zinc-950 border border-zinc-700 p-2"></textarea></label> }
+                @case ('summary') { <label class="block text-sm">Event Summary<textarea [(ngModel)]="report.summary" (ngModelChange)="reportSaved.set(false)" rows="3" class="block mt-1 w-full rounded bg-zinc-950 border border-zinc-700 p-2"></textarea></label> }
+                @case ('successes') { <label class="block text-sm">Successes<textarea [(ngModel)]="report.successes" (ngModelChange)="reportSaved.set(false)" rows="3" class="block mt-1 w-full rounded bg-zinc-950 border border-zinc-700 p-2"></textarea></label> }
+                @case ('problems') { <label class="block text-sm">Problems<textarea [(ngModel)]="report.problems" (ngModelChange)="reportSaved.set(false)" rows="3" class="block mt-1 w-full rounded bg-zinc-950 border border-zinc-700 p-2"></textarea></label> }
+                @case ('missingEquipment') { <label class="block text-sm">Missing / Damaged Equipment<textarea [(ngModel)]="report.missingEquipment" (ngModelChange)="reportSaved.set(false)" rows="3" class="block mt-1 w-full rounded bg-zinc-950 border border-zinc-700 p-2"></textarea></label> }
+                @case ('lessonsLearned') { <label class="block text-sm">Lessons Learned<textarea [(ngModel)]="report.lessonsLearned" (ngModelChange)="reportSaved.set(false)" rows="3" class="block mt-1 w-full rounded bg-zinc-950 border border-zinc-700 p-2"></textarea></label> }
+                @case ('nextActions') { <label class="block text-sm">Next Actions<textarea [(ngModel)]="report.nextActions" (ngModelChange)="reportSaved.set(false)" rows="3" class="block mt-1 w-full rounded bg-zinc-950 border border-zinc-700 p-2"></textarea></label> }
               }
             </div>
           }
