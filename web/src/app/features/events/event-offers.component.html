@@ -1,0 +1,90 @@
+<div class="p-6 md:p-8 max-w-6xl mx-auto text-zinc-100 space-y-6">
+  <header class="flex flex-wrap justify-between items-center gap-3">
+    <div>
+      <a routerLink="/calendar" class="text-zinc-400 text-sm hover:text-white">← Back to Calendar</a>
+      <h1 class="text-2xl font-bold mt-2">Event Offers</h1>
+      <p class="text-zinc-400 text-sm">{{ eventTitle() }}</p>
+    </div>
+    <div class="flex gap-2">
+      <button type="button" (click)="start('staff')" class="rounded-lg bg-white text-zinc-900 px-4 py-2 font-semibold text-sm">+ Staff Offer</button>
+      <button type="button" (click)="start('supplier')" class="rounded-lg border border-zinc-600 px-4 py-2 font-semibold text-sm">+ Supplier Quote</button>
+    </div>
+  </header>
+
+  @if (error()) { <p role="alert" class="rounded-lg border border-red-800 bg-red-950/30 text-red-300 p-3">{{ error() }}</p> }
+  @if (feedback()) { <p role="status" class="rounded-lg border border-emerald-800 bg-emerald-950/30 text-emerald-300 p-3">{{ feedback() }}</p> }
+
+  <div class="grid md:grid-cols-2 gap-4">
+    @for (offer of offers(); track offer.id) {
+      <article class="rounded-xl border border-zinc-800 bg-zinc-900 p-5 space-y-3">
+        <div class="flex justify-between gap-3">
+          <div>
+            <p class="uppercase tracking-wide text-xs text-zinc-400">{{ offer.type === 'staff' ? 'Staff offer' : 'Supplier quotation' }}</p>
+            <h2 class="text-lg font-bold">{{ offer.recipientName }}</h2>
+            <p class="text-sm text-zinc-300">{{ offer.description }}</p>
+          </div>
+          <span class="text-sm text-emerald-400">{{ offer.status }}</span>
+        </div>
+        <p class="text-sm text-zinc-300">{{ offer.quantity }} {{ offer.unit }} × {{ money(offer.unitRateCents) }} {{ offer.currency }}</p>
+        <p class="font-bold">{{ money(offer.totalCents) }} {{ offer.currency }} total</p>
+        @if (offer.notes) { <p class="text-sm text-zinc-400">{{ offer.notes }}</p> }
+        <div class="flex gap-2">
+          <button type="button" (click)="edit(offer)" class="text-sm px-3 py-1.5 rounded border border-zinc-700">Edit / Status</button>
+          <button type="button" (click)="remove(offer)" class="text-sm px-3 py-1.5 rounded border border-red-900 text-red-400">Delete</button>
+        </div>
+      </article>
+    } @empty {
+      <p class="text-zinc-400">No offers for this event yet. Add a staff offer or supplier quotation.</p>
+    }
+  </div>
+
+  @if (editing()) {
+    <section class="rounded-xl border border-zinc-700 bg-zinc-900 p-5 space-y-4">
+      <h2 class="text-lg font-semibold">{{ editId === null ? 'Create' : 'Edit' }} {{ form.type === 'staff' ? 'Staff Offer' : 'Supplier Quotation' }}</h2>
+      @if (form.type === 'supplier') {
+        <label class="block text-sm">Choose an existing supplier (optional)
+          <select [value]="form.supplierId ?? ''" (change)="selectSupplier($any($event.target).value)" class="block w-full mt-1 rounded bg-zinc-950 border border-zinc-700 p-2">
+            <option value="">External supplier / enter name</option>
+            @for (supplier of suppliers(); track supplier.id) { <option [value]="supplier.id">{{ supplier.name }}</option> }
+          </select>
+        </label>
+      }
+      <div class="grid md:grid-cols-2 gap-3">
+        <label class="text-sm">{{ form.type === 'staff' ? 'Staff name' : 'Supplier name' }}
+          <input [(ngModel)]="form.recipientName" class="block w-full mt-1 rounded bg-zinc-950 border border-zinc-700 p-2" />
+        </label>
+        <label class="text-sm">Work / Service Description
+          <input [(ngModel)]="form.description" class="block w-full mt-1 rounded bg-zinc-950 border border-zinc-700 p-2" />
+        </label>
+        <label class="text-sm">Quantity / Days
+          <input type="number" min="1" step="1" [(ngModel)]="form.quantity" class="block w-full mt-1 rounded bg-zinc-950 border border-zinc-700 p-2" />
+        </label>
+        <label class="text-sm">Unit (days, hours, pcs, jobs)
+          <input [(ngModel)]="form.unit" class="block w-full mt-1 rounded bg-zinc-950 border border-zinc-700 p-2" />
+        </label>
+        <label class="text-sm">Rate per Unit
+          <input [(ngModel)]="form.unitRate" inputmode="decimal" class="block w-full mt-1 rounded bg-zinc-950 border border-zinc-700 p-2" />
+        </label>
+        <label class="text-sm">Currency
+          <input [(ngModel)]="form.currency" maxlength="3" class="block w-full mt-1 rounded bg-zinc-950 border border-zinc-700 p-2" />
+        </label>
+        <label class="text-sm">Status
+          <select [(ngModel)]="form.status" class="block w-full mt-1 rounded bg-zinc-950 border border-zinc-700 p-2">
+            <option value="draft">Draft</option>
+            <option value="sent">Sent</option>
+            <option value="accepted">Accepted</option>
+            <option value="rejected">Rejected</option>
+          </select>
+        </label>
+      </div>
+      <label class="block text-sm">Additional notes
+        <textarea [(ngModel)]="form.notes" class="block w-full mt-1 rounded bg-zinc-950 border border-zinc-700 p-2"></textarea>
+      </label>
+      <p class="text-xs text-zinc-400">Offers are planning records. Accepting an offer does not create an accounting entry or payment.</p>
+      <div class="flex gap-2">
+        <button type="button" [disabled]="busy()" (click)="save()" class="bg-white text-zinc-900 rounded px-4 py-2 font-semibold text-sm disabled:opacity-50">Save Offer</button>
+        <button type="button" (click)="editing.set(false)" class="rounded border border-zinc-700 px-4 py-2 text-sm">Cancel</button>
+      </div>
+    </section>
+  }
+</div>

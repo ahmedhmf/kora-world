@@ -144,6 +144,10 @@ export const routes: Routes = [
         loadComponent: () => import('./features/experiences/experiences.component').then(m => m.ExperiencesComponent),
       },
       {
+        path: 'calendar/:id/offers',
+        loadComponent: () => import('./features/events/event-offers.component').then(m => m.EventOffersComponent),
+      },
+      {
         path: 'calendar/:id/experiences',
         loadComponent: () => import('./features/experiences/experiences.component').then(m => m.ExperiencesComponent),
       },
