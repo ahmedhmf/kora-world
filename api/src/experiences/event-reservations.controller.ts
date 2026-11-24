@@ -13,5 +13,7 @@ export class EventReservationsController {
   @Get() list(@Param('id',ParseIntPipe) id:number){return this.service.list(id);}
   @Post('preview') preview(@Param('id',ParseIntPipe) id:number,@Body() dto:Parameters<EventReservationsService['preview']>[1]){return this.service.preview(id,dto);}
   @Post() reserve(@Param('id',ParseIntPipe) id:number,@Body() dto:Parameters<EventReservationsService['reserve']>[1],@Req() req:AuthenticatedRequest){return this.service.reserve(id,dto,req.user.sub);}
+  @Post('dispatch') dispatch(@Param('id',ParseIntPipe) id:number,@Req() req:AuthenticatedRequest){return this.service.dispatch(id,req.user.sub);}
+  @Post('reconcile') reconcile(@Param('id',ParseIntPipe) id:number,@Body() dto:Parameters<EventReservationsService['reconcile']>[1],@Req() req:AuthenticatedRequest){return this.service.reconcile(id,dto,req.user.sub);}
   @Post('cancel') cancel(@Param('id',ParseIntPipe) id:number,@Req() req:AuthenticatedRequest){return this.service.cancel(id,req.user.sub);}
 }
