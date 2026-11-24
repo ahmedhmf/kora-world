@@ -30,6 +30,13 @@ describe('Local EGP supplier legacy transition guard', () => {
       .toThrow(ConflictException);
   });
 
+  it('matches the pilot service default local host when DATABASE_HOST is unset', () => {
+    delete process.env.DATABASE_HOST;
+    expect(isLocalSupplierPilotMode()).toBe(true);
+    expect(() => blockLegacySupplierPilotWrite(incoming, 'Legacy payment'))
+      .toThrow(ConflictException);
+  });
+
   it('allows outgoing, foreign-currency, and unlinked legacy transactions', () => {
     expect(() => blockLegacySupplierPilotWrite({ type: InvoiceType.OUTGOING, currency: 'EGP' }, 'Legacy payment')).not.toThrow();
     expect(() => blockLegacySupplierPilotWrite({ type: InvoiceType.INCOMING, currency: 'EUR' }, 'Legacy payment')).not.toThrow();
@@ -40,7 +47,6 @@ describe('Local EGP supplier legacy transition guard', () => {
     ['flag disabled', 'false', 'kora_test', '127.0.0.1'],
     ['wrong database', 'true', 'kora_world', '127.0.0.1'],
     ['remote host', 'true', 'kora_test', 'db.production.example'],
-    ['missing host', 'true', 'kora_test', ''],
   ])('does not alter legacy operations when %s', (_title, flag, name, host) => {
     process.env.SUPPLIER_EGP_PILOT = flag;
     process.env.DATABASE_NAME = name;
