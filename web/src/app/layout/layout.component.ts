@@ -73,6 +73,7 @@ export class LayoutComponent {
       ],
     },
     { label: 'Warehouse', route: '/warehouse', icon: 'package', roles: ['admin', 'employee'] },
+    { label: 'Equipment', route: '/warehouse/equipment', icon: 'package', roles: ['admin', 'employee'] },
     { label: 'Calendar', route: '/calendar', icon: 'calendar' },
     { label: 'Contacts', route: '/contacts', icon: 'contact' },
     { label: 'Employees', route: '/users', icon: 'users', roles: ['admin'] },
