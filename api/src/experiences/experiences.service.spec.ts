@@ -14,7 +14,7 @@ describe('ExperiencesService packing list generation', () => {
   ];
 
   function setup(existing: any[] = []) {
-    const events = { exist: jest.fn().mockResolvedValue(true) };
+    const events = { exists: jest.fn().mockResolvedValue(true) };
     const experiences = { find: jest.fn(), findBy: jest.fn().mockResolvedValue(templates) };
     const assignments = { find: jest.fn().mockResolvedValue([{ experienceId: 1 }, { experienceId: 2 }]) };
     const checklists = {
