@@ -1,4 +1,5 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
+import { CustomerReturnsComponent } from './customer-returns.component';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { PDFDocument, StandardFonts, rgb, PDFFont, PDFPage } from 'pdf-lib';
@@ -21,7 +22,7 @@ interface DeliveryNote {
 @Component({
   selector: 'app-account-delivery-notes',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink, CustomerReturnsComponent],
   template: `
     <div class="p-8 max-w-5xl mx-auto space-y-6">
       <a [routerLink]="['/accounts', accountId]" class="text-zinc-400 hover:text-white text-sm">← Back to Account</a>
@@ -77,6 +78,7 @@ interface DeliveryNote {
         <button type="button" [disabled]="saving() || loadingStock()" (click)="create()" class="bg-white text-zinc-900 font-semibold rounded-lg px-4 py-2 disabled:opacity-50">Save Delivery Note</button>
       </section>
 
+      <app-customer-returns [accountId]="accountId" />
       <section class="space-y-3">
         <h2 class="font-semibold text-white">Saved Delivery Notes</h2>
         @for (note of notes(); track note.id) {
