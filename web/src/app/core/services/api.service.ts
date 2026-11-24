@@ -31,6 +31,14 @@ export class ApiService {
     return this.http.post<{ id: number; status: string; duplicate: boolean }>(`${this.base}/purchase-orders/${id}/goods-receipts`, dto);
   }
 
+  getCustomerReturns(id:number) { return this.http.get<{id:number;productName:string;quantity:number;warehouseName:string;locationCode:string;notes:string;createdAt:string}[]>(`${this.base}/delivery-notes/account/${id}/returns`); }
+  returnCustomerStock(id:number,dto:{productId:number;quantity:number;warehouseId:number;locationId:number;notes:string;requestKey:string}) { return this.http.post<{id:number;duplicate:boolean}>(`${this.base}/delivery-notes/account/${id}/returns`,dto); }
+  getEquipment() { return this.http.get<{id:number;code:string;name:string;category:string|null;description:string|null}[]>(`${this.base}/equipment`); }
+  createEquipment(dto:{code:string;name:string;category:string;description:string}) { return this.http.post<unknown>(`${this.base}/equipment`,dto); }
+  getEquipmentStock(id:number) { return this.http.get<{equipmentId:number;code:string;name:string;locationId:number;locationCode:string;quantity:number}[]>(`${this.base}/equipment/warehouse/${id}/stock`); }
+  getEquipmentMovements(id:number) { return this.http.get<{id:string;code:string;name:string;locationCode:string;quantityChange:number;type:string;reference:string|null;notes:string|null;createdAt:string;performedById:number|null}[]>(`${this.base}/equipment/warehouse/${id}/movements`); }
+  recordEquipment(id:number,dto:{equipmentId:number;locationId:number;toLocationId:number;quantity:number;action:string;reference:string;notes:string}) { return this.http.post<unknown>(`${this.base}/equipment/warehouse/${id}/movements`,dto); }
+
   // Warehouse
   getWarehouses() { return this.http.get<WarehouseSite[]>(`${this.base}/warehouses`); }
   createWarehouse(dto: { code: string; name: string; address?: string }) { return this.http.post<WarehouseSite>(`${this.base}/warehouses`, dto); }
