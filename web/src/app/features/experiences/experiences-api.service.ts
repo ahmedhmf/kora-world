@@ -9,7 +9,12 @@ export interface ExperienceItem {
   category: string;
   mode: CombineMode;
   notes?: string;
+  inventoryKind?: 'product' | 'equipment';
+  inventoryId?: number;
 }
+export interface ReservationInput { warehouseId:number; locationId:number; startsAt:string; endsAt:string; }
+export interface AvailabilityItem { key:string; name:string; quantity:number; physical:number; reservedByOthers:number; available:number; missing:number; }
+export interface EventReservation { id:number; status:string; name:string; quantity:number; warehouseName:string; locationCode:string; startsAt:string; endsAt:string; }
 export interface KoraExperience {
   id: number;
   name: string;
@@ -31,6 +36,10 @@ export class ExperiencesApiService {
     return local ? 'http://localhost:3000' : '/api';
   }
 
+  reservations(id:number) { return this.http.get<EventReservation[]>(`${this.base}/events/${id}/stock-reservations`); }
+  previewReservation(id:number,dto:ReservationInput) { return this.http.post<{items:AvailabilityItem[];manual:ExperienceItem[]}>(`${this.base}/events/${id}/stock-reservations/preview`,dto); }
+  reserve(id:number,dto:ReservationInput) { return this.http.post<unknown>(`${this.base}/events/${id}/stock-reservations`,dto); }
+  cancelReservation(id:number) { return this.http.post<unknown>(`${this.base}/events/${id}/stock-reservations/cancel`,{}); }
   list() { return this.http.get<KoraExperience[]>(`${this.base}/experiences`); }
   create(data: Omit<KoraExperience, 'id'>) { return this.http.post<KoraExperience>(`${this.base}/experiences`, data); }
   update(id: number, data: Omit<KoraExperience, 'id'>) { return this.http.put<KoraExperience>(`${this.base}/experiences/${id}`, data); }
