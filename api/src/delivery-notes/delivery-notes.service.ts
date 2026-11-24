@@ -70,6 +70,51 @@ export class DeliveryNotesService {
     return [...inventory.values()].sort((a, b) => a.articleNumber.localeCompare(b.articleNumber));
   }
 
+  async listCustomerReturns(accountId: number) {
+    return this.dataSource.query(`SELECT r.id, r.product_id AS "productId", p.name AS "productName", r.quantity,
+      w.name AS "warehouseName", l.code AS "locationCode", r.notes, r.created_at AS "createdAt"
+      FROM warehouse_customer_returns r JOIN products p ON p.id=r.product_id
+      JOIN warehouse_sites w ON w.id=r.warehouse_id JOIN warehouse_locations l ON l.id=r.location_id
+      WHERE r.account_id=$1 ORDER BY r.id DESC`,[accountId]);
+  }
+
+  async returnToWarehouse(accountId: number, dto: { productId: number; quantity: number; warehouseId: number; locationId: number; notes: string; requestKey: string }, user: ActiveUser) {
+    if (![accountId,dto?.productId,dto?.quantity,dto?.warehouseId,dto?.locationId].every(n=>Number.isSafeInteger(n)&&n>0&&n<=2147483647) ||
+      dto.quantity>100000 || typeof dto.notes!=='string' || !dto.notes.trim() || dto.notes.length>2000 ||
+      typeof dto.requestKey!=='string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(dto.requestKey))
+      throw new BadRequestException('Enter valid return details and explanation');
+    return this.dataSource.transaction(async manager=>{
+      const account = await manager.findOne(Account,{where:{id:accountId},lock:{mode:'pessimistic_write'}});
+      if (!account) throw new NotFoundException('Account not found');
+      const [existing] = await manager.query('SELECT * FROM warehouse_customer_returns WHERE request_key=$1',[dto.requestKey]);
+      if (existing) {
+        if (existing.account_id!==accountId || existing.product_id!==dto.productId || existing.quantity!==dto.quantity ||
+          existing.warehouse_id!==dto.warehouseId || existing.location_id!==dto.locationId || existing.notes!==dto.notes.trim())
+          throw new BadRequestException('Return request key already used for different details');
+        return {id:existing.id,duplicate:true};
+      }
+      const balance=await this.stockBalance(manager,accountId);
+      if ((balance.get(dto.productId)??0)<dto.quantity) throw new BadRequestException('Insufficient customer inventory');
+      const product=await manager.findOne(Product,{where:{id:dto.productId}});
+      if (!product) throw new NotFoundException('Product not found');
+      const [location]=await manager.query('SELECT l.id FROM warehouse_locations l JOIN warehouse_sites w ON w.id=l.warehouse_id WHERE w.id=$1 AND l.id=$2 AND w.is_active AND l.is_active',[dto.warehouseId,dto.locationId]);
+      if (!location) throw new BadRequestException('Select an active warehouse location');
+      const adjustment=await manager.save(InventoryAdjustment,manager.create(InventoryAdjustment,{
+        accountId,productId:product.id,articleNumber:product.articleNumber,productName:product.name,
+        quantity:-dto.quantity,reason:'return',notes:dto.notes.trim(),createdById:user.sub,createdByName:user.name||user.email
+      }));
+      const [receipt]=await manager.query(`INSERT INTO warehouse_customer_returns
+        (account_id,adjustment_id,warehouse_id,location_id,product_id,quantity,request_key,notes,performed_by_id)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
+        [accountId,adjustment.id,dto.warehouseId,dto.locationId,product.id,dto.quantity,dto.requestKey,dto.notes.trim(),user.sub]);
+      await manager.query(`INSERT INTO warehouse_stock(location_id,product_id,quantity) VALUES($1,$2,$3)
+        ON CONFLICT(location_id,product_id) DO UPDATE SET quantity=warehouse_stock.quantity+EXCLUDED.quantity`,[dto.locationId,product.id,dto.quantity]);
+      await manager.query(`INSERT INTO warehouse_movements(warehouse_id,location_id,product_id,quantity_change,movement_type,reference,notes,performed_by_id)
+        VALUES($1,$2,$3,$4,'return',$5,$6,$7)`,[dto.warehouseId,dto.locationId,product.id,dto.quantity,'CR-'+String(receipt.id).padStart(6,'0'),dto.notes.trim(),user.sub]);
+      return {id:receipt.id,duplicate:false};
+    });
+  }
+
   async listAdjustments(accountId: number) {
     if (!await this.accounts.exists({ where: { id: accountId } })) throw new NotFoundException('Account not found');
     return this.adjustments.find({ where: { accountId }, order: { id: 'DESC' } });
