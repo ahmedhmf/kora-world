@@ -51,6 +51,7 @@
       <div class="flex flex-wrap border-b border-zinc-800 px-4 gap-1">
         <button type="button" (click)="tab.set('stock')" [class.border-white]="tab() === 'stock'" class="px-4 py-3 border-b-2 border-transparent text-sm">Inventory</button>
         <button type="button" (click)="tab.set('movements')" [class.border-white]="tab() === 'movements'" class="px-4 py-3 border-b-2 border-transparent text-sm">Movement history</button>
+        <button type="button" (click)="loadReport()" [disabled]="busy()" [class.border-white]="tab() === 'report'" class="px-4 py-3 border-b-2 border-transparent text-sm">Reports</button>
         <button type="button" (click)="tab.set('locations')" [class.border-white]="tab() === 'locations'" class="px-4 py-3 border-b-2 border-transparent text-sm">Locations</button>
       </div>
       @if (tab() === 'stock') {
@@ -70,6 +71,17 @@
           @empty { <tr><td colspan="7" class="p-8 text-center text-zinc-500">No movements recorded.</td></tr> }
         </tbody></table></div>
       }
+      @if(tab()==='report'){
+        <div class="p-4 space-y-4">
+        @if(report();as r){
+          <div class="flex justify-between"><h2 class="font-semibold">Inventory commitments</h2><button type="button" (click)="exportReport()" class="text-blue-400 text-sm">Export CSV</button></div>
+          <p class="text-xs text-zinc-400">Peak reserved is the maximum simultaneous future reservation quantity. Dispatched items are already excluded from physical stock.</p>
+          <div class="overflow-x-auto"><table class="w-full text-sm text-left"><thead><tr><th>Type</th><th>Item</th><th>Location</th><th>Physical</th><th>Peak reserved</th><th>Dispatched</th><th>Uncommitted</th></tr></thead><tbody>@for(s of r.stock;track s.kind+':'+s.itemId+':'+s.locationCode){<tr class="border-t border-zinc-800"><td>{{s.kind}}</td><td class="py-2">{{s.code}} — {{s.name}}</td><td>{{s.locationCode}}</td><td>{{s.physical}}</td><td>{{s.reservedPeak}}</td><td>{{s.dispatched}}</td><td>{{s.physical-s.reservedPeak}}</td></tr>}</tbody></table></div>
+          <h2 class="font-semibold">Event inventory history</h2>
+          <div class="overflow-x-auto"><table class="w-full text-sm text-left"><thead><tr><th>Event</th><th>Item</th><th>Status</th><th>Quantity</th><th>Returned</th><th>Damaged</th><th>Missing</th><th>Consumed</th></tr></thead><tbody>@for(e of r.events;track $index){<tr class="border-t border-zinc-800"><td class="py-2">{{e.title}}</td><td>{{e.name}}</td><td>{{e.status}}</td><td>{{e.quantity}}</td><td>{{e.returned??'—'}}</td><td>{{e.damaged??'—'}}</td><td>{{e.missing??'—'}}</td><td>{{e.consumed??'—'}}</td></tr>}</tbody></table></div>
+        }@else{<p class="text-sm text-zinc-400">Report not loaded. Select Reports to refresh.</p>}
+        </div>
+      }
       @if (tab() === 'locations') {
         <div class="p-4 space-y-4">
           <div class="flex flex-wrap items-end gap-3">
@@ -83,5 +95,5 @@
       }
     </section>
   } @else { <p class="text-sm text-zinc-500">Create or select a warehouse to begin.</p> }
-  <p class="text-xs text-zinc-500">Warehouse stock is currently tracked independently of customer inventory and event checklists.</p>
+  <p class="text-xs text-zinc-500">Warehouse stock includes posted customer and event movements.</p>
 </div>
