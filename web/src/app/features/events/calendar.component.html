@@ -140,7 +140,7 @@
         >
           <!-- Drawer Sheet -->
           <div 
-            class="w-full max-w-md bg-zinc-950 border-l border-zinc-800 h-full p-6 shadow-2xl flex flex-col justify-between overflow-y-auto"
+            class="w-full max-w-2xl bg-zinc-950 border-l border-zinc-800 h-full p-6 shadow-2xl flex flex-col justify-between overflow-y-auto"
             (click)="$event.stopPropagation()"
           >
             <!-- Form Body -->
@@ -160,12 +160,6 @@
                   </svg>
                 </button>
               </div>
-
-              @if (drawerMode() === 'edit' && eventId !== null) {
-                <a [routerLink]="['/calendar', eventId, 'experiences']" class="block w-full text-center bg-emerald-900/40 text-emerald-200 border border-emerald-700 rounded-lg p-3 font-semibold text-sm hover:bg-emerald-900/60">
-                  Manage Kora Experiences &amp; Packing List
-                </a>
-              }
 
               <!-- Form Inputs -->
               <form class="space-y-4 text-sm">
@@ -243,6 +237,80 @@
                   ></textarea>
                 </div>
               </form>
+
+              @if (drawerMode() === 'edit' && eventId !== null) {
+                <section class="border-t border-zinc-800 pt-5 space-y-4" aria-label="Kora Experiences assigned to event">
+                  <div class="flex justify-between items-start gap-3">
+                    <div>
+                      <h4 class="text-base font-bold text-white">Kora Experiences</h4>
+                      <p class="text-xs text-zinc-400 mt-1">Choose the activations for this event. Save to attach them to this event.</p>
+                    </div>
+                    <a routerLink="/experiences" class="text-xs text-emerald-400 hover:text-emerald-300 whitespace-nowrap">Experience Library</a>
+                  </div>
+
+                  @if (experienceError()) {
+                    <p role="alert" class="text-xs text-red-300 bg-red-950/30 border border-red-900 rounded-lg p-3">{{ experienceError() }}</p>
+                  }
+                  @if (experienceSuccess()) {
+                    <p role="status" class="text-xs text-emerald-300 bg-emerald-950/30 border border-emerald-900 rounded-lg p-3">{{ experienceSuccess() }}</p>
+                  }
+
+                  <div class="space-y-2">
+                    @for (experience of experienceLibrary(); track experience.id) {
+                      <label class="flex items-center justify-between gap-3 bg-zinc-900 border border-zinc-800 rounded-lg p-3 text-sm"
+                        [class.opacity-50]="!experience.active && !eventExperienceIds().includes(experience.id)">
+                        <span class="flex items-center gap-3">
+                          <input type="checkbox" class="accent-emerald-500"
+                            [checked]="eventExperienceIds().includes(experience.id)"
+                            [disabled]="experienceBusy() || (!experience.active && !eventExperienceIds().includes(experience.id))"
+                            (change)="toggleEventExperience(experience.id, $any($event.target).checked)" />
+                          <span>
+                            <span class="block text-zinc-100 font-medium">{{ experience.name }}</span>
+                            <span class="block text-zinc-500 text-xs">{{ experience.items.length }} required items</span>
+                          </span>
+                        </span>
+                      </label>
+                    } @empty {
+                      <p class="text-sm text-zinc-500">No experience templates yet. Create them in the Experience Library.</p>
+                    }
+                  </div>
+
+                  <button type="button" (click)="saveEventExperiences()" [disabled]="experienceBusy() || !experienceDirty()"
+                    class="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white rounded-lg px-4 py-2.5 font-semibold text-sm">
+                    {{ experienceBusy() ? 'Saving...' : 'Save Experiences to Event' }}
+                  </button>
+
+                  <div class="bg-zinc-900/70 border border-zinc-800 rounded-xl p-4 space-y-3">
+                    <div class="flex flex-wrap gap-2 items-center justify-between">
+                      <div>
+                        <h5 class="text-sm font-semibold text-white">Event Packing Checklist</h5>
+                        <p class="text-xs text-zinc-400">{{ eventPackedCount() }} / {{ eventPackingList().length }} items packed</p>
+                      </div>
+                      <a [routerLink]="['/calendar', eventId, 'experiences']"
+                        class="text-xs text-emerald-400 hover:text-emerald-300">Full list / Print</a>
+                    </div>
+                    @if (experienceDirty()) {
+                      <p class="text-xs text-amber-300">Save the changed experience selection to update this packing list.</p>
+                    }
+                    @for (item of eventPackingList(); track item.key) {
+                      <label class="flex items-start justify-between gap-2 py-2 border-t border-zinc-800 text-sm">
+                        <span class="flex items-start gap-2">
+                          <input type="checkbox" class="mt-1 accent-emerald-500"
+                            [checked]="item.packed" [disabled]="experienceBusy() || experienceDirty()"
+                            (change)="setEventItemPacked(item, $any($event.target).checked)" />
+                          <span>
+                            <span [class.line-through]="item.packed" [class.text-zinc-500]="item.packed">{{ item.name }}</span>
+                            <span class="block text-xs text-zinc-500">{{ item.sources.join(', ') }}</span>
+                          </span>
+                        </span>
+                        <span class="font-medium text-zinc-300 whitespace-nowrap">{{ item.quantity }} {{ item.unit }}</span>
+                      </label>
+                    } @empty {
+                      <p class="text-xs text-zinc-500">Save the experiences to generate a checklist for this event.</p>
+                    }
+                  </div>
+                </section>
+              }
             </div>
 
             <!-- Drawer Footer Actions -->
