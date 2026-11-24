@@ -58,7 +58,9 @@ export class ExperiencesService {
     }
     const notes =
       typeof v.notes === 'string' ? v.notes.trim().slice(0, 500) : '';
+    if (v.inventoryKind != null && (!['product','equipment'].includes(v.inventoryKind) || !Number.isSafeInteger(v.inventoryId) || v.inventoryId < 1 || unit !== 'pcs')) throw new BadRequestException('Linked inventory requires a valid item and pcs unit');
     return {
+      ...(v.inventoryKind ? { inventoryKind: v.inventoryKind, inventoryId: v.inventoryId } : {}),
       name,
       quantity,
       unit,
@@ -92,6 +94,11 @@ export class ExperiencesService {
       items: v.items.map((item: unknown) => this.cleanItem(item)),
       active: v.active === undefined ? true : v.active === true,
     };
+  }
+
+  private async requireUnreserved(id: number) {
+    const [r] = await this.dataSource.query("SELECT id FROM event_stock_reservations WHERE event_id=$1 AND status='active' LIMIT 1",[id]);
+    if(r) throw new BadRequestException('Cancel the stock reservation before editing the checklist');
   }
 
   private async requireEvent(id: number) {
@@ -131,6 +138,7 @@ export class ExperiencesService {
 
   async assign(eventId: number, experienceIds: unknown) {
     await this.requireEvent(eventId);
+    await this.requireUnreserved(eventId);
     if (
       !Array.isArray(experienceIds) ||
       experienceIds.length > 100 ||
@@ -161,7 +169,8 @@ export class ExperiencesService {
     return ids;
   }
 
-  private key(item: Pick<ExperienceRequirement, 'name' | 'unit'>) {
+  private key(item: ExperienceRequirement) {
+    if (item.inventoryKind && item.inventoryId) return item.inventoryKind + ':' + item.inventoryId;
     return (
       item.name.trim().toLocaleLowerCase('en-US') +
       '|' +
@@ -176,6 +185,7 @@ export class ExperiencesService {
 
   async generate(eventId: number) {
     await this.requireEvent(eventId);
+    await this.requireUnreserved(eventId);
     const rows = await this.assignments.find({ where: { eventId } });
     const templates = rows.length
       ? await this.experiences.findBy({
@@ -235,6 +245,7 @@ export class ExperiencesService {
 
   async addEventItem(eventId: number, value: unknown) {
     await this.requireEvent(eventId);
+    await this.requireUnreserved(eventId);
     const requirement = this.cleanItem(value);
     const key = this.key(requirement);
     return this.dataSource.transaction(async (manager) => {
