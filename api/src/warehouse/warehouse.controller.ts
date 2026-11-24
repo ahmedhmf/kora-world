@@ -27,6 +27,9 @@ export class WarehouseController {
     return this.service.createLocation(id, dto);
   }
 
+  @Get(':id/report')
+  report(@Param('id',ParseIntPipe) id:number){return this.service.report(id);}
+
   @Get(':id/stock')
   stock(@Param('id', ParseIntPipe) id: number) { return this.service.stock(id); }
 
