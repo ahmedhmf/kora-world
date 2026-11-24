@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { WarehouseSite, WarehouseLocation, WarehouseStock, WarehouseMovement, WarehouseStockInput, WarehouseTransferInput, WarehouseAction } from '../models/warehouse.model';
 import { Supplier, CreateSupplierDto } from '../models/supplier.model';
 import { Product, CreateProductDto } from '../models/product.model';
 import { Sample, CreateSampleDto } from '../models/sample.model';
@@ -18,6 +19,20 @@ export class ApiService {
   private get base(): string {
     const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     return isLocal ? 'http://localhost:3000' : '/api';
+  }
+
+  // Warehouse
+  getWarehouses() { return this.http.get<WarehouseSite[]>(`${this.base}/warehouses`); }
+  createWarehouse(dto: { code: string; name: string; address?: string }) { return this.http.post<WarehouseSite>(`${this.base}/warehouses`, dto); }
+  getWarehouseLocations(id: number) { return this.http.get<WarehouseLocation[]>(`${this.base}/warehouses/${id}/locations`); }
+  createWarehouseLocation(id: number, dto: { code: string; name: string }) { return this.http.post<WarehouseLocation>(`${this.base}/warehouses/${id}/locations`, dto); }
+  getWarehouseStock(id: number) { return this.http.get<WarehouseStock[]>(`${this.base}/warehouses/${id}/stock`); }
+  getWarehouseMovements(id: number) { return this.http.get<WarehouseMovement[]>(`${this.base}/warehouses/${id}/movements`); }
+  recordWarehouseMovement(id: number, action: Exclude<WarehouseAction, 'transfers'>, dto: WarehouseStockInput) {
+    return this.http.post<unknown>(`${this.base}/warehouses/${id}/${action}`, dto);
+  }
+  transferWarehouseStock(id: number, dto: WarehouseTransferInput) {
+    return this.http.post<unknown>(`${this.base}/warehouses/${id}/transfers`, dto);
   }
 
   // Suppliers
