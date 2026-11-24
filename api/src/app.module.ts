@@ -14,6 +14,7 @@ import { Sample } from './samples/entities/sample.entity';
 import { User } from './users/entities/user.entity';
 import { Event } from './events/entities/event.entity';
 import { EventOffer } from './events/entities/event-offer.entity';
+import { EventOfferFile } from './events/entities/event-offer-file.entity';
 import { Account } from './accounts/entities/account.entity';
 import { Receipt } from './receipts/entities/receipt.entity';
 import { ReceiptLineItem } from './receipts/entities/receipt-line-item.entity';
@@ -85,6 +86,7 @@ import { DropdownOptionsModule } from './dropdown-options/dropdown-options.modul
           User,
           Event,
           EventOffer,
+          EventOfferFile,
           KoraExperience,
           EventKoraExperience,
           EventKoraChecklist,
