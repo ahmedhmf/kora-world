@@ -239,7 +239,7 @@ export class DeliveryNotesService {
     return note;
   }
 
-  async create(accountId: number, dto: { deliveryDate: string; remarks?: string; items: Array<{ productId: number; quantity: number }> }) {
+  async create(accountId: number, dto: { deliveryDate: string; remarks?: string; items: Array<{ productId: number; quantity: number }>; deliverySource?: 'warehouse' | 'supplier' | 'external'; warehouseId?: number; locationId?: number; sourceDetails?: string }) {
     const account = await this.accounts.findOneBy({ id: accountId });
     if (!account) throw new NotFoundException('Account not found');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dto.deliveryDate || '') || !Number.isFinite(Date.parse(dto.deliveryDate))) {
@@ -259,27 +259,70 @@ export class DeliveryNotesService {
       if (!product) throw new BadRequestException('One of the selected products does not exist');
       items.push({ productId: product.id, articleNumber: product.articleNumber, productName: product.name, quantity: item.quantity });
     }
+    const deliverySource = dto.deliverySource ?? 'warehouse';
+    if (!['warehouse','supplier','external'].includes(deliverySource)) throw new BadRequestException('Invalid delivery source');
+    const warehouseId = deliverySource === 'warehouse' ? dto.warehouseId : null;
+    const locationId = deliverySource === 'warehouse' ? dto.locationId : null;
+    const sourceDetails = deliverySource === 'warehouse' ? null : typeof dto.sourceDetails === 'string' ? dto.sourceDetails.trim() : '';
+    if (deliverySource === 'warehouse') {
+      if (!Number.isInteger(warehouseId) || !Number.isInteger(locationId)) throw new BadRequestException('Select warehouse and location');
+      const [location] = await this.dataSource.query(
+        'SELECT l.id FROM warehouse_locations l JOIN warehouse_sites w ON w.id=l.warehouse_id WHERE w.id=$1 AND l.id=$2 AND w.is_active AND l.is_active', [warehouseId,locationId]);
+      if (!location) throw new BadRequestException('Select an active warehouse location');
+      for (const item of items) {
+        const [stock] = await this.dataSource.query('SELECT quantity FROM warehouse_stock WHERE location_id=$1 AND product_id=$2',[locationId,item.productId]);
+        if ((stock?.quantity ?? 0) < item.quantity) throw new BadRequestException('Insufficient warehouse stock for ' + item.articleNumber);
+      }
+    } else if (!sourceDetails || sourceDetails.length > 200) throw new BadRequestException('Specify the supplier or external stock source');
     // A database sequence-backed ID ensures uniqueness even when users create notes concurrently.
     const note = await this.notes.save(this.notes.create({
       accountId, noteNumber: 'TMP-' + randomUUID(), deliveryDate: dto.deliveryDate,
       customerName: account.companyName,
       deliveryAddress: [account.shippingStreet, account.shippingZip, account.shippingCity, account.shippingCountry].filter(Boolean).join(', '),
       paymentModel: account.paymentModel, items, remarks: dto.remarks?.slice(0, 2000),
+      deliverySource, warehouseId: warehouseId ?? null, locationId: locationId ?? null, sourceDetails,
     }));
     note.noteNumber = 'DN-' + String(note.id).padStart(6, '0');
     return this.notes.save(note);
   }
 
+  async dispatch(id: number, userId: number) {
+    return this.dataSource.transaction(async manager => {
+      const note = await manager.findOne(DeliveryNote, { where: { id }, lock: { mode: 'pessimistic_write' } });
+      if (!note) throw new NotFoundException('Delivery note not found');
+      if (note.deliverySource === 'legacy') throw new BadRequestException('Legacy delivery notes cannot be dispatched retroactively');
+      if (note.dispatchedAt) return note;
+      if (note.signedFilePath) throw new BadRequestException('Delivery already signed');
+      if (note.deliverySource === 'warehouse') {
+        const [location] = await manager.query('SELECT l.id FROM warehouse_locations l JOIN warehouse_sites w ON w.id=l.warehouse_id WHERE w.id=$1 AND l.id=$2 AND w.is_active AND l.is_active',[note.warehouseId,note.locationId]);
+        if (!location) throw new BadRequestException('Warehouse location is not active');
+        for (const item of [...note.items].sort((a,b)=>a.productId-b.productId)) {
+          const rows = await manager.query('SELECT quantity FROM warehouse_stock WHERE location_id=$1 AND product_id=$2 FOR UPDATE',[note.locationId,item.productId]);
+          if (!rows.length || rows[0].quantity < item.quantity) throw new BadRequestException('Insufficient warehouse stock for ' + item.articleNumber);
+          await manager.query('UPDATE warehouse_stock SET quantity=quantity-$3 WHERE location_id=$1 AND product_id=$2',[note.locationId,item.productId,item.quantity]);
+          await manager.query(`INSERT INTO warehouse_movements (warehouse_id,location_id,product_id,quantity_change,movement_type,reference,performed_by_id) VALUES ($1,$2,$3,$4,'issue',$5,$6)`,[note.warehouseId,note.locationId,item.productId,-item.quantity,note.noteNumber,userId]);
+        }
+      }
+      note.dispatchedAt = new Date();
+      note.dispatchedById = userId;
+      return manager.save(DeliveryNote,note);
+    });
+  }
+
   async attachSignedCopy(id: number, dto: { path: string; name: string }) {
-    const note = await this.get(id);
     if (!dto || !/^\d+-\d+\.(pdf|png|jpg|jpeg)$/i.test(dto.path || '')) {
       throw new BadRequestException('Upload a PDF, PNG, or JPEG signed copy first');
     }
     const file = path.join(process.cwd(), 'uploads', dto.path);
     if (!fs.existsSync(file)) throw new BadRequestException('Uploaded file not found');
     if (dto.name?.length > 255) throw new BadRequestException('File name is too long');
-    note.signedFilePath = dto.path;
-    note.signedFileName = dto.name || dto.path;
-    return this.notes.save(note);
+    return this.dataSource.transaction(async manager => {
+      const note = await manager.findOne(DeliveryNote, { where: { id }, lock: { mode: 'pessimistic_write' } });
+      if (!note) throw new NotFoundException('Delivery note not found');
+      if (note.deliverySource === 'warehouse' && !note.dispatchedAt) throw new BadRequestException('Confirm warehouse dispatch before uploading signed copy');
+      note.signedFilePath = dto.path;
+      note.signedFileName = dto.name || dto.path;
+      return manager.save(DeliveryNote,note);
+    });
   }
 }
