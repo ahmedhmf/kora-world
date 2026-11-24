@@ -6,6 +6,7 @@ import { EventsStore } from '../../store/events.store';
 import { CalendarEvent, EventCategory } from '../../core/models/event.model';
 import { AuthService } from '../../core/services/auth.service';
 import { DialogService } from '../../core/services/dialog.service';
+import { eventOccursOnLocalDay } from './event-date-range';
 import { switchMap } from 'rxjs';
 import { ExperiencesApiService, KoraExperience, PackingItem } from '../experiences/experiences-api.service';
 
@@ -198,16 +199,10 @@ export class CalendarComponent implements OnInit {
   }
 
   getEventsForDate(date: Date): CalendarEvent[] {
-    const dateStr = this.formatLocalDate(date);
-    return this.store.events().filter((e) => {
-      if (!this.activeFilters()[e.category]) return false;
-      try {
-        const eDate = new Date(e.startDate);
-        return this.formatLocalDate(eDate) === dateStr;
-      } catch {
-        return false;
-      }
-    });
+    return this.store.events().filter((event) =>
+      this.activeFilters()[event.category] &&
+      eventOccursOnLocalDay(event.startDate, event.endDate, date),
+    );
   }
 
   getCategoryClass(category: string): string {
