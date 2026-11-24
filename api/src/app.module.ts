@@ -13,6 +13,10 @@ import { PurchaseOrderLineItem } from './purchase-orders/entities/purchase-order
 import { Sample } from './samples/entities/sample.entity';
 import { User } from './users/entities/user.entity';
 import { Event } from './events/entities/event.entity';
+import { EventOffer } from './events/entities/event-offer.entity';
+import { EventOfferFile } from './events/entities/event-offer-file.entity';
+import { EventDocument } from './events/entities/event-document.entity';
+import { EventReport } from './events/entities/event-report.entity';
 import { Account } from './accounts/entities/account.entity';
 import { Receipt } from './receipts/entities/receipt.entity';
 import { ReceiptLineItem } from './receipts/entities/receipt-line-item.entity';
@@ -44,6 +48,12 @@ import { AccountingModule } from './accounting/accounting.module';
 import { InvoicesModule } from './invoices/invoices.module';
 import { PaymentsModule } from './payments/payments.module';
 import { SourcingModule } from './sourcing/sourcing.module';
+import {
+  KoraExperience,
+  EventKoraExperience,
+  EventKoraChecklist,
+} from './experiences/experience.entity';
+import { ExperiencesModule } from './experiences/experiences.module';
 import { DeliveryNote } from './delivery-notes/delivery-note.entity';
 import { CustomerPricingRule } from './delivery-notes/customer-pricing-rule.entity';
 import { CustomerStatement } from './delivery-notes/customer-statement.entity';
@@ -58,7 +68,7 @@ import { DropdownOptionsModule } from './dropdown-options/dropdown-options.modul
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({ isGlobal: true, envFilePath: ['../.env', '.env'] }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (config: ConfigService) => ({
@@ -77,6 +87,13 @@ import { DropdownOptionsModule } from './dropdown-options/dropdown-options.modul
           Sample,
           User,
           Event,
+          EventOffer,
+          EventOfferFile,
+          EventDocument,
+          EventReport,
+          KoraExperience,
+          EventKoraExperience,
+          EventKoraChecklist,
           Account,
           Receipt,
           ReceiptLineItem,
@@ -114,6 +131,7 @@ import { DropdownOptionsModule } from './dropdown-options/dropdown-options.modul
     AuthModule,
     AttachmentsModule,
     EventsModule,
+    ExperiencesModule,
     AccountsModule,
     ReceiptsModule,
     ContactsModule,
