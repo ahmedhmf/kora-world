@@ -21,6 +21,13 @@ interface EventOffer {
   status: OfferStatus;
   notes: string | null;
 }
+interface QuotationFile {
+  id: number;
+  originalName: string;
+  mimeType: string;
+  sizeBytes: number;
+  createdAt: string;
+}
 interface OfferForm {
   type: OfferType;
   recipientName: string;
@@ -56,6 +63,8 @@ export class EventOffersComponent implements OnInit {
   readonly feedback = signal('');
   readonly busy = signal(false);
   readonly editing = signal(false);
+  readonly filesByOffer = signal<Record<number, QuotationFile[]>>({});
+  readonly fileBusy = signal<number | null>(null);
   editId: number | null = null;
   form: OfferForm = this.blank();
 
@@ -82,8 +91,69 @@ export class EventOffersComponent implements OnInit {
 
   load() {
     this.http.get<EventOffer[]>(`${this.base}/events/${this.eventId}/offers`).subscribe({
-      next: offers => this.offers.set(offers),
+      next: offers => {
+        this.offers.set(offers);
+        for (const offer of offers) if (offer.type === 'supplier') this.loadFiles(offer.id);
+      },
       error: () => this.error.set('Unable to load event offers'),
+    });
+  }
+
+  loadFiles(offerId: number) {
+    this.http.get<QuotationFile[]>(`${this.base}/events/${this.eventId}/offers/${offerId}/files`).subscribe({
+      next: files => this.filesByOffer.update(previous => ({ ...previous, [offerId]: files })),
+      error: () => this.error.set('Could not load quotation attachments'),
+    });
+  }
+
+  uploadQuote(offer: EventOffer, input: HTMLInputElement) {
+    const file = input.files?.[0];
+    if (!file) return;
+    if (file.size > 15 * 1024 * 1024) {
+      this.error.set('The maximum quotation file size is 15 MB');
+      input.value = '';
+      return;
+    }
+    this.error.set('');
+    this.fileBusy.set(offer.id);
+    const formData = new FormData();
+    formData.append('file', file);
+    this.http.post(`${this.base}/events/${this.eventId}/offers/${offer.id}/files`, formData).subscribe({
+      next: () => {
+        this.fileBusy.set(null);
+        input.value = '';
+        this.feedback.set('Supplier quotation document uploaded');
+        this.loadFiles(offer.id);
+      },
+      error: err => {
+        this.fileBusy.set(null);
+        input.value = '';
+        const message = err?.error?.message;
+        this.error.set(typeof message === 'string' ? message : 'Could not upload quotation document');
+      },
+    });
+  }
+
+  downloadQuote(offerId: number, file: QuotationFile) {
+    this.http.get(`${this.base}/events/${this.eventId}/offers/${offerId}/files/${file.id}/download`,
+      { responseType: 'blob' }).subscribe({
+      next: blob => {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = file.originalName;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      },
+      error: () => this.error.set('Could not download quotation document'),
+    });
+  }
+
+  deleteQuote(offerId: number, file: QuotationFile) {
+    if (!window.confirm(`Remove attached file ${file.originalName}?`)) return;
+    this.http.delete(`${this.base}/events/${this.eventId}/offers/${offerId}/files/${file.id}`).subscribe({
+      next: () => { this.feedback.set('Attachment removed'); this.loadFiles(offerId); },
+      error: () => this.error.set('Could not remove attachment'),
     });
   }
 
