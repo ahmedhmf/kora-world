@@ -109,7 +109,7 @@
           <p class="text-sm text-zinc-400">There are no experience templates yet. Create one in the library.</p>
         }
       </div>
-      <button type="button" [disabled]="busy() || activeReservation()" (click)="generate()" class="bg-white text-zinc-900 font-semibold px-4 py-2 rounded-lg text-sm disabled:opacity-50">
+      <button type="button" [disabled]="busy() || logisticsLocked()" (click)="generate()" class="bg-white text-zinc-900 font-semibold px-4 py-2 rounded-lg text-sm disabled:opacity-50">
         Generate / Refresh Packing Checklist
       </button>
       <p class="text-xs text-amber-300">Refreshing recalculates template quantities. Existing packed ticks and event-only items are kept where possible.</p>
@@ -141,7 +141,7 @@
     <section class="rounded-xl border border-zinc-800 bg-zinc-900 p-5 space-y-4">
       <h2 class="font-bold">Event stock reservations</h2>
       <p class="text-sm text-zinc-400">Reserve linked items for preparation, event and expected return dates. Physical stock stays unchanged.</p>
-      @if(activeReservation()){<p class="text-amber-300 text-sm">Cancel existing reservations before changing the checklist or dates.</p>}
+      @if(logisticsLocked()){<p class="text-zinc-400 text-sm">Reservation and dispatch history is locked. Active reservations can be cancelled before dispatch.</p>}
       @else{
       <fieldset [disabled]="busy()" class="space-y-3 print:hidden">
         <div class="grid sm:grid-cols-2 gap-3">
@@ -158,6 +158,28 @@
       </fieldset>}
       <h3 class="font-semibold">Reservation history</h3>
       @for(r of reservations();track r.id){<div class="border border-zinc-800 rounded p-3 text-sm"><strong>{{r.name}} — {{r.quantity}}</strong> · {{r.status}}<p class="text-zinc-400">{{r.warehouseName}} / {{r.locationCode}} · {{r.startsAt|date:'short'}} to {{r.endsAt|date:'short'}}</p></div>}@empty{<p class="text-sm text-zinc-500">No reservations yet.</p>}
+      @if(activeReservation()){<button type="button" (click)="dispatchEvent()" [disabled]="busy() || packedCount()!==checklist().length" class="bg-white text-zinc-900 font-semibold rounded px-4 py-2 text-sm print:hidden">Confirm event dispatch</button>}
+      @if(dispatchedRows().length){
+        <h3 class="font-semibold">Post-event reconciliation</h3>
+        <p class="text-sm text-zinc-400">Account for all dispatched units. Only serviceable returned items go back into stock; damaged, missing and consumed quantities stay out of usable inventory.</p>
+        <fieldset [disabled]="busy()" class="space-y-3">
+        @for(row of dispatchedRows();track row.id){
+          @if(reconciliation[row.id];as line){
+          <div class="border border-zinc-800 rounded p-3 space-y-2">
+            <p class="font-semibold">{{row.name}} — {{row.quantity}} dispatched</p>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+            <label class="text-xs">Serviceable return<input type="number" min="0" step="1" [(ngModel)]="line.returned" class="block w-full bg-zinc-950 border border-zinc-700 rounded p-2"></label>
+            <label class="text-xs">Damaged<input type="number" min="0" step="1" [(ngModel)]="line.damaged" class="block w-full bg-zinc-950 border border-zinc-700 rounded p-2"></label>
+            <label class="text-xs">Missing<input type="number" min="0" step="1" [(ngModel)]="line.missing" class="block w-full bg-zinc-950 border border-zinc-700 rounded p-2"></label>
+            @if(row.inventoryKind==='product'){<label class="text-xs">Consumed<input type="number" min="0" step="1" [(ngModel)]="line.consumed" class="block w-full bg-zinc-950 border border-zinc-700 rounded p-2"></label>}
+            </div>
+            <label class="text-xs">Explanation (required for exceptions)<input [(ngModel)]="line.notes" maxlength="2000" class="block w-full bg-zinc-950 border border-zinc-700 rounded p-2"></label>
+          </div>}
+        }
+        <button type="button" (click)="reconcileEvent()" class="bg-white text-zinc-900 font-semibold rounded px-4 py-2 text-sm">Finalize event reconciliation</button>
+        </fieldset>
+      }
+      @for(row of reservations();track row.id){@if(row.status==='reconciled'){<p class="text-sm">{{row.name}}: {{row.returned}} returned · {{row.damaged}} damaged · {{row.missing}} missing · {{row.consumed}} consumed. {{row.reconciliationNotes}}</p>}}
       @if(activeReservation()){<button type="button" (click)="cancelStock()" [disabled]="busy()" class="text-red-400 border border-red-900 rounded px-3 py-2 text-sm print:hidden">Cancel reservation</button>}
     </section>
     <section class="rounded-xl border border-zinc-800 bg-zinc-900 p-5 space-y-3 print:hidden">
@@ -181,7 +203,7 @@
           <input [(ngModel)]="extra.category" class="mt-1 w-full bg-zinc-950 border border-zinc-700 rounded p-2" />
         </label>
       </div>
-      <button type="button" [disabled]="busy() || activeReservation()" (click)="addExtra()" class="px-4 py-2 rounded-lg border border-zinc-600 text-sm disabled:opacity-50">+ Add to Event Checklist</button>
+      <button type="button" [disabled]="busy() || logisticsLocked()" (click)="addExtra()" class="px-4 py-2 rounded-lg border border-zinc-600 text-sm disabled:opacity-50">+ Add to Event Checklist</button>
     </section>
   }
 </div>
