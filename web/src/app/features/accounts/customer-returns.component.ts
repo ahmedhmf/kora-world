@@ -1,4 +1,4 @@
-import { Component, Input, OnInit, inject, signal } from '@angular/core';
+import { Component, Input, OnInit, inject, signal, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom, forkJoin } from 'rxjs';
@@ -31,6 +31,7 @@ import { WarehouseSite, WarehouseLocation } from '../../core/models/warehouse.mo
 })
 export class CustomerReturnsComponent implements OnInit {
  @Input({required:true}) accountId!:number;
+ readonly returned = output<void>();
  private api=inject(ApiService);
  inventory=signal<{productId:number;articleNumber:string;productName:string;quantity:number}[]>([]);
  history=signal<{id:number;productName:string;quantity:number;warehouseName:string;locationCode:string;notes:string;createdAt:string}[]>([]);
@@ -50,7 +51,7 @@ export class CustomerReturnsComponent implements OnInit {
  if(!dto.productId||!dto.warehouseId||!dto.locationId||!Number.isInteger(dto.quantity)||dto.quantity<1||dto.quantity>100000||!dto.notes||(!this.pending&&dto.quantity>(this.inventory().find(p=>p.productId===dto.productId)?.quantity??0))){this.error.set('Select product, valid quantity, destination and reason.');return;}
  if(!window.confirm('Confirm products have physically arrived at the warehouse?'))return;
  this.pending??={key:crypto.randomUUID(),fingerprint};this.busy.set(true);
- try{const r=await firstValueFrom(this.api.returnCustomerStock(this.accountId,{...dto,requestKey:this.pending.key}));this.pending=null;this.productId=0;this.quantity=1;this.notes='';this.success.set('Return CR-'+String(r.id).padStart(6,'0')+' recorded. Both balances updated.');try{await this.load();}catch{this.error.set('Saved, but refresh failed. Reload before recording another return.');}}
+ try{const r=await firstValueFrom(this.api.returnCustomerStock(this.accountId,{...dto,requestKey:this.pending.key}));this.pending=null;this.productId=0;this.quantity=1;this.notes='';this.success.set('Return CR-'+String(r.id).padStart(6,'0')+' recorded. Both balances updated.');this.returned.emit();try{await this.load();}catch{this.error.set('Saved, but refresh failed. Reload before recording another return.');}}
  catch(e:any){if(e?.status>=400&&e.status<500)this.pending=null;this.error.set(this.message(e));}finally{this.busy.set(false);}
  }
 }
