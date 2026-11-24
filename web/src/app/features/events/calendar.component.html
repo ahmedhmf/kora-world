@@ -239,6 +239,21 @@
               </form>
 
               @if (drawerMode() === 'edit' && eventId !== null) {
+                <section class="border-t border-zinc-800 pt-5 space-y-3" aria-label="Event documents and reports">
+                  <h4 class="text-base font-bold text-white">Event Documents &amp; Report</h4>
+                  <p class="text-xs text-zinc-400">Upload contracts and plans, then complete your post-event report.</p>
+                  <div class="flex flex-wrap gap-2">
+                    <a [routerLink]="['/calendar', eventId, 'manage']"
+                      class="flex-1 text-center rounded-lg border border-emerald-700 bg-emerald-950/40 px-3 py-3 text-sm font-semibold text-emerald-200">
+                      Documents / Report
+                    </a>
+                    <button type="button" (click)="duplicateEvent()" [disabled]="duplicating()"
+                      class="flex-1 rounded-lg border border-zinc-700 px-3 py-3 text-sm font-semibold text-zinc-200 disabled:opacity-50">
+                      {{ duplicating() ? 'Duplicating...' : 'Duplicate Event' }}
+                    </button>
+                  </div>
+                </section>
+
                 <section class="border-t border-zinc-800 pt-5 space-y-3" aria-label="Event offers">
                   <h4 class="text-base font-bold text-white">Staff &amp; Supplier Offers</h4>
                   <p class="text-xs text-zinc-400">Manage staff rates and supplier quotations for this event. No employee logins required.</p>
