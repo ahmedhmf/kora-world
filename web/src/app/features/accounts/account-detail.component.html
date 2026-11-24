@@ -282,7 +282,7 @@
             }
           </section>
           <section class="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6 mb-8 space-y-4">
-            <h2 class="text-lg font-bold text-white">Stock Corrections &amp; Returns</h2>
+            <h2 class="text-lg font-bold text-white">Stock Corrections</h2>
             <p class="text-sm text-zinc-400">Use a negative quantity to remove damaged, missing, or incorrectly counted stock. Use a positive quantity to restore stock. Every adjustment is recorded.</p>
             @if (canManageInventory()) {
               <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -299,7 +299,6 @@
                 </label>
                 <label class="text-sm text-zinc-300">Reason
                   <select [(ngModel)]="correctionReason" class="block w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white">
-                    <option value="return">Return</option>
                     <option value="damage">Damage</option>
                     <option value="loss">Loss</option>
                     <option value="stocktake">Stock count correction</option>
@@ -321,6 +320,9 @@
               </div>
             } @empty { <p class="text-zinc-500 text-sm">No corrections recorded.</p> }
           </section>
+          @if (canManageInventory()) {
+            <div class="mb-8"><app-customer-returns [accountId]="acct.id" (returned)="loadInventory()" /></div>
+          }
           <section class="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6 mb-8 space-y-4">
             <div class="flex flex-wrap items-center justify-between gap-3">
               <div>
