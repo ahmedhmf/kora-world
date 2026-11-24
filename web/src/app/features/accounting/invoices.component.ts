@@ -60,7 +60,7 @@ export class InvoicesComponent implements OnInit {
 
   private readPilotAmountCents(): number | null {
     const raw = this.pilotPaymentAmount.trim();
-    if (!/^(?:0|[1-9]\\d*)(?:\\.\\d{1,2})?$/.test(raw)) return null;
+    if (!/^(?:0|[1-9]\d*)(?:\.\d{1,2})?$/.test(raw)) return null;
     const [whole, fraction = ''] = raw.split('.');
     const amount = Number(whole) * 100 + Number(fraction.padEnd(2, '0'));
     return Number.isSafeInteger(amount) && amount > 0 ? amount : null;
@@ -76,7 +76,7 @@ export class InvoicesComponent implements OnInit {
       const bankId = Number(this.pilotPaymentBankId);
       if (!amountCents || amountCents > balance.outstandingCents ||
           !this.pilotBanks().some(a => a.id === bankId) ||
-          !/^\\d{4}-\\d{2}-\\d{2}$/.test(this.pilotPaymentDate) ||
+          !/^\d{4}-\d{2}-\d{2}$/.test(this.pilotPaymentDate) ||
           Number.isNaN(Date.parse(this.pilotPaymentDate)) ||
           new Date(this.pilotPaymentDate).toISOString().slice(0, 10) !== this.pilotPaymentDate ||
           this.pilotPaymentDescription.length > 255) {
