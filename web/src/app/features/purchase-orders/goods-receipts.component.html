@@ -1,0 +1,34 @@
+<section class="print:hidden mt-6 bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-4">
+  <div class="flex justify-between items-center"><h2 class="text-lg font-semibold">Goods receipts</h2><button (click)="refresh()" [disabled]="busy()" class="text-sm text-zinc-400">Refresh</button></div>
+  @if (error()) { <p role="alert" class="text-red-300">{{ error() }}</p> }
+  @if (success()) { <p role="status" class="text-emerald-300">{{ success() }}</p> }
+  @if (data(); as d) {
+    @if (d.legacyReceived) { <p class="text-amber-300 text-sm">This order was marked received before warehouse tracking. No stock has been added automatically. Reconcile opening stock separately.</p> }
+    @else {
+      <div class="overflow-x-auto"><table class="w-full text-sm text-left">
+        <thead class="text-zinc-400"><tr><th class="p-2">Product</th><th>Ordered</th><th>Received</th><th>Remaining</th>@if (d.canReceive) { <th>Receive now</th> }</tr></thead>
+        <tbody>@for (l of d.lines; track l.poLineId) {
+          <tr class="border-t border-zinc-800"><td class="p-2">{{ l.articleNumber }} — {{ l.description }}</td><td>{{ l.ordered }}</td><td>{{ l.received }}</td><td>{{ l.remaining }}</td>
+          @if (d.canReceive) { <td><input type="number" min="0" [max]="l.remaining" step="1" [attr.aria-label]="'Receive ' + l.articleNumber" [(ngModel)]="quantities[l.poLineId]" [disabled]="busy() || !l.productId || !l.remaining" class="w-24 bg-zinc-950 border border-zinc-700 rounded p-2"></td> }</tr>
+        }</tbody>
+      </table></div>
+      @if (d.canReceive) {
+        <fieldset [disabled]="busy()" class="space-y-3">
+          <button (click)="fillRemaining()" type="button" class="text-blue-400 text-sm">Fill remaining quantities</button>
+          <div class="grid sm:grid-cols-2 gap-3">
+            <label class="text-sm text-zinc-400">Warehouse<select [ngModel]="warehouseId" (ngModelChange)="selectWarehouse($event)" class="block w-full bg-zinc-950 border border-zinc-700 rounded p-2 text-white"><option [ngValue]="0">Select warehouse</option>@for (s of sites(); track s.id) { <option [ngValue]="s.id">{{ s.name }}</option> }</select></label>
+            <label class="text-sm text-zinc-400">Location<select [(ngModel)]="locationId" class="block w-full bg-zinc-950 border border-zinc-700 rounded p-2 text-white"><option [ngValue]="0">Select location</option>@for (l of locations(); track l.id) { <option [ngValue]="l.id">{{ l.code }} — {{ l.name }}</option> }</select></label>
+            <label class="text-sm text-zinc-400">Supplier delivery reference<input [(ngModel)]="reference" maxlength="160" class="block w-full bg-zinc-950 border border-zinc-700 rounded p-2 text-white"></label>
+            <label class="text-sm text-zinc-400">Notes<input [(ngModel)]="notes" maxlength="2000" class="block w-full bg-zinc-950 border border-zinc-700 rounded p-2 text-white"></label>
+          </div>
+          <button (click)="receive()" type="button" class="bg-white text-zinc-900 font-semibold rounded px-4 py-2">Receive goods</button>
+          @if (!sites().length) { <p class="text-zinc-400 text-sm">Create a warehouse and location in the Warehouse module first.</p> }
+        </fieldset>
+      }
+    }
+    <h3 class="font-semibold">Receipt history</h3>
+    @for (r of d.receipts; track r.id) {
+      <div class="border border-zinc-800 rounded p-3 text-sm"><strong>{{ r.receiptNumber }}</strong> · {{ r.quantity }} units · {{ r.warehouseName }} / {{ r.locationCode }}<p class="text-zinc-400">{{ r.createdAt | date:'short' }} · {{ r.supplierReference || 'No supplier reference' }}</p></div>
+    } @empty { <p class="text-zinc-500 text-sm">No goods receipts recorded.</p> }
+  }
+</section>
