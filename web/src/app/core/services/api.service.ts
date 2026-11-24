@@ -21,6 +21,16 @@ export class ApiService {
     return isLocal ? 'http://localhost:3000' : '/api';
   }
 
+  getGoodsReceipts(id: number) {
+    return this.http.get<{ status: string; legacyReceived: boolean; canReceive: boolean;
+      lines: { poLineId: number; productId: number | null; articleNumber: string; description: string; ordered: number; received: number; remaining: number }[];
+      receipts: { id: number; receiptNumber: string; warehouseName: string; locationCode: string; createdAt: string; supplierReference: string | null; quantity: number }[];
+    }>(`${this.base}/purchase-orders/${id}/goods-receipts`);
+  }
+  receivePurchaseOrder(id: number, dto: { warehouseId: number; locationId: number; requestKey: string; supplierReference: string; notes: string; lines: { poLineId: number; quantity: number }[] }) {
+    return this.http.post<{ id: number; status: string; duplicate: boolean }>(`${this.base}/purchase-orders/${id}/goods-receipts`, dto);
+  }
+
   // Warehouse
   getWarehouses() { return this.http.get<WarehouseSite[]>(`${this.base}/warehouses`); }
   createWarehouse(dto: { code: string; name: string; address?: string }) { return this.http.post<WarehouseSite>(`${this.base}/warehouses`, dto); }
