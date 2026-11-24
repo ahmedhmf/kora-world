@@ -9,7 +9,7 @@ import { InvoiceType } from '../invoices/entities/invoice.entity';
 export function isLocalSupplierPilotMode(): boolean {
   return process.env.SUPPLIER_EGP_PILOT === 'true' &&
     process.env.DATABASE_NAME === 'kora_test' &&
-    ['localhost', '127.0.0.1', '::1'].includes(process.env.DATABASE_HOST || '');
+    ['localhost', '127.0.0.1', '::1'].includes(process.env.DATABASE_HOST || '127.0.0.1');
 }
 
 export function blockLegacySupplierPilotWrite(
