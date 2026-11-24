@@ -10,12 +10,13 @@ import { AuthService } from '../../core/services/auth.service';
 
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
+import { CustomerReturnsComponent } from './customer-returns.component';
 import { Product } from '../../core/models/product.model';
 
 @Component({
   selector: 'app-account-detail',
   standalone: true,
-  imports: [CommonModule, RouterLink, FormsModule, LucideAngularModule],
+  imports: [CommonModule, RouterLink, FormsModule, LucideAngularModule, CustomerReturnsComponent],
   templateUrl: './account-detail.component.html',
 })
 export class AccountDetailComponent implements OnInit {
@@ -375,6 +376,7 @@ export class AccountDetailComponent implements OnInit {
   }
 
   async saveCorrection(): Promise<void> {
+    if (this.correctionReason === 'return') { this.salesError.set('Use Customer returns to warehouse below for physical returns.'); return; }
     const acct = this.account();
     if (!acct || !this.correctionProductId || !Number.isInteger(Number(this.correctionQuantity)) ||
       !Number(this.correctionQuantity) || !this.correctionNotes.trim()) {
