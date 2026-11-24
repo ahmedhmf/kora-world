@@ -275,7 +275,8 @@ export class DeliveryNotesService {
       }
     } else if (!sourceDetails || sourceDetails.length > 200) throw new BadRequestException('Specify the supplier or external stock source');
     // A database sequence-backed ID ensures uniqueness even when users create notes concurrently.
-    const note = await this.notes.save(this.notes.create({
+    return this.dataSource.transaction(async manager => {
+    const note = await manager.save(DeliveryNote, manager.create(DeliveryNote, {
       accountId, noteNumber: 'TMP-' + randomUUID(), deliveryDate: dto.deliveryDate,
       customerName: account.companyName,
       deliveryAddress: [account.shippingStreet, account.shippingZip, account.shippingCity, account.shippingCountry].filter(Boolean).join(', '),
@@ -283,7 +284,8 @@ export class DeliveryNotesService {
       deliverySource, warehouseId: warehouseId ?? null, locationId: locationId ?? null, sourceDetails,
     }));
     note.noteNumber = 'DN-' + String(note.id).padStart(6, '0');
-    return this.notes.save(note);
+    return manager.save(DeliveryNote, note);
+    });
   }
 
   async dispatch(id: number, userId: number) {
