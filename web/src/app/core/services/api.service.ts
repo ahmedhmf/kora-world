@@ -323,9 +323,11 @@ export class ApiService {
     return this.http.post<any>(`${this.base}/delivery-notes/sales/${reportId}/approve`, {});
   }
 
-  createDeliveryNote(accountId: number, dto: { deliveryDate: string; remarks?: string; items: Array<{ productId: number; quantity: number }> }): Observable<any> {
+  createDeliveryNote(accountId: number, dto: { deliveryDate: string; remarks?: string; items: Array<{ productId: number; quantity: number }>; deliverySource?: 'warehouse' | 'supplier' | 'external'; warehouseId?: number; locationId?: number; sourceDetails?: string }): Observable<any> {
     return this.http.post<any>(`${this.base}/delivery-notes/account/${accountId}`, dto);
   }
+
+  dispatchDeliveryNote(id: number) { return this.http.post<unknown>(`${this.base}/delivery-notes/${id}/dispatch`, {}); }
 
   attachDeliveryNoteSignedCopy(noteId: number, file: { path: string; name: string }): Observable<any> {
     return this.http.patch<any>(`${this.base}/delivery-notes/${noteId}/signed-copy`, file);
