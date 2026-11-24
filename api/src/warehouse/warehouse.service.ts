@@ -12,6 +12,30 @@ export class WarehouseService {
     if (!Number.isSafeInteger(value) || value < 1) throw new BadRequestException('Invalid ' + field);
   }
 
+  async report(warehouseId:number) {
+    return this.db.transaction('REPEATABLE READ',async m=>{
+      const [site]=await m.query('SELECT id FROM warehouse_sites WHERE id=$1',[warehouseId]);
+      if(!site)throw new NotFoundException('Warehouse not found');
+      const stock=await m.query(`
+        WITH inventory AS (
+          SELECT 'product' AS kind,s.product_id AS item_id,p.article_number AS code,p.name,s.location_id,s.quantity
+          FROM warehouse_stock s JOIN products p ON p.id=s.product_id
+          UNION ALL
+          SELECT 'equipment',s.equipment_id,e.code,e.name,s.location_id,s.quantity
+          FROM warehouse_equipment_stock s JOIN warehouse_equipment e ON e.id=s.equipment_id
+        )
+        SELECT i.kind,i.item_id AS "itemId",i.code,i.name,l.code AS "locationCode",i.quantity AS physical,
+          warehouse_reserved_peak(i.location_id,CASE WHEN i.kind='product' THEN i.item_id END,CASE WHEN i.kind='equipment' THEN i.item_id END,NOW(),'infinity'::timestamptz,NULL)::int AS "reservedPeak",
+          COALESCE((SELECT SUM(r.quantity) FROM event_stock_reservations r WHERE r.location_id=i.location_id AND r.status='dispatched' AND ((i.kind='product' AND r.product_id=i.item_id) OR (i.kind='equipment' AND r.equipment_id=i.item_id))),0)::int AS dispatched
+        FROM inventory i JOIN warehouse_locations l ON l.id=i.location_id WHERE l.warehouse_id=$1 ORDER BY i.kind,i.code,l.code
+      `,[warehouseId]);
+      const events=await m.query(`SELECT r.event_id AS "eventId",e.title,r.status,COALESCE(p.name,q.name) AS name,r.quantity,r.starts_at AS "startsAt",r.ends_at AS "endsAt",c.returned,c.damaged,c.missing,c.consumed,c.notes
+        FROM event_stock_reservations r JOIN events e ON e.id=r.event_id LEFT JOIN products p ON p.id=r.product_id LEFT JOIN warehouse_equipment q ON q.id=r.equipment_id
+        LEFT JOIN event_stock_reconciliations c ON c.reservation_id=r.id WHERE r.warehouse_id=$1 ORDER BY r.id DESC`,[warehouseId]);
+      return {stock,events};
+    });
+  }
+
   async warehouses() {
     return this.db.query('SELECT * FROM warehouse_sites ORDER BY name, id');
   }
