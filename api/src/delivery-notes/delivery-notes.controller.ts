@@ -62,6 +62,16 @@ export class DeliveryNotesController {
     return this.service.cancelSales(id, dto.reason, req.user);
   }
 
+  @Roles('admin','employee')
+  @Get('account/:accountId/returns')
+  listReturns(@Param('accountId',ParseIntPipe) accountId:number) { return this.service.listCustomerReturns(accountId); }
+
+  @Roles('admin','employee')
+  @Post('account/:accountId/returns')
+  returnStock(@Param('accountId',ParseIntPipe) accountId:number,@Body() dto:Parameters<DeliveryNotesService['returnToWarehouse']>[1],@Req() req:AuthenticatedRequest) {
+    return this.service.returnToWarehouse(accountId,dto,req.user);
+  }
+
   @Get('account/:accountId/adjustments')
   listAdjustments(@Param('accountId', ParseIntPipe) accountId: number) {
     return this.service.listAdjustments(accountId);
