@@ -109,6 +109,35 @@ describe('InvoicesService', () => {
       else process.env.DATABASE_HOST = previous.host;
     });
 
+    it('requires the controlled route for SENT issuance only when booking flag is enabled', async () => {
+      process.env.CONTROLLED_INVOICE_BOOKING = 'true';
+      try {
+        await expect(service.create({
+          type: InvoiceType.INCOMING, currency: 'EGP',
+          date: '2026-11-11', dueDate: '2026-12-11',
+          status: InvoiceStatus.SENT, lines: [],
+        })).rejects.toThrow('controlled supplier workflow');
+        expect(mockInvoiceRepo.save).not.toHaveBeenCalled();
+      } finally {
+        delete process.env.CONTROLLED_INVOICE_BOOKING;
+      }
+    });
+
+    it('blocks legacy draft-to-SENT transition in controlled booking mode', async () => {
+      process.env.CONTROLLED_INVOICE_BOOKING = 'true';
+      try {
+        mockInvoiceRepo.findOne.mockResolvedValue({
+          id: 10, type: InvoiceType.INCOMING, currency: 'EGP',
+          status: InvoiceStatus.DRAFT, lines: [], total: 100,
+        } as Invoice);
+        await expect(service.update(10, { status: InvoiceStatus.SENT }))
+          .rejects.toThrow('controlled supplier workflow');
+        expect(mockInvoiceRepo.save).not.toHaveBeenCalled();
+      } finally {
+        delete process.env.CONTROLLED_INVOICE_BOOKING;
+      }
+    });
+
     it('rejects creating an already-paid supplier invoice before saving', async () => {
       await expect(service.create({
         type: InvoiceType.INCOMING, currency: 'EGP',
