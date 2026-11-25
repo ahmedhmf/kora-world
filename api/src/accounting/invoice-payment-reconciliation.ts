@@ -77,6 +77,15 @@ export function reconcileInvoicePayments(
     }
     if (!used.has(journal.id)) issues.add('unmatched_payment_journal');
   }
+  for (const original of originals) {
+    const linked = reversals.filter(j => j.reversalOfId === original.id);
+    if ((original.postingStatus === 'reversed' && linked.length !== 1) ||
+        (original.postingStatus === 'posted' && linked.length > 0) ||
+        (original.postingStatus !== 'posted' && original.postingStatus !== 'reversed' &&
+          payments.some(p => original.sourceEventKey === `supplier-payment:${p.id}:posted:v1`))) {
+      issues.add('inconsistent_reversal_status');
+    }
+  }
   for (const reversal of reversals) {
     const original = originals.find(j => j.id === reversal.reversalOfId);
     if (!original) {
