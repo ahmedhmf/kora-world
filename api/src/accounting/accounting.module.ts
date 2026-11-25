@@ -17,6 +17,8 @@ import { ReportsService } from './reports.service';
 import { ReportsController } from './reports.controller';
 import { InvoicesModule } from '../invoices/invoices.module';
 import { PaymentsModule } from '../payments/payments.module';
+import { InvoicePaymentReconciliationService } from './invoice-payment-reconciliation.service';
+import { InvoicePaymentReconciliationController } from './invoice-payment-reconciliation.controller';
 
 @Module({
   imports: [
@@ -29,8 +31,8 @@ import { PaymentsModule } from '../payments/payments.module';
     forwardRef(() => InvoicesModule),
     forwardRef(() => PaymentsModule),
   ],
-  controllers: [AccountingController, JournalController, ReportsController, ManualJournalsController, SimpleAccountingController],
-  providers: [AccountingService, AccountingPostingService, JournalWorkflowService, SimpleAccountingService, JournalService, ReportsService],
+  controllers: [AccountingController, JournalController, ReportsController, ManualJournalsController, SimpleAccountingController, InvoicePaymentReconciliationController],
+  providers: [AccountingService, AccountingPostingService, JournalWorkflowService, SimpleAccountingService, JournalService, ReportsService, InvoicePaymentReconciliationService],
   exports: [AccountingService, AccountingPostingService, JournalWorkflowService, JournalService, ReportsService, TypeOrmModule],
 })
 export class AccountingModule {}
