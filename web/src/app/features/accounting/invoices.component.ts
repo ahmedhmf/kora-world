@@ -35,6 +35,75 @@ export class InvoicesComponent implements OnInit {
   });
   readonly pilotCanCreate = computed(() => this.canViewSupplierPilot() &&
     this.auth.currentUser()?.role === 'admin');
+  // Controlled invoice issuance is a separate backend feature flag.
+  // The frontend only limits visibility; it never assumes the flag is enabled.
+  readonly pilotBookingInvoice = signal<Invoice | null>(null);
+  readonly pilotBookingBusy = signal(false);
+  readonly pilotBookingError = signal<string | null>(null);
+  readonly pilotBookingSuccess = signal<string | null>(null);
+  readonly pilotBookingUncertain = signal(false);
+  private pilotBookingRequest = 0;
+
+  openControlledSupplierBooking(invoice: Invoice) {
+    if (!this.pilotCanCreate() || this.pilotBookingBusy() ||
+        this.pilotBookingUncertain() || this.pilotRetryPending() ||
+        invoice.type !== 'incoming' || invoice.currency !== 'EGP' ||
+        invoice.status !== 'draft') return;
+    this.pilotBookingInvoice.set(invoice);
+    this.pilotBookingError.set(null);
+    this.pilotBookingSuccess.set(null);
+  }
+
+  cancelControlledSupplierBooking() {
+    if (this.pilotBookingBusy() || this.pilotBookingUncertain()) return;
+    ++this.pilotBookingRequest;
+    this.pilotBookingInvoice.set(null);
+    this.pilotBookingError.set(null);
+  }
+
+  confirmControlledSupplierBooking() {
+    const invoice = this.pilotBookingInvoice();
+    if (!this.pilotCanCreate() || !invoice || this.pilotBookingBusy() ||
+        invoice.type !== 'incoming' || invoice.currency !== 'EGP' ||
+        invoice.status !== 'draft') return;
+    const request = ++this.pilotBookingRequest;
+    this.pilotBookingBusy.set(true);
+    this.pilotBookingError.set(null);
+    this.accountingApi.bookControlledSupplierInvoice(invoice.id).subscribe({
+      next: result => {
+        if (request !== this.pilotBookingRequest) return;
+        this.pilotBookingBusy.set(false);
+        this.pilotBookingUncertain.set(false);
+        this.pilotBookingInvoice.set(null);
+        this.pilotBookingSuccess.set(
+          `Invoice ${invoice.number} booked (journal #${result.journalId})${result.replayed ? ' — confirmed replay' : ''}.`,
+        );
+        this.store.loadInvoices();
+        this.store.loadJournalEntries();
+      },
+      error: () => {
+        if (request !== this.pilotBookingRequest) return;
+        this.pilotBookingBusy.set(false);
+        this.pilotBookingUncertain.set(true);
+        this.pilotBookingError.set(
+          'Booking could not be confirmed. The request might have succeeded. Retry this SAME invoice to check its verified booking; do not edit or issue it through the legacy flow.',
+        );
+      },
+    });
+  }
+
+  // The backend returns the original journal for an identical booking replay.
+  // Never switch invoice identity after an uncertain booking response.
+  dismissControlledSupplierBookingWarning() {
+    if (this.pilotBookingBusy() || !this.pilotBookingUncertain()) return;
+    if (!confirm('The booking may have succeeded. Verify the invoice and journal history before starting any other action. Close this warning?')) return;
+    this.pilotBookingUncertain.set(false);
+    this.pilotBookingInvoice.set(null);
+    this.pilotBookingError.set(null);
+    this.store.loadInvoices();
+    this.store.loadJournalEntries();
+  }
+
   readonly pilotBanks = computed(() => {
     const accounts = this.store.accounts();
     return accounts.filter(a => a.isActive && a.currency === 'EGP' &&
@@ -377,8 +446,8 @@ export class InvoicesComponent implements OnInit {
 
     this.formInvoice = {
       number: inv.number,
-      type: 'outgoing',
-      supplierId: null,
+      type: inv.type,
+      supplierId: inv.supplierId || null,
       customerName: inv.customerName || '',
       date: new Date(inv.date).toISOString().split('T')[0],
       dueDate: new Date(inv.dueDate).toISOString().split('T')[0],
