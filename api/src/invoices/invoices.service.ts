@@ -60,7 +60,9 @@ export class InvoicesService {
   async create(dto: CreateInvoiceDto): Promise<Invoice> {
     // The legacy PAID state generates a synthetic bank/payment journal. In the
     // local pilot, payments must be real transactions through the pilot route.
-    if (dto.status === InvoiceStatus.PAID || dto.status === InvoiceStatus.SENT) {
+    if (dto.status === InvoiceStatus.PAID ||
+        (process.env.CONTROLLED_INVOICE_BOOKING === 'true' &&
+         dto.status === InvoiceStatus.SENT)) {
       blockLegacySupplierPilotWrite(dto, 'Creating an already-booked invoice');
     }
     let invoiceNumber = dto.number;
@@ -143,7 +145,8 @@ export class InvoicesService {
       (dto.currency || invoice.currency).toUpperCase() === 'EGP';
     if (becomesPilotInvoice &&
         (dto.status === InvoiceStatus.PAID ||
-         (invoice.status === InvoiceStatus.DRAFT && dto.status === InvoiceStatus.SENT))) {
+         (process.env.CONTROLLED_INVOICE_BOOKING === 'true' &&
+          invoice.status === InvoiceStatus.DRAFT && dto.status === InvoiceStatus.SENT))) {
       blockLegacySupplierPilotWrite(
         { type: InvoiceType.INCOMING, currency: 'EGP' },
         'Changing invoice status through legacy booking',
