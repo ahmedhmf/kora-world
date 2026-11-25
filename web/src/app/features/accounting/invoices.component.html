@@ -393,6 +393,22 @@
 
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="space-y-1.5">
+                  <label class="block text-xs font-medium text-zinc-400">Invoice Type</label>
+                  <select [(ngModel)]="formInvoice.type"
+                    class="w-full bg-zinc-950 border border-zinc-800 rounded px-3 py-2 text-sm text-white">
+                    <option value="outgoing">Outgoing · Customer</option>
+                    <option value="incoming">Incoming · Supplier</option>
+                  </select>
+                </div>
+                @if (formInvoice.type === 'incoming' && formInvoice.currency === 'EGP' && canViewSupplierPilot()) {
+                  <p class="self-end text-xs text-amber-300">
+                    Local EGP supplier pilot: save as Draft, then use Book Invoice from the invoice list.
+                    This does not pay the supplier.
+                  </p>
+                }
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="space-y-1.5">
                   <label class="block text-xs font-medium text-zinc-400">Invoice Number</label>
                   <div class="bg-zinc-950 border border-zinc-900 rounded px-3 py-2 text-sm font-mono text-zinc-300 flex items-center justify-between min-h-[38px]">
                     @if (numberLoading()) {
@@ -455,17 +471,27 @@
                 </div>
               </div>
 
-              <!-- Customer -->
+              <!-- Counterparty -->
               <div class="border-t border-zinc-900 pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="space-y-1.5">
-                  <label class="block text-xs font-medium text-zinc-400">Customer Name *</label>
-                  <input
-                    type="text"
-                    [(ngModel)]="formInvoice.customerName"
-                    class="w-full bg-zinc-950 border border-zinc-800 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-600"
-                    placeholder="e.g. Acme Corp"
-                  />
-                </div>
+                @if (formInvoice.type === 'incoming') {
+                  <div class="space-y-1.5">
+                    <label class="block text-xs font-medium text-zinc-400">Supplier</label>
+                    <select [(ngModel)]="formInvoice.supplierId"
+                      class="w-full bg-zinc-950 border border-zinc-800 rounded px-3 py-2 text-sm text-white">
+                      <option [ngValue]="null">Select supplier</option>
+                      @for (supplier of suppliersStore.suppliers(); track supplier.id) {
+                        <option [ngValue]="supplier.id">{{ supplier.name }}</option>
+                      }
+                    </select>
+                  </div>
+                } @else {
+                  <div class="space-y-1.5">
+                    <label class="block text-xs font-medium text-zinc-400">Customer Name *</label>
+                    <input type="text" [(ngModel)]="formInvoice.customerName"
+                      class="w-full bg-zinc-950 border border-zinc-800 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-600"
+                      placeholder="e.g. Acme Corp"/>
+                  </div>
+                }
               </div>
 
               <!-- Invoice Lines -->
