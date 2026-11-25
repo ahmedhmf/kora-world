@@ -235,6 +235,21 @@ export class AccountingApiService {
     return this.http.delete<void>(`${this.base}/invoices/${id}`);
   }
 
+  /** Admin-only, default-off; backend verifies disposable local kora_test. */
+  bookControlledSupplierInvoice(id: number): Observable<{
+    invoiceId: number;
+    journalId: number;
+    status: 'sent';
+    replayed: boolean;
+  }> {
+    return this.http.post<{
+      invoiceId: number;
+      journalId: number;
+      status: 'sent';
+      replayed: boolean;
+    }>(`${this.base}/invoices/controlled-egp-pilot/${id}/book`, {});
+  }
+
   // Payments
   getPayments(): Observable<Payment[]> {
     return this.http.get<Payment[]>(`${this.base}/payments`);
