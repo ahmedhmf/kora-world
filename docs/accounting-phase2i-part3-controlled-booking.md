@@ -59,3 +59,30 @@ npm run start:dev
 - Unit tests were added; running the new service against the local PostgreSQL database and concurrent-call tests are still required before declaring it fully verified.
 - The existing legacy invoice/payment flows and global financial reporting have not been migrated. This is not a production rollout.
 - No automatic currency conversion or scheduled FX processing (former Phase 2K).
+
+
+## PostgreSQL integration tests added
+
+`api/src/invoices/controlled-supplier-invoice-booking.integration.ts` adds 8 real PostgreSQL checks: balanced invoice booking with no synthetic payment journal, verified replay, concurrent same-invoice requests, refusal of existing history, mismatched total rejection, foreign-currency preservation, feature flag safety, and transaction rollback after simulated invoice-status persistence failure.
+
+The tests use only a disposable `kora_test` connection and verify `SELECT current_database()` before creating any fixture. They never enable automatic migrations or schema synchronization. Each test creates one unique invoice ID, and cleanup is scoped to that exact fixture. Existing accounts `5100` (active leaf EGP expense) and `2100` (active leaf EGP liability) are required; tests abort rather than modify the chart of accounts when these prerequisites are missing.
+
+Run from PowerShell:
+
+```powershell
+cd D:\Ahmed\project\kora-world
+git pull --ff-only origin feature/accounting-redesign
+cd api
+
+npm run build
+npm test -- --runInBand controlled-supplier-invoice-booking.service.spec.ts invoices.service.spec.ts
+
+# Set only after verifying this is disposable local kora_test.
+$env:DATABASE_NAME = 'kora_test'
+$env:DATABASE_HOST = '127.0.0.1'
+npm run test:accounting:integration -- controlled-supplier-invoice-booking.integration.ts
+```
+
+The test file sets `SUPPLIER_EGP_PILOT` and `CONTROLLED_INVOICE_BOOKING` in its own test process and restores their prior values afterward. Do not enable these flags in production.
+
+**Status:** Integration test code committed, but not executed in the developer's local PostgreSQL runtime by this assistant. A passing unit suite or the existing 15 supplier-payment integration tests does not by itself verify these 8 new booking tests.
