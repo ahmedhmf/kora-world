@@ -52,7 +52,9 @@ export class InvoicePaymentReconciliationService {
             payments.filter(p => p.invoiceId === i.id),
             journals.filter(j => j.invoiceId === i.id)).clean).length,
         unassignedPayments: payments.filter(p => !p.invoiceId || !ids.has(p.invoiceId)).map(p => p.id),
-        unassignedJournals: journals.filter(j => j.invoiceId && !ids.has(j.invoiceId)).map(j => j.id),
+        unassignedJournals: journals.filter(j =>
+          (j.invoiceId != null && !ids.has(j.invoiceId)) ||
+          (j.invoiceId == null && j.type === 'payment')).map(j => j.id),
         invoices: invoices.map(i =>
           reconcileInvoicePayments(i,
             payments.filter(p => p.invoiceId === i.id),
