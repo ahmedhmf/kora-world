@@ -52,6 +52,16 @@ describe('InvoicePaymentReconciliationService', () => {
     expect(manager.find).not.toHaveBeenCalled();
   });
 
+  it('reports payment journals without invoice linkage for manual investigation', async () => {
+    manager.find
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ id: 2, invoiceId: null }])
+      .mockResolvedValueOnce([{ id: 4, invoiceId: null, type: 'payment' }]);
+    const audit = await service.audit();
+    expect(audit.unassignedPayments).toEqual([2]);
+    expect(audit.unassignedJournals).toEqual([4]);
+  });
+
   it('uses repeatable-read, read-only snapshot with no writes', async () => {
     const audit = await service.audit();
     expect(db.transaction).toHaveBeenCalledWith('REPEATABLE READ', expect.any(Function));
