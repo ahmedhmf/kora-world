@@ -7,7 +7,7 @@ describe('Academy production release safety',()=>{
  beforeEach(()=>{for(const f of flags){previous[f]=process.env[f];delete process.env[f];}});
  afterEach(()=>{for(const f of flags){if(previous[f]===undefined)delete process.env[f];else process.env[f]=previous[f];}});
  const runner=(name:string)=>({query:jest.fn().mockResolvedValue([{name}])}) as unknown as QueryRunner;
- const db=(name:string,count=academyReleaseMigrations.length)=>({query:jest.fn().mockResolvedValueOnce([{name}]).mockResolvedValueOnce([{count}])}) as unknown as DataSource;
+ const db=(name:string,count:number=academyReleaseMigrations.length)=>({query:jest.fn().mockResolvedValueOnce([{name}]).mockResolvedValueOnce([{count}])}) as unknown as DataSource;
  it('never admits production migrations implicitly',async()=>{
   await expect(requireAcademyMigrationTarget(runner('kora_world'))).rejects.toThrow();
   process.env.KORA_ACADEMY_EXPLICIT_MIGRATION='approved';
