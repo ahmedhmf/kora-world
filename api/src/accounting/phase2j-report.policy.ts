@@ -16,7 +16,9 @@ export interface Phase2JResult {
   ap: Subledger; ar: Subledger;
   profitLoss: { revenue: StatementRow[]; expenses: StatementRow[]; grossProfit: number; netProfit: number };
   balanceSheet: { assets: StatementRow[]; liabilities: StatementRow[]; equity: StatementRow[];
-    totalAssets: number; totalLiabilities: number; totalEquity: number; difference: number; isBalanced: boolean };
+    totalAssets: number; totalLiabilities: number; totalEquity: number;
+    currentYearEarnings: number; priorUnclosedEarnings: number; unclosedEarnings: number;
+    adjustedEquity: number; difference: number; isBalanced: boolean };
   cashFlow: { period: string; inflows: number; outflows: number; netChange: number }[];
   issues: AuditIssue[];
   journalCount: number; needsReview: boolean;
@@ -193,6 +195,12 @@ export function buildPhase2JReport(input: {
   const revenues = new Map<number, number>();
   const expenses = new Map<number, number>();
   const cash = new Map<string, { inflows: number; outflows: number }>();
+  // The Balance Sheet is an as-of report, independent of the selected P&L
+  // period. Include all UN-CLOSED nominal balances through asOfDate, split
+  // between the current calendar year and prior years for transparency.
+  let currentYearEarningsCents = 0;
+  let priorUnclosedEarningsCents = 0;
+  const yearStart = `${asOfDate.slice(0, 4)}-01-01`;
   for (const journal of active) {
     const periodDate = dateKey(journal.date);
     const inPeriod = periodDate >= startDate && periodDate <= endDate;
@@ -202,6 +210,12 @@ export function buildPhase2JReport(input: {
       const value = cents(line.amountBase);
       if (!Number.isSafeInteger(value)) continue;
       totals.set(account.id, (totals.get(account.id) || 0) + value);
+      if (account.type === AccountType.REVENUE || account.type === AccountType.EXPENSE) {
+        // amountBase is debit minus credit. Negating it yields revenue
+        // positive / expense negative, i.e. net profit or loss.
+        if (periodDate >= yearStart) currentYearEarningsCents -= value;
+        else priorUnclosedEarningsCents -= value;
+      }
       if (inPeriod && account.type === AccountType.REVENUE) {
         revenues.set(account.id, (revenues.get(account.id) || 0) - value);
       }
@@ -242,12 +256,15 @@ export function buildPhase2JReport(input: {
   const totalAssets = assets.reduce((sum, r) => sum + cents(r.amount), 0);
   const totalLiabilities = liabilities.reduce((sum, r) => sum + cents(r.amount), 0);
   const totalEquity = equity.reduce((sum, r) => sum + cents(r.amount), 0);
-  // Retained earnings/current-year income may not yet be closed into equity:
-  // surface the difference, do not fabricate an equity journal or silently
-  // label an incomplete chart of accounts as a balanced statement.
-  const difference = totalAssets - totalLiabilities - totalEquity;
+  // Nominal accounts stay open until a genuine closing entry. Recognize
+  // their net EGP balance as presentation-only equity; never post a journal.
+  // Prior unclosed earnings are separately exposed so historical gaps are
+  // not quietly mislabeled as current-year income.
+  const unclosedEarningsCents = currentYearEarningsCents + priorUnclosedEarningsCents;
+  const adjustedEquityCents = totalEquity + unclosedEarningsCents;
+  const difference = totalAssets - totalLiabilities - adjustedEquityCents;
   if (Math.abs(difference) > 2) add('balance_sheet_difference',
-    'Assets do not equal liabilities plus posted equity; verify retained earnings and journal history');
+    'Assets do not equal liabilities plus posted equity and unclosed earnings; verify journal history and opening balances');
   const rows = [...cash].map(([period, val]) => ({
     period, inflows: money(val.inflows), outflows: money(val.outflows),
     netChange: money(val.inflows - val.outflows),
@@ -270,6 +287,10 @@ export function buildPhase2JReport(input: {
       totalAssets: money(totalAssets),
       totalLiabilities: money(totalLiabilities),
       totalEquity: money(totalEquity),
+      currentYearEarnings: money(currentYearEarningsCents),
+      priorUnclosedEarnings: money(priorUnclosedEarningsCents),
+      unclosedEarnings: money(unclosedEarningsCents),
+      adjustedEquity: money(adjustedEquityCents),
       difference: money(difference), isBalanced: Math.abs(difference) <= 2,
     },
     cashFlow: rows, issues, journalCount: journals.length, needsReview: issues.length > 0,
