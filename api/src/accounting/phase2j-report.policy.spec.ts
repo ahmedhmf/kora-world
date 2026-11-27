@@ -14,7 +14,7 @@ const accounts = [
 ];
 const invoice: ReportInvoice = {
   id: 7, number: 'SUP-7', type: InvoiceType.INCOMING, status: 'partially_paid' as never,
-  currency: 'EGP', total: 100, supplierId: 9, customerName: null, supplier: { name: 'Supplier A' },
+  currency: 'EGP', date: '2026-11-11', total: 100, supplierId: 9, customerName: null, supplier: { name: 'Supplier A' },
 };
 const journal = (
   id: number, type: JournalEntryType,
@@ -30,7 +30,7 @@ const pay = journal(11, JournalEntryType.PAYMENT, [line(2, 40, 0), line(3, 0, 40
   sourceEventKey: 'supplier-payment:22:posted:v1',
 });
 const payment: ReportPayment = {
-  id: 22, invoiceId: 7, amount: 40, currency: 'EGP',
+  id: 22, invoiceId: 7, date: '2026-11-12', amount: 40, currency: 'EGP',
   exchangeRate: 1, reference: 'SUP-PAY-22',
 };
 const report = (options: Partial<{
@@ -67,6 +67,23 @@ describe('Phase 2J report reconciliation', () => {
     }));
     expect(r.cashFlow[0].netChange).toBe(0);
     expect(r.issues.some(x => x.code === 'reversal_history_inconsistent')).toBe(false);
+  });
+
+  it('preserves historical outstanding balance before a later reversal date', () => {
+    const later = journal(12, JournalEntryType.PAYMENT,
+      [line(2, 0, 40), line(3, 40, 0)], {
+        date: '2027-01-15',
+        sourceEventKey: 'supplier-payment:22:reversal:v1', reversalOfId: 11,
+      });
+    const r = buildPhase2JReport({
+      startDate: '2026-01-01', endDate: '2026-12-31',
+      asOfDate: '2026-12-31',
+      invoices: [invoice], payments: [payment],
+      journals: [booking, { ...pay, postingStatus: 'reversed' }, later], accounts,
+    });
+    expect(r.ap.invoices[0]).toEqual(expect.objectContaining({
+      paid: 40, reversed: 0, outstanding: 60, reviewRequired: false,
+    }));
   });
 
   it('never treats an unlinked legacy payment as verified settlement', () => {
