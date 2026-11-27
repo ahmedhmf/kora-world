@@ -12,7 +12,7 @@ interface NavItem {
   route: string;
   icon: string;
   roles?: string[];
-  subItems?: { label: string; route: string; icon: string }[];
+  subItems?: { label: string; route: string; icon: string; roles?: string[] }[];
 }
 
 @Component({
@@ -165,6 +165,12 @@ export class LayoutComponent {
         { label: 'Purchase Orders', route: '/purchase-orders', icon: 'clipboard-list' },
       ];
     }
-    return this.navItems.filter((item) => !item.roles || (role && item.roles.includes(role)));
+    return this.navItems
+      .filter(item => !item.roles || (!!role && item.roles.includes(role)))
+      .map(item => !item.subItems ? item : ({
+        ...item,
+        subItems: item.subItems.filter(sub => !sub.roles ||
+          (!!role && sub.roles.includes(role))),
+      }));
   }
 }
