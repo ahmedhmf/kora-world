@@ -126,6 +126,12 @@ describe('Phase 2J combined report (local PostgreSQL)', () => {
   afterEach(async () => {
     if (!db?.isInitialized) return;
     if (invoiceId) {
+      // Reversal journals are children of the original journal and must be
+      // removed first if the local test schema enforces reversal_of_id FK.
+      await db.query(
+        'DELETE FROM journal_entries WHERE invoice_id = $1 AND reversal_of_id IS NOT NULL',
+        [invoiceId],
+      );
       await db.getRepository(JournalEntry).delete({ invoiceId });
       await db.getRepository(Payment).delete({ invoiceId });
       await db.getRepository(Invoice).delete({ id: invoiceId });
