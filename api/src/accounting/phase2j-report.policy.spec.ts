@@ -125,6 +125,15 @@ describe('Phase 2J report reconciliation', () => {
     expect(r.profitLoss.expenses[0].amount).toBe(100);
   });
 
+  it('rejects verified AP totals when booking journal differs from invoice total', () => {
+    const r = report({
+      journals: [{ ...booking, lines: [line(1, 90, 0), line(2, 0, 90)] }, pay],
+    });
+    expect(r.ap.invoices[0].reviewRequired).toBe(true);
+    expect(r.ap.invoices[0].outstanding).toBeNull();
+    expect(r.issues.some(i => i.code === 'invoice_booking_amount_mismatch')).toBe(true);
+  });
+
   it('flags missing posted reversals and never repairs them', () => {
     const r = report({ journals: [booking, { ...pay, postingStatus: 'reversed' }] });
     expect(r.needsReview).toBe(true);
