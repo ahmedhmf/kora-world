@@ -1,4 +1,5 @@
 import { DataSource } from 'typeorm';
+import { koraMigrationPaths } from './src/migration-selection';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 
@@ -19,6 +20,6 @@ export const AppDataSource = new DataSource({
   password: dbPassword,
   database: dbName,
   entities: [],
-  migrations: ['src/migrations/*{.ts,.js}'],
+  migrations: koraMigrationPaths(path.join(__dirname, 'src/migrations'), dbName),
   synchronize: false,
 });

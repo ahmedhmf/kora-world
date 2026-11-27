@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { koraMigrationPaths } from './migration-selection';
 import { AcademyModule } from './academy/academy.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -118,7 +119,7 @@ import { DropdownOptionsModule } from './dropdown-options/dropdown-options.modul
           PaymentAllocation,
           CustomerStatement,
         ],
-        migrations: [__dirname + '/migrations/*{.ts,.js}'],
+        migrations: koraMigrationPaths(__dirname + '/migrations', config.get<string>('DATABASE_NAME') || config.getOrThrow<string>('DB_NAME')),
         migrationsRun: true,
         synchronize: false,
         logging: config.get('NODE_ENV') === 'development',
