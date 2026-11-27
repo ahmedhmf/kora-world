@@ -12,7 +12,7 @@
 - One atomic, balanced, posted manual journal with source key `phase2l-opening:<reference>`.
 - Retrying the exact same reference and payload returns the original journal ID; conflicting payload is rejected.
 - Concurrent first-opening submissions serialize through a transaction-scoped advisory lock.
-- **Account history protection:** refuses posting an opening balance to any account already containing posted/reversed journals. This is intentional: the existing Marketing example has an already-used bank account. Opening balances for that historic account require a separately audited backfill/migration plan, not arbitrary backdating through this pilot form.
+- **Account history protection:** refuses posting an opening balance to any account already containing journal lines, including drafts and pending-approval entries. This is intentional: the existing Marketing example has an already-used bank account. Opening balances for that historic account require a separately audited backfill/migration plan, not arbitrary backdating through this pilot form.
 - No automatic balancing plug entries are made.
 
 ### 2L-B — EGP bank statement import
@@ -36,7 +36,7 @@ date,amount,reference,description
 ### 2L-C — Controlled exact bank-to-journal matching
 
 - Admin-only `POST /accounting/phase2l/rows/:id/match` with `journalLineId`, explicit reason.
-- The selected journal line must be from a posted or reversed journal, and the account, transaction date and **signed amount** must match the staged bank row exactly.
+- The selected journal line must be from a posted or reversed journal, and the account, transaction date and **signed amount** must match the staged bank row exactly. Only EGP journal lines with exchange rate 1 and a consistent stored EGP base amount are accepted.
 - Each bank row and journal line can be matched **at most once**, enforced in PostgreSQL.
 - Mismatch, duplicate or unsupported currency cannot silently auto-post a transaction. Matching is a linkage only, **not** a payment.
 - `POST /accounting/phase2l/rows/:id/unmatch` requires reason; the former journal-line ID and explanation remain in audit history.
