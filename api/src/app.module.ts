@@ -13,6 +13,10 @@ import { PurchaseOrderLineItem } from './purchase-orders/entities/purchase-order
 import { Sample } from './samples/entities/sample.entity';
 import { User } from './users/entities/user.entity';
 import { Event } from './events/entities/event.entity';
+import { EventOffer } from './events/entities/event-offer.entity';
+import { EventOfferFile } from './events/entities/event-offer-file.entity';
+import { EventDocument } from './events/entities/event-document.entity';
+import { EventReport } from './events/entities/event-report.entity';
 import { Account } from './accounts/entities/account.entity';
 import { Receipt } from './receipts/entities/receipt.entity';
 import { ReceiptLineItem } from './receipts/entities/receipt-line-item.entity';
@@ -44,6 +48,12 @@ import { AccountingModule } from './accounting/accounting.module';
 import { InvoicesModule } from './invoices/invoices.module';
 import { PaymentsModule } from './payments/payments.module';
 import { SourcingModule } from './sourcing/sourcing.module';
+import {
+  KoraExperience,
+  EventKoraExperience,
+  EventKoraChecklist,
+} from './experiences/experience.entity';
+import { ExperiencesModule } from './experiences/experiences.module';
 import { DeliveryNote } from './delivery-notes/delivery-note.entity';
 import { CustomerPricingRule } from './delivery-notes/customer-pricing-rule.entity';
 import { CustomerStatement } from './delivery-notes/customer-statement.entity';
@@ -53,21 +63,22 @@ import { PaymentAllocation } from './delivery-notes/payment-allocation.entity';
 import { InventoryAdjustment } from './delivery-notes/inventory-adjustment.entity';
 import { WeeklySalesReport } from './delivery-notes/weekly-sales-report.entity';
 import { DeliveryNotesModule } from './delivery-notes/delivery-notes.module';
+import { WarehouseModule } from './warehouse/warehouse.module';
 import { DropdownOption } from './dropdown-options/entities/dropdown-option.entity';
 import { DropdownOptionsModule } from './dropdown-options/dropdown-options.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true, envFilePath: ['.env', '../.env'] }),
+ ConfigModule.forRoot({ isGlobal: true, envFilePath: ['../.env', '.env'] }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (config: ConfigService) => ({
         type: 'postgres',
-        host: config.get('DATABASE_HOST') || 'localhost',
-        port: Number(config.get('DATABASE_PORT') || 5432),
-        username: config.get('DATABASE_USER') || config.get('DB_USER'),
-        password: config.get('DATABASE_PASSWORD') || config.get('DB_PASSWORD'),
-        database: config.get('DATABASE_NAME') || config.get('DB_NAME'),
+        host: config.get<string>('DATABASE_HOST') || 'localhost',
+        port: Number(config.get<string>('DATABASE_PORT') || '5432'),
+        username: config.get<string>('DATABASE_USER') || config.getOrThrow<string>('DB_USER'),
+        password: config.get<string>('DATABASE_PASSWORD') || config.getOrThrow<string>('DB_PASSWORD'),
+        database: config.get<string>('DATABASE_NAME') || config.getOrThrow<string>('DB_NAME'),
         entities: [
           Supplier,
           SupplierContact,
@@ -77,6 +88,13 @@ import { DropdownOptionsModule } from './dropdown-options/dropdown-options.modul
           Sample,
           User,
           Event,
+          EventOffer,
+          EventOfferFile,
+          EventDocument,
+          EventReport,
+          KoraExperience,
+          EventKoraExperience,
+          EventKoraChecklist,
           Account,
           Receipt,
           ReceiptLineItem,
@@ -114,6 +132,7 @@ import { DropdownOptionsModule } from './dropdown-options/dropdown-options.modul
     AuthModule,
     AttachmentsModule,
     EventsModule,
+    ExperiencesModule,
     AccountsModule,
     ReceiptsModule,
     ContactsModule,
@@ -124,6 +143,7 @@ import { DropdownOptionsModule } from './dropdown-options/dropdown-options.modul
     SourcingModule,
     DropdownOptionsModule,
     DeliveryNotesModule,
+    WarehouseModule,
     ThrottlerModule.forRoot([
       {
         ttl: 60000,

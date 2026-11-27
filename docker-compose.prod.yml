@@ -32,9 +32,9 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       CORS_ORIGINS: ${CORS_ORIGINS}
     ports:
-      - '3010:3000'
+      - '127.0.0.1:3010:3000'
     volumes:
-      - ./api/uploads:/app/uploads
+      - /opt/kora-world-data/uploads:/app/uploads
     depends_on:
       - postgres
     networks:
@@ -47,7 +47,7 @@ services:
     container_name: kora_world_web
     restart: unless-stopped
     ports:
-      - '4210:80'
+      - '127.0.0.1:4210:80'
     networks:
       - kora_network
 

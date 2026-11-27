@@ -1,0 +1,99 @@
+<div class="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
+  <header class="flex flex-wrap items-center justify-between gap-3">
+    <div><p class="text-xs uppercase tracking-widest text-zinc-500">Operations / Inventory</p><h1 class="text-3xl font-bold text-white mt-1">Warehouse</h1><p class="text-sm text-zinc-400 mt-1">Manage physical stock, storage locations and movements.</p></div>
+    <button type="button" (click)="refresh()" [disabled]="busy()" class="border border-zinc-700 rounded-lg px-4 py-2 text-sm disabled:opacity-50">Refresh</button>
+  </header>
+  @if (error()) { <p role="alert" class="rounded-lg border border-red-800 bg-red-950/40 text-red-300 p-3">{{ error() }}</p> }
+  @if (success()) { <p role="status" class="rounded-lg border border-emerald-800 bg-emerald-950/40 text-emerald-300 p-3">{{ success() }}</p> }
+  @if (busy()) { <p role="status" class="text-sm text-zinc-400">Working…</p> }
+  <section class="rounded-xl border border-zinc-800 bg-zinc-900/40 p-5 space-y-4">
+    <label class="block text-sm text-zinc-400">Warehouse
+      <select [ngModel]="selectedId()" (ngModelChange)="selectSite($event)" [disabled]="busy()" class="block w-full md:w-96 mt-1 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white">
+        <option [ngValue]="0">Select warehouse</option>
+        @for (site of sites(); track site.id) { <option [ngValue]="site.id">{{ site.code }} — {{ site.name }}{{ site.is_active ? '' : ' (inactive)' }}</option> }
+      </select>
+    </label>
+    @if (selected()?.address) { <p class="text-sm text-zinc-400">{{ selected()?.address }}</p> }
+    <details [open]="!sites().length">
+      <summary class="cursor-pointer text-sm font-semibold text-zinc-300">+ Create warehouse</summary>
+      <div class="grid md:grid-cols-3 gap-3 mt-3">
+        <label class="text-sm text-zinc-400">Code<input [(ngModel)]="siteForm.code" maxlength="40" placeholder="MAIN" class="block w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white mt-1"></label>
+        <label class="text-sm text-zinc-400">Name<input [(ngModel)]="siteForm.name" maxlength="160" placeholder="Main warehouse" class="block w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white mt-1"></label>
+        <label class="text-sm text-zinc-400">Address (optional)<input [(ngModel)]="siteForm.address" class="block w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white mt-1"></label>
+      </div>
+      <button type="button" (click)="createSite()" [disabled]="busy()" class="mt-3 bg-white text-zinc-900 rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50">Create warehouse</button>
+    </details>
+  </section>
+  @if (selected()) {
+    <section class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div class="rounded-xl border border-zinc-800 bg-zinc-900/40 p-5"><p class="text-sm text-zinc-400">Units on hand</p><p class="text-3xl font-semibold mt-2">{{ total() | number }}</p></div>
+      <div class="rounded-xl border border-zinc-800 bg-zinc-900/40 p-5"><p class="text-sm text-zinc-400">Products in stock</p><p class="text-3xl font-semibold mt-2">{{ productCount() }}</p></div>
+      <div class="rounded-xl border border-zinc-800 bg-zinc-900/40 p-5"><p class="text-sm text-zinc-400">Storage locations</p><p class="text-3xl font-semibold mt-2">{{ locations().length }}</p></div>
+    </section>
+    <section class="rounded-xl border border-zinc-800 bg-zinc-900/40 p-5 space-y-4">
+      <h2 class="font-semibold">Record stock movement</h2>
+      <fieldset [disabled]="busy() || !selected()?.is_active" class="space-y-4 disabled:opacity-50">
+        <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <label class="text-sm text-zinc-400">Operation<select [(ngModel)]="operation" class="block w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white mt-1">@for (action of actions; track action.value) { <option [ngValue]="action.value">{{ action.label }}</option> }</select></label>
+          <label class="text-sm text-zinc-400">Product<select [(ngModel)]="movement.productId" class="block w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white mt-1"><option [ngValue]="0">Select product</option>@for (p of products(); track p.id) { <option [ngValue]="p.id">{{ p.articleNumber }} — {{ p.name }}</option> }</select></label>
+          <label class="text-sm text-zinc-400">{{ operation === 'transfers' ? 'From location' : 'Location' }}<select [(ngModel)]="movement.locationId" class="block w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white mt-1"><option [ngValue]="0">Select location</option>@for (l of locations(); track l.id) { @if (l.is_active) { <option [ngValue]="l.id">{{ l.code }} — {{ l.name }}</option> } }</select></label>
+          @if (operation === 'transfers') { <label class="text-sm text-zinc-400">To location<select [(ngModel)]="movement.toLocationId" class="block w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white mt-1"><option [ngValue]="0">Select destination</option>@for (l of locations(); track l.id) { @if (l.is_active && l.id !== movement.locationId) { <option [ngValue]="l.id">{{ l.code }} — {{ l.name }}</option> } }</select></label> }
+          <label class="text-sm text-zinc-400">Quantity<input type="number" step="1" [min]="operation === 'adjustments' ? -100000 : 1" max="100000" [(ngModel)]="movement.quantity" class="block w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white mt-1"></label>
+          @if (operation !== 'transfers') { <label class="text-sm text-zinc-400">Reference (optional)<input maxlength="160" [(ngModel)]="movement.reference" class="block w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white mt-1"></label> }
+        </div>
+        @if (operation === 'adjustments') { <p class="text-xs text-zinc-400">Enter a positive quantity to add stock or a negative quantity to remove it.</p> }
+        <label class="block text-sm text-zinc-400">{{ operation === 'adjustments' ? 'Reason (required)' : 'Notes (optional)' }}<textarea [(ngModel)]="movement.notes" maxlength="2000" rows="2" class="block w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white mt-1"></textarea></label>
+        <button type="button" (click)="record()" [disabled]="busy()" class="bg-white text-zinc-900 rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50">Record movement</button>
+      </fieldset>
+      @if (!locations().length) { <p class="text-sm text-zinc-400">Create a storage location in the Locations tab first.</p> }
+    </section>
+    <section class="rounded-xl border border-zinc-800 bg-zinc-900/40 overflow-hidden">
+      <div class="flex flex-wrap border-b border-zinc-800 px-4 gap-1">
+        <button type="button" (click)="tab.set('stock')" [class.border-white]="tab() === 'stock'" class="px-4 py-3 border-b-2 border-transparent text-sm">Inventory</button>
+        <button type="button" (click)="tab.set('movements')" [class.border-white]="tab() === 'movements'" class="px-4 py-3 border-b-2 border-transparent text-sm">Movement history</button>
+        <button type="button" (click)="loadReport()" [disabled]="busy()" [class.border-white]="tab() === 'report'" class="px-4 py-3 border-b-2 border-transparent text-sm">Reports</button>
+        <button type="button" (click)="tab.set('locations')" [class.border-white]="tab() === 'locations'" class="px-4 py-3 border-b-2 border-transparent text-sm">Locations</button>
+      </div>
+      @if (tab() === 'stock') {
+        <div class="p-4 flex flex-wrap gap-3">
+          <input aria-label="Search inventory" placeholder="Search article, product or location" [ngModel]="search()" (ngModelChange)="search.set($event)" class="flex-1 min-w-48 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-sm">
+          <select aria-label="Filter storage location" [ngModel]="locationFilter()" (ngModelChange)="locationFilter.set($event)" class="bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-sm"><option [ngValue]="0">All locations</option>@for (l of locations(); track l.id) { <option [ngValue]="l.id">{{ l.code }}</option> }</select>
+        </div>
+        <div class="overflow-x-auto"><table class="w-full text-sm text-left"><thead class="text-zinc-400 bg-zinc-950/50"><tr><th class="p-3">Article</th><th class="p-3">Product</th><th class="p-3">Location</th><th class="p-3 text-right">On hand</th></tr></thead><tbody>
+          @for (r of visibleStock(); track r.locationId + ':' + r.productId) { <tr class="border-t border-zinc-800"><td class="p-3 font-mono">{{ r.articleNumber }}</td><td class="p-3">{{ r.productName }}</td><td class="p-3 text-zinc-400">{{ r.locationCode }}</td><td class="p-3 text-right font-semibold">{{ r.quantity }}</td></tr> }
+          @empty { <tr><td colspan="4" class="p-8 text-center text-zinc-500">No matching stock records.</td></tr> }
+        </tbody></table></div>
+      }
+      @if (tab() === 'movements') {
+        <p class="p-4 text-xs text-zinc-500">Latest 500 movements. Quantities are signed changes to on-hand stock.</p>
+        <div class="overflow-x-auto"><table class="w-full text-sm text-left"><thead class="text-zinc-400 bg-zinc-950/50"><tr><th class="p-3">Date</th><th class="p-3">Operation</th><th class="p-3">Product</th><th class="p-3">Location</th><th class="p-3 text-right">Change</th><th class="p-3">Reference / notes</th><th class="p-3">User ID</th></tr></thead><tbody>
+          @for (m of movements(); track m.id) { <tr class="border-t border-zinc-800"><td class="p-3 whitespace-nowrap">{{ m.createdAt | date:'short' }}</td><td class="p-3">{{ m.type.replace('_', ' ') }}</td><td class="p-3">{{ productLabel(m.productId) }}</td><td class="p-3">{{ locationLabel(m.locationId) }}</td><td class="p-3 text-right font-semibold" [class.text-emerald-400]="m.quantityChange > 0" [class.text-red-400]="m.quantityChange < 0">{{ m.quantityChange > 0 ? '+' : '' }}{{ m.quantityChange }}</td><td class="p-3 break-words">{{ m.reference || '—' }} @if (m.notes) { <p class="text-xs text-zinc-400">{{ m.notes }}</p> }</td><td class="p-3">{{ m.performedById ?? '—' }}</td></tr> }
+          @empty { <tr><td colspan="7" class="p-8 text-center text-zinc-500">No movements recorded.</td></tr> }
+        </tbody></table></div>
+      }
+      @if(tab()==='report'){
+        <div class="p-4 space-y-4">
+        @if(report();as r){
+          <div class="flex justify-between"><h2 class="font-semibold">Inventory commitments</h2><button type="button" (click)="exportReport()" class="text-blue-400 text-sm">Export CSV</button></div>
+          <p class="text-xs text-zinc-400">Peak reserved is the maximum simultaneous future reservation quantity. Dispatched items are already excluded from physical stock.</p>
+          <div class="overflow-x-auto"><table class="w-full text-sm text-left"><thead><tr><th>Type</th><th>Item</th><th>Location</th><th>Physical</th><th>Peak reserved</th><th>Dispatched</th><th>Uncommitted</th></tr></thead><tbody>@for(s of r.stock;track s.kind+':'+s.itemId+':'+s.locationCode){<tr class="border-t border-zinc-800"><td>{{s.kind}}</td><td class="py-2">{{s.code}} — {{s.name}}</td><td>{{s.locationCode}}</td><td>{{s.physical}}</td><td>{{s.reservedPeak}}</td><td>{{s.dispatched}}</td><td>{{s.physical-s.reservedPeak}}</td></tr>}</tbody></table></div>
+          <h2 class="font-semibold">Event inventory history</h2>
+          <div class="overflow-x-auto"><table class="w-full text-sm text-left"><thead><tr><th>Event</th><th>Item</th><th>Status</th><th>Quantity</th><th>Returned</th><th>Damaged</th><th>Missing</th><th>Consumed</th></tr></thead><tbody>@for(e of r.events;track $index){<tr class="border-t border-zinc-800"><td class="py-2">{{e.title}}</td><td>{{e.name}}</td><td>{{e.status}}</td><td>{{e.quantity}}</td><td>{{e.returned??'—'}}</td><td>{{e.damaged??'—'}}</td><td>{{e.missing??'—'}}</td><td>{{e.consumed??'—'}}</td></tr>}</tbody></table></div>
+        }@else{<p class="text-sm text-zinc-400">Report not loaded. Select Reports to refresh.</p>}
+        </div>
+      }
+      @if (tab() === 'locations') {
+        <div class="p-4 space-y-4">
+          <div class="flex flex-wrap items-end gap-3">
+            <label class="text-sm text-zinc-400">Code<input [(ngModel)]="locationForm.code" maxlength="40" placeholder="A-01" class="block bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white mt-1"></label>
+            <label class="text-sm text-zinc-400">Name<input [(ngModel)]="locationForm.name" maxlength="160" placeholder="Shelf A" class="block bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white mt-1"></label>
+            <button type="button" (click)="createLocation()" [disabled]="busy() || !selected()?.is_active" class="bg-white text-zinc-900 rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50">Add location</button>
+          </div>
+          @for (l of locations(); track l.id) { <div class="border border-zinc-800 rounded-lg p-3 flex justify-between gap-3"><span><strong>{{ l.code }}</strong> · {{ l.name }}</span><span class="text-xs text-zinc-400">{{ l.is_active ? 'Active' : 'Inactive' }}</span></div> }
+          @empty { <p class="text-sm text-zinc-500">No storage locations yet.</p> }
+        </div>
+      }
+    </section>
+  } @else { <p class="text-sm text-zinc-500">Create or select a warehouse to begin.</p> }
+  <p class="text-xs text-zinc-500">Warehouse stock includes posted customer and event movements.</p>
+</div>

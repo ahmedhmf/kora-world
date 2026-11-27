@@ -1,0 +1,178 @@
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { ActivatedRoute, RouterLink } from '@angular/router';
+import { switchMap, forkJoin } from 'rxjs';
+import { ExperienceItem, ExperiencesApiService, KoraExperience, PackingItem, AvailabilityItem, EventReservation, ReservationInput, ReconcileLine } from './experiences-api.service';
+import { ApiService } from '../../core/services/api.service';
+
+@Component({
+  selector: 'app-kora-experiences',
+  standalone: true,
+  imports: [CommonModule, FormsModule, RouterLink],
+  templateUrl: './experiences.component.html',
+})
+export class ExperiencesComponent implements OnInit {
+  private readonly api = inject(ExperiencesApiService);
+  private readonly eventsApi = inject(ApiService);
+  private readonly route = inject(ActivatedRoute);
+  readonly inventoryProducts = signal<{id:number;name:string;articleNumber:string}[]>([]);
+  readonly inventoryEquipment = signal<{id:number;name:string;code:string}[]>([]);
+  readonly warehouses = signal<{id:number;name:string;is_active:boolean}[]>([]);
+  readonly locations = signal<{id:number;code:string;name:string;is_active:boolean}[]>([]);
+  readonly reservations = signal<EventReservation[]>([]);
+  readonly activeReservation = computed(()=>this.reservations().some(r=>r.status==='active'));
+  readonly dispatchedRows = computed(()=>this.reservations().filter(r=>r.status==='dispatched'));
+  readonly logisticsLocked = computed(()=>this.reservations().some(r=>['active','dispatched','reconciled'].includes(r.status)));
+  reconciliation:Record<number,ReconcileLine>={};
+  readonly availability = signal<AvailabilityItem[] | null>(null);
+  warehouseId=0; locationId=0; startsAt=''; endsAt='';
+  readonly experiences = signal<KoraExperience[]>([]);
+  readonly selectedIds = signal<number[]>([]);
+  readonly checklist = signal<PackingItem[]>([]);
+  readonly eventTitle = signal('');
+  readonly error = signal('');
+  readonly message = signal('');
+  readonly busy = signal(false);
+  readonly editing = signal(false);
+  readonly packedCount = computed(() => this.checklist().filter(x => x.packed).length);
+  eventId: number | null = null;
+  editId: number | null = null;
+  formName = '';
+  formDescription = '';
+  formActive = true;
+  formItems: ExperienceItem[] = [];
+  extra: ExperienceItem = this.blankItem();
+
+  ngOnInit(): void {
+    const id = Number(this.route.snapshot.paramMap.get('id'));
+    this.eventId = Number.isSafeInteger(id) && id > 0 ? id : null;
+    this.loadLibrary();
+    forkJoin({products:this.eventsApi.getProducts(),equipment:this.eventsApi.getEquipment(),warehouses:this.eventsApi.getWarehouses()}).subscribe({next:r=>{this.inventoryProducts.set(r.products);this.inventoryEquipment.set(r.equipment);this.warehouses.set(r.warehouses.filter(w=>w.is_active));},error:e=>this.fail(e)});
+    if (this.eventId !== null) {
+      const eventId = this.eventId;
+      this.eventsApi.getEvent(eventId).subscribe({
+        next: event => {this.eventTitle.set(event.title);const start=new Date(event.startDate),end=new Date(event.endDate||event.startDate);start.setDate(start.getDate()-1);end.setDate(end.getDate()+1);this.startsAt=this.localDate(start);this.endsAt=this.localDate(end);},
+        error: () => this.error.set('Could not load this event'),
+      });
+      this.api.selected(eventId).subscribe({
+        next: ids => this.selectedIds.set(ids),
+        error: err => this.fail(err),
+      });
+      this.refreshChecklist();
+      this.loadReservations();
+    }
+  }
+
+  private localDate(date:Date):string { return new Date(date.getTime()-date.getTimezoneOffset()*60000).toISOString().slice(0,16); }
+  changeKind(item:ExperienceItem,kind:'product'|'equipment'|undefined) { item.inventoryKind=kind;item.inventoryId=undefined;if(kind)item.unit='pcs'; }
+  changeInventory(item:ExperienceItem,id:number) { item.inventoryId=id;const row=item.inventoryKind==='product'?this.inventoryProducts().find(p=>p.id===id):this.inventoryEquipment().find(e=>e.id===id);if(row){item.name=row.name;item.unit='pcs';} }
+  selectWarehouse(id:number){this.warehouseId=id;this.locationId=0;this.locations.set([]);this.availability.set(null);if(id)this.eventsApi.getWarehouseLocations(id).subscribe({next:rows=>{if(this.warehouseId===id)this.locations.set(rows.filter(l=>l.is_active));},error:e=>this.fail(e)});}
+  loadReservations(){if(this.eventId!==null)this.api.reservations(this.eventId).subscribe({next:r=>{this.reservations.set(r);for(const row of r.filter(x=>x.status==='dispatched'))this.reconciliation[row.id]??={reservationId:row.id,returned:row.quantity,damaged:0,missing:0,consumed:0,notes:''};},error:e=>this.fail(e)});}
+  private reservationInput():ReservationInput|null {
+    const start=new Date(this.startsAt),end=new Date(this.endsAt);
+    if(!this.warehouseId||!this.locationId||!Number.isFinite(+start)||!Number.isFinite(+end)||end<=start){this.error.set('Choose warehouse, location and valid reservation dates');return null;}
+    return {warehouseId:this.warehouseId,locationId:this.locationId,startsAt:start.toISOString(),endsAt:end.toISOString()};
+  }
+  checkAvailability(){if(this.eventId===null||this.busy())return;const dto=this.reservationInput();if(!dto)return;this.busy.set(true);this.error.set('');this.availability.set(null);this.api.previewReservation(this.eventId,dto).subscribe({next:r=>{this.availability.set(r.items);this.busy.set(false);},error:e=>this.fail(e)});}
+  reserveStock(){if(this.eventId===null||this.busy()||this.activeReservation())return;const dto=this.reservationInput();if(!dto)return;this.busy.set(true);this.error.set('');this.api.reserve(this.eventId,dto).subscribe({next:()=>{this.busy.set(false);this.availability.set(null);this.message.set('Stock reserved. Physical quantities unchanged.');this.loadReservations();},error:e=>this.fail(e)});}
+  cancelStock(){if(this.eventId===null||this.busy()||!window.confirm('Release all reservations for this event?'))return;this.busy.set(true);this.error.set('');this.api.cancelReservation(this.eventId).subscribe({next:()=>{this.busy.set(false);this.availability.set(null);this.message.set('Reservation released');this.loadReservations();},error:e=>this.fail(e)});}
+  dispatchEvent(){if(this.eventId===null||this.busy()||!window.confirm('Confirm the packed inventory has physically left the warehouse?'))return;this.busy.set(true);this.error.set('');this.api.dispatchEvent(this.eventId).subscribe({next:()=>{this.busy.set(false);this.message.set('Event dispatched. Physical stock deducted.');this.loadReservations();},error:e=>this.fail(e)});}
+  reconcileEvent(){if(this.eventId===null||this.busy())return;const lines=this.dispatchedRows().map(r=>this.reconciliation[r.id]);if(lines.some((l,i)=>!l||![l.returned,l.damaged,l.missing,l.consumed].every(n=>Number.isInteger(n)&&n>=0)||l.returned+l.damaged+l.missing+l.consumed!==this.dispatchedRows()[i].quantity)){this.error.set('Account for every dispatched unit before closing the event.');return;}if(!window.confirm('Finalize event reconciliation? Only serviceable returns will be added to stock.'))return;this.busy.set(true);this.error.set('');this.api.reconcileEvent(this.eventId,lines).subscribe({next:()=>{this.busy.set(false);this.message.set('Event reconciled. Serviceable returns added to stock.');this.loadReservations();},error:e=>this.fail(e)});}
+  blankItem(): ExperienceItem {
+    return { name: '', quantity: 1, unit: 'pcs', category: 'General', mode: 'sum' };
+  }
+  loadLibrary() {
+    this.api.list().subscribe({ next: rows => this.experiences.set(rows), error: err => this.fail(err) });
+  }
+  startNew() {
+    this.editId = null;
+    this.formName = '';
+    this.formDescription = '';
+    this.formActive = true;
+    this.formItems = [this.blankItem()];
+    this.editing.set(true);
+  }
+  startEdit(value: KoraExperience) {
+    this.editId = value.id;
+    this.formName = value.name;
+    this.formDescription = value.description || '';
+    this.formActive = value.active;
+    this.formItems = value.items.map(item => ({ ...item }));
+    this.editing.set(true);
+  }
+  addRequirement() { this.formItems.push(this.blankItem()); }
+  removeRequirement(index: number) { this.formItems.splice(index, 1); }
+  saveExperience() {
+    this.error.set('');
+    if (!this.formName.trim() || this.formItems.some(i => !i.name.trim() || i.quantity < 1 || !Number.isSafeInteger(Number(i.quantity)))) {
+      this.error.set('Enter an experience name and valid item names and quantities');
+      return;
+    }
+    const dto = { name: this.formName.trim(), description: this.formDescription, active: this.formActive,
+      items: this.formItems.map(item => ({ ...item, quantity: Number(item.quantity) })) };
+    this.busy.set(true);
+    const request = this.editId === null ? this.api.create(dto) : this.api.update(this.editId, dto);
+    request.subscribe({
+      next: () => { this.busy.set(false); this.editing.set(false); this.message.set('Experience saved'); this.loadLibrary(); },
+      error: err => this.fail(err),
+    });
+  }
+  removeExperience(value: KoraExperience) {
+    if (!window.confirm(`Delete ${value.name}? Existing generated event checklists will be retained.`)) return;
+    this.api.delete(value.id).subscribe({
+      next: () => { this.message.set('Experience deleted'); this.loadLibrary(); },
+      error: err => this.fail(err),
+    });
+  }
+  toggleSelection(id: number, checked: boolean) {
+    this.selectedIds.update(ids => checked ? [...ids.filter(x => x !== id), id] : ids.filter(x => x !== id));
+    this.message.set('Selection changed. Generate the checklist to save it.');
+  }
+  generate() {
+    if (this.eventId === null || this.busy()) return;
+    const eventId = this.eventId;
+    this.busy.set(true);
+    this.error.set('');
+    this.api.assign(eventId, this.selectedIds()).pipe(switchMap(() => this.api.generate(eventId))).subscribe({
+      next: rows => {
+        this.checklist.set(rows);
+        this.availability.set(null);
+        this.message.set('Event checklist generated and saved');
+        this.busy.set(false);
+      },
+      error: err => this.fail(err),
+    });
+  }
+  refreshChecklist() {
+    if (this.eventId === null) return;
+    this.api.checklist(this.eventId).subscribe({
+      next: rows => this.checklist.set(rows),
+      error: err => this.fail(err),
+    });
+  }
+  togglePacked(row: PackingItem, packed: boolean) {
+    if (this.eventId === null) return;
+    this.api.setPacked(this.eventId, row.key, packed).subscribe({
+      next: rows => this.checklist.set(rows),
+      error: err => this.fail(err),
+    });
+  }
+  addExtra() {
+    if (this.eventId === null || !this.extra.name.trim()) {
+      this.error.set('Enter the additional item name');
+      return;
+    }
+    this.busy.set(true);
+    this.api.addEventItem(this.eventId, { ...this.extra, quantity: Number(this.extra.quantity) }).subscribe({
+      next: rows => { this.checklist.set(rows); this.availability.set(null); this.extra = this.blankItem(); this.busy.set(false); this.message.set('Event-only item added'); },
+      error: err => this.fail(err),
+    });
+  }
+  print() { window.print(); }
+  private fail(err: any) {
+    this.busy.set(false);
+    const message = err?.error?.message;
+    this.error.set(typeof message === 'string' ? message : Array.isArray(message) ? message.join(', ') : 'Unable to save. Please try again.');
+  }
+}

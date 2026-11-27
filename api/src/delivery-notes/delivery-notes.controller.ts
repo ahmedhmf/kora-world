@@ -62,6 +62,16 @@ export class DeliveryNotesController {
     return this.service.cancelSales(id, dto.reason, req.user);
   }
 
+  @Roles('admin','employee')
+  @Get('account/:accountId/returns')
+  listReturns(@Param('accountId',ParseIntPipe) accountId:number) { return this.service.listCustomerReturns(accountId); }
+
+  @Roles('admin','employee')
+  @Post('account/:accountId/returns')
+  returnStock(@Param('accountId',ParseIntPipe) accountId:number,@Body() dto:Parameters<DeliveryNotesService['returnToWarehouse']>[1],@Req() req:AuthenticatedRequest) {
+    return this.service.returnToWarehouse(accountId,dto,req.user);
+  }
+
   @Get('account/:accountId/adjustments')
   listAdjustments(@Param('accountId', ParseIntPipe) accountId: number) {
     return this.service.listAdjustments(accountId);
@@ -80,11 +90,19 @@ export class DeliveryNotesController {
     return this.service.get(id);
   }
 
+  @Roles('admin', 'employee')
   @Post('account/:accountId')
-  create(@Param('accountId', ParseIntPipe) accountId: number, @Body() dto: { deliveryDate: string; remarks?: string; items: Array<{ productId: number; quantity: number }> }) {
+  create(@Param('accountId', ParseIntPipe) accountId: number, @Body() dto: Parameters<DeliveryNotesService['create']>[1]) {
     return this.service.create(accountId, dto);
   }
 
+  @Roles('admin', 'employee')
+  @Post(':id/dispatch')
+  dispatch(@Param('id', ParseIntPipe) id: number, @Req() req: AuthenticatedRequest) {
+    return this.service.dispatch(id, req.user.sub);
+  }
+
+  @Roles('admin', 'employee')
   @Patch(':id/signed-copy')
   attachSignedCopy(@Param('id', ParseIntPipe) id: number, @Body() dto: { path: string; name: string }) {
     return this.service.attachSignedCopy(id, dto);

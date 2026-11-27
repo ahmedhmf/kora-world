@@ -1,0 +1,64 @@
+import { ExperiencesService } from './experiences.service';
+import { KoraExperience } from './experience.entity';
+
+describe('ExperiencesService packing list generation', () => {
+  const templates: Partial<KoraExperience>[] = [
+    { id: 1, name: 'Shooting', items: [
+      { name: 'Footballs', quantity: 5, unit: 'pcs', category: 'Sport', mode: 'sum' },
+      { name: 'Generator', quantity: 1, unit: 'pcs', category: 'Power', mode: 'shared' },
+    ] },
+    { id: 2, name: 'Skills', items: [
+      { name: 'footballs', quantity: 3, unit: 'pcs', category: 'Sport', mode: 'sum' },
+      { name: 'Generator', quantity: 1, unit: 'pcs', category: 'Power', mode: 'shared' },
+    ] },
+  ];
+
+  function setup(existing: any[] = []) {
+    const events = { exists: jest.fn().mockResolvedValue(true) };
+    const experiences = { find: jest.fn(), findBy: jest.fn().mockResolvedValue(templates) };
+    const assignments = { find: jest.fn().mockResolvedValue([{ experienceId: 1 }, { experienceId: 2 }]) };
+    const checklists = {
+      findOneBy: jest.fn().mockResolvedValue(existing.length ? { eventId: 10, items: existing } : null),
+      create: jest.fn().mockImplementation(data => data),
+      save: jest.fn().mockImplementation(async data => data),
+    };
+    const dataSource = { query: jest.fn().mockResolvedValue([]) };
+    const service = new ExperiencesService(events as any, experiences as any, assignments as any, checklists as any, dataSource as any);
+    return { service, checklists, dataSource };
+  }
+
+  it('adds consumable quantities and shares common equipment', async () => {
+    const { service, checklists } = setup();
+    const rows = await service.generate(10);
+    expect(rows.find(x => x.name === 'Footballs')?.quantity).toBe(8);
+    expect(rows.find(x => x.name === 'Generator')?.quantity).toBe(1);
+    expect(rows.find(x => x.name === 'Generator')?.sources).toEqual(['Shooting', 'Skills']);
+    expect(checklists.save).toHaveBeenCalled();
+  });
+
+  it('keeps packing progress and event-only entries when regenerated', async () => {
+    const existing = [
+      { name: 'Footballs', key: 'footballs|pcs', quantity: 8, unit: 'pcs', category: 'Sport', mode: 'sum', packed: true, sources: ['Shooting'] },
+      { name: 'Water', key: 'water|bottles', quantity: 20, unit: 'bottles', category: 'Food', mode: 'sum', packed: false, sources: ['Event-only'] },
+    ];
+    const { service } = setup(existing);
+    const rows = await service.generate(10);
+    expect(rows.find(x => x.key === 'footballs|pcs')?.packed).toBe(true);
+    expect(rows.find(x => x.key === 'water|bottles')?.quantity).toBe(20);
+  });
+
+  it('prevents regeneration while stock is reserved or dispatched', async () => {
+    const { service, checklists, dataSource } = setup();
+    dataSource.query.mockResolvedValueOnce([{ id: 42 }]);
+    await expect(service.generate(10)).rejects.toThrow('Cancel the active reservation');
+    expect(checklists.save).not.toHaveBeenCalled();
+    expect(dataSource.query).toHaveBeenCalledWith(expect.stringContaining("'active','dispatched','reconciled'"), [10]);
+  });
+
+  it('rejects invalid experience requirements', async () => {
+    const { service } = setup();
+    await expect(service.create({ name: 'Example', items: [
+      { name: 'Balls', quantity: -1, unit: 'pcs', category: 'Sport', mode: 'sum' },
+    ] })).rejects.toThrow();
+  });
+});

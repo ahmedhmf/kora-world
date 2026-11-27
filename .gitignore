@@ -3,4 +3,6 @@ node_modules/
 dist/
 .angular/
 *.log
- 
+
+# Runtime uploads are stored outside the repository in production
+api/uploads/

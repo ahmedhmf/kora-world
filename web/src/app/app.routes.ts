@@ -2,6 +2,9 @@ import { Routes } from '@angular/router';
 import { LayoutComponent } from './layout/layout.component';
 import { authGuard } from './core/guards/auth.guard';
 import { roleGuard } from './core/guards/role.guard';
+import { inject } from '@angular/core';
+import { Router } from '@angular/router';
+import { AuthService } from './core/services/auth.service';
 
 export const routes: Routes = [
   {
@@ -15,6 +18,23 @@ export const routes: Routes = [
     canActivate: [authGuard],
     children: [
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
+      {
+        path: 'warehouse/equipment',
+        canActivate: [() => {
+          const role = inject(AuthService).currentUser()?.role;
+          return role === 'admin' || role === 'employee' || inject(Router).createUrlTree(['/dashboard']);
+        }],
+        loadComponent: () => import('./features/warehouse/equipment.component').then(m => m.EquipmentComponent),
+      },
+      {
+        path: 'warehouse',
+        canActivate: [() => {
+          const role = inject(AuthService).currentUser()?.role;
+          return role === 'admin' || role === 'employee' || inject(Router).createUrlTree(['/dashboard']);
+        }],
+        loadComponent: () =>
+          import('./features/warehouse/warehouse.component').then(m => m.WarehouseComponent),
+      },
       {
         path: 'users',
         canActivate: [roleGuard],
@@ -138,6 +158,22 @@ export const routes: Routes = [
         path: 'forecasts',
         loadComponent: () =>
           import('./features/forecasts/forecasts-list.component').then((m) => m.ForecastsListComponent),
+      },
+      {
+        path: 'experiences',
+        loadComponent: () => import('./features/experiences/experiences.component').then(m => m.ExperiencesComponent),
+      },
+      {
+        path: 'calendar/:id/manage',
+        loadComponent: () => import('./features/events/event-operations.component').then(m => m.EventOperationsComponent),
+      },
+      {
+        path: 'calendar/:id/offers',
+        loadComponent: () => import('./features/events/event-offers.component').then(m => m.EventOffersComponent),
+      },
+      {
+        path: 'calendar/:id/experiences',
+        loadComponent: () => import('./features/experiences/experiences.component').then(m => m.ExperiencesComponent),
       },
       {
         path: 'calendar',

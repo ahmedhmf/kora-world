@@ -1,10 +1,13 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
+import { CustomerReturnsComponent } from './customer-returns.component';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { PDFDocument, StandardFonts, rgb, PDFFont, PDFPage } from 'pdf-lib';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ApiService } from '../../core/services/api.service';
 import { B2BAccount } from '../../core/models/account.model';
+import { WarehouseSite, WarehouseLocation, WarehouseStock } from '../../core/models/warehouse.model';
+import { forkJoin } from 'rxjs';
 import { Product } from '../../core/models/product.model';
 
 interface DeliveryItem { productId: number; quantity: number; }
@@ -13,12 +16,13 @@ interface DeliveryNote {
   deliveryAddress?: string; paymentModel?: string; remarks?: string;
   items: Array<{ articleNumber: string; productName: string; quantity: number }>;
   signedFilePath?: string; signedFileName?: string;
+  deliverySource?: 'legacy' | 'warehouse' | 'supplier' | 'external'; sourceDetails?: string; warehouseId?: number; locationId?: number; dispatchedAt?: string;
 }
 
 @Component({
   selector: 'app-account-delivery-notes',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink, CustomerReturnsComponent],
   template: `
     <div class="p-8 max-w-5xl mx-auto space-y-6">
       <a [routerLink]="['/accounts', accountId]" class="text-zinc-400 hover:text-white text-sm">← Back to Account</a>
@@ -36,13 +40,30 @@ interface DeliveryNote {
           <label class="block text-sm text-zinc-400 mb-1">Delivery Date</label>
           <input type="date" [(ngModel)]="deliveryDate" class="bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white" />
         </div>
+        <label class="block text-sm text-zinc-400">Delivery source
+          <select [ngModel]="deliverySource" (ngModelChange)="changeSource($event)" [disabled]="saving()" class="block bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white">
+            <option value="warehouse">KORA Warehouse</option><option value="supplier">Direct supplier delivery</option><option value="external">External stock</option>
+          </select>
+        </label>
+        @if (deliverySource === 'warehouse') {
+          <div class="grid sm:grid-cols-2 gap-3">
+            <label class="text-sm text-zinc-400">Warehouse<select [ngModel]="warehouseId" (ngModelChange)="selectWarehouse($event)" [disabled]="saving()" class="block w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white"><option [ngValue]="0">Select warehouse</option>@for (w of warehouses(); track w.id) { <option [ngValue]="w.id">{{ w.name }}</option> }</select></label>
+            <label class="text-sm text-zinc-400">Location<select [ngModel]="locationId" (ngModelChange)="selectLocation($event)" [disabled]="saving() || loadingStock()" class="block w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white"><option [ngValue]="0">Select location</option>@for (l of locations(); track l.id) { <option [ngValue]="l.id">{{ l.code }} — {{ l.name }}</option> }</select></label>
+          </div>
+          <p class="text-xs text-zinc-400">Stock is checked now and deducted only when dispatch is confirmed. Stock is not reserved.</p>
+        } @else {
+          <label class="block text-sm text-zinc-400">{{ deliverySource === 'supplier' ? 'Supplier name / shipment reference' : 'External stock source / reason' }}
+            <input [(ngModel)]="sourceDetails" maxlength="200" class="block w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white">
+          </label>
+          <p class="text-xs text-zinc-400">No KORA warehouse stock will be deducted.</p>
+        }
         <h3 class="text-sm font-semibold text-zinc-300">Products delivered</h3>
         @for (item of items; track $index; let i = $index) {
           <div class="flex gap-3 items-center flex-wrap">
             <select [(ngModel)]="item.productId" class="bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white flex-1 min-w-48">
               <option [ngValue]="0">Select product...</option>
-              @for (product of products(); track product.id) {
-                <option [ngValue]="product.id">{{ product.articleNumber }} — {{ product.name }}</option>
+              @for (product of availableProducts(); track product.id) {
+                <option [ngValue]="product.id">{{ product.articleNumber }} — {{ product.name }}{{ deliverySource === 'warehouse' ? ' (' + available(product.id) + ' available)' : '' }}</option>
               }
             </select>
             <input type="number" min="1" step="1" [(ngModel)]="item.quantity" aria-label="Quantity" class="w-24 bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white" />
@@ -54,9 +75,10 @@ interface DeliveryNote {
           <label class="block text-sm text-zinc-400 mb-1">Delivery Remarks (optional)</label>
           <textarea [(ngModel)]="remarks" maxlength="2000" rows="2" class="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white"></textarea>
         </div>
-        <button type="button" [disabled]="saving()" (click)="create()" class="bg-white text-zinc-900 font-semibold rounded-lg px-4 py-2 disabled:opacity-50">Save Delivery Note</button>
+        <button type="button" [disabled]="saving() || loadingStock()" (click)="create()" class="bg-white text-zinc-900 font-semibold rounded-lg px-4 py-2 disabled:opacity-50">Save Delivery Note</button>
       </section>
 
+      <app-customer-returns [accountId]="accountId" />
       <section class="space-y-3">
         <h2 class="font-semibold text-white">Saved Delivery Notes</h2>
         @for (note of notes(); track note.id) {
@@ -64,6 +86,8 @@ interface DeliveryNote {
             <div>
               <p class="text-white font-semibold">{{ note.noteNumber }}</p>
               <p class="text-zinc-400 text-sm">{{ note.deliveryDate }} · {{ note.items.length }} product lines</p>
+              <p class="text-xs text-zinc-400">{{ sourceLabel(note) }}</p>
+              @if (note.deliverySource === 'warehouse' && !note.signedFilePath) { <p class="text-xs text-amber-400">{{ note.dispatchedAt ? 'Dispatched — awaiting signature' : 'Prepared — awaiting dispatch' }}</p> }
               <p class="text-xs" [class.text-emerald-400]="note.signedFilePath" [class.text-amber-400]="!note.signedFilePath">
                 {{ note.signedFilePath ? 'Signed copy uploaded' : 'Awaiting signed copy' }}
               </p>
@@ -73,10 +97,15 @@ interface DeliveryNote {
               @if (note.signedFilePath) {
                 <button type="button" (click)="downloadSigned(note)" class="text-blue-400 text-sm">View signed copy</button>
               }
+              @if (note.deliverySource && note.deliverySource !== 'legacy' && !note.dispatchedAt && !note.signedFilePath) {
+                <button type="button" (click)="dispatch(note)" [disabled]="saving()" class="bg-white text-zinc-900 rounded-lg px-3 py-2 text-sm">Confirm dispatch</button>
+              }
+              @if (note.deliverySource !== 'warehouse' || note.dispatchedAt) {
               <label class="cursor-pointer bg-zinc-800 text-white px-3 py-2 rounded-lg text-sm">
                 Upload signed copy
                 <input type="file" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" class="hidden" (change)="uploadSigned(note, $event)" />
               </label>
+              }
             </div>
           </div>
         } @empty {
@@ -98,13 +127,50 @@ export class AccountDeliveryNotesComponent implements OnInit {
   saving = signal(false);
   deliveryDate = new Date().toLocaleDateString('en-CA');
   remarks = '';
+  deliverySource: 'warehouse' | 'supplier' | 'external' = 'warehouse';
+  warehouseId = 0; locationId = 0; sourceDetails = '';
+  warehouses = signal<WarehouseSite[]>([]);
+  locations = signal<WarehouseLocation[]>([]);
+  warehouseStock = signal<WarehouseStock[]>([]);
+  loadingStock = signal(false);
   items: DeliveryItem[] = [{ productId: 0, quantity: 1 }];
 
   ngOnInit(): void {
     this.accountId = Number(this.route.snapshot.paramMap.get('id'));
     this.api.getAccount(this.accountId).subscribe({ next: a => this.account.set(a), error: () => this.error.set('Could not load account') });
     this.api.getProducts().subscribe({ next: p => this.products.set(p), error: () => this.error.set('Could not load products') });
+    this.api.getWarehouses().subscribe({ next: w => this.warehouses.set(w.filter(s => s.is_active)), error: () => this.error.set('Could not load warehouses') });
     this.reload();
+  }
+  changeSource(source: 'warehouse' | 'supplier' | 'external'): void {
+    this.deliverySource = source; this.sourceDetails = ''; this.items = [{ productId: 0, quantity: 1 }];
+  }
+  selectWarehouse(id: number): void {
+    this.warehouseId = id; this.locationId = 0; this.locations.set([]); this.warehouseStock.set([]);
+    this.items = [{ productId: 0, quantity: 1 }];
+    if (!id) { this.loadingStock.set(false); return; }
+    this.loadingStock.set(true);
+    forkJoin({ locations: this.api.getWarehouseLocations(id), stock: this.api.getWarehouseStock(id) }).subscribe({
+      next: result => { if (this.warehouseId !== id) return; this.locations.set(result.locations.filter(l => l.is_active)); this.warehouseStock.set(result.stock); this.loadingStock.set(false); },
+      error: () => { if (this.warehouseId === id) { this.loadingStock.set(false); this.error.set('Could not load warehouse stock'); } },
+    });
+  }
+  selectLocation(id: number): void { this.locationId = id; this.items = [{ productId: 0, quantity: 1 }]; }
+  available(id: number): number { return this.warehouseStock().find(s => s.locationId === this.locationId && s.productId === id)?.quantity ?? 0; }
+  availableProducts(): Product[] { return this.deliverySource === 'warehouse' ? this.products().filter(p => this.available(p.id) > 0) : this.products(); }
+  sourceLabel(note: DeliveryNote): string {
+    if (note.deliverySource === 'warehouse') return 'Warehouse #' + note.warehouseId + ' / Location #' + note.locationId;
+    if (note.deliverySource === 'supplier') return 'Direct supplier: ' + note.sourceDetails;
+    if (note.deliverySource === 'external') return 'External stock: ' + note.sourceDetails;
+    return 'Legacy delivery (not warehouse tracked)';
+  }
+  dispatch(note: DeliveryNote): void {
+    if (this.saving() || !window.confirm('Confirm goods have physically left the source? Warehouse stock will be deducted for warehouse deliveries.')) return;
+    this.saving.set(true); this.error.set(''); this.success.set('');
+    this.api.dispatchDeliveryNote(note.id).subscribe({
+      next: () => { this.saving.set(false); this.success.set(note.noteNumber + ' dispatched.'); this.reload(); if (this.warehouseId) this.api.getWarehouseStock(this.warehouseId).subscribe({ next: s => this.warehouseStock.set(s), error: () => this.error.set('Dispatch saved; refresh stock before creating another note.') }); },
+      error: err => { this.saving.set(false); this.error.set(err.error?.message || 'Could not dispatch delivery'); },
+    });
   }
   reload(): void {
     this.api.getDeliveryNotes(this.accountId).subscribe({ next: n => this.notes.set(n), error: () => this.error.set('Could not load delivery notes') });
@@ -116,9 +182,13 @@ export class AccountDeliveryNotesComponent implements OnInit {
     if (!this.deliveryDate || !this.items.length || this.items.some(i => !i.productId || !Number.isInteger(Number(i.quantity)) || Number(i.quantity) < 1) || new Set(this.items.map(i => i.productId)).size !== this.items.length) {
       this.error.set('Select unique products and positive whole-number quantities.'); return;
     }
+    if (this.deliverySource === 'warehouse' && (!this.warehouseId || !this.locationId || this.items.some(i => i.quantity > this.available(i.productId)))) {
+      this.error.set('Select a warehouse location with sufficient stock.'); return;
+    }
+    if (this.deliverySource !== 'warehouse' && !this.sourceDetails.trim()) { this.error.set('Specify the delivery source.'); return; }
     this.saving.set(true);
-    this.api.createDeliveryNote(this.accountId, { deliveryDate: this.deliveryDate, remarks: this.remarks, items: this.items.map(i => ({ productId: Number(i.productId), quantity: Number(i.quantity) })) }).subscribe({
-      next: note => { this.saving.set(false); this.items = [{ productId: 0, quantity: 1 }]; this.remarks = ''; this.success.set(note.noteNumber + ' saved. Print and obtain customer signature.'); this.reload(); },
+    this.api.createDeliveryNote(this.accountId, { deliveryDate: this.deliveryDate, remarks: this.remarks, deliverySource: this.deliverySource, warehouseId: this.warehouseId, locationId: this.locationId, sourceDetails: this.sourceDetails, items: this.items.map(i => ({ productId: Number(i.productId), quantity: Number(i.quantity) })) }).subscribe({
+      next: note => { this.saving.set(false); this.items = [{ productId: 0, quantity: 1 }]; this.remarks = ''; this.success.set(note.noteNumber + ' saved. Confirm dispatch when goods leave, then obtain customer signature.'); this.reload(); },
       error: err => { this.saving.set(false); this.error.set(err.error?.message || 'Could not create delivery note'); },
     });
   }
@@ -194,7 +264,6 @@ export class AccountDeliveryNotesComponent implements OnInit {
         nameLines.forEach((line, j) => text(state.page, line, left + 135, state.y - j * 13, 9));
         text(state.page, item.quantity, right - 35, state.y, 9);
         state.y -= height;
-        // No horizontal row separator: it can visually strike through subsequent item text.
       }
       const consignment = note.paymentModel === 'Consignment' || note.paymentModel === 'Consignment (Monthly Settlement)';
       const ack = consignment

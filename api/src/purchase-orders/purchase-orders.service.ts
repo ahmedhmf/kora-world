@@ -57,6 +57,7 @@ export class PurchaseOrdersService {
   }
 
   async create(dto: CreatePurchaseOrderDto): Promise<PurchaseOrder> {
+    if (dto.status === POStatus.RECEIVED) throw new BadRequestException('Use Goods Receipts to receive purchase orders');
     // 1. Validate Supplier exists
     const supplier = await this.suppliersService.findOne(dto.supplierId);
 
@@ -161,7 +162,12 @@ export class PurchaseOrdersService {
       );
     }
 
-    if (dto.status) po.status = dto.status;
+    if (dto.status && dto.status !== po.status) {
+      if (dto.status === POStatus.RECEIVED) throw new BadRequestException('Use Goods Receipts to receive purchase orders');
+      const [receipt] = await this.poRepo.query('SELECT id FROM warehouse_goods_receipts WHERE po_id = $1 LIMIT 1', [id]);
+      if (receipt || po.status === POStatus.RECEIVED) throw new BadRequestException('Cannot change status of a received order or an order with goods receipts');
+      po.status = dto.status;
+    }
     if (dto.expectedDelivery !== undefined)
       po.expectedDelivery = dto.expectedDelivery
         ? new Date(dto.expectedDelivery)
@@ -176,6 +182,8 @@ export class PurchaseOrdersService {
 
   async remove(id: number): Promise<void> {
     const po = await this.findOne(id);
+    const [receipt] = await this.poRepo.query('SELECT id FROM warehouse_goods_receipts WHERE po_id = $1 LIMIT 1', [id]);
+    if (receipt) throw new BadRequestException('Cannot delete an order with goods receipts');
     
     // Parse notes to check if it was auto-generated from a B2B Client Forecast
     // Notes format: "Auto-generated from B2B Client Forecast (Year: 2027) for Account: Acme Corp"
