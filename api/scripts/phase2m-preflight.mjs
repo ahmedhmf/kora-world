@@ -34,7 +34,7 @@ check('2M-B-legacy-review', has('src/accounting/phase2m-readiness.policy.ts',
   has('src/accounting/phase2m-readiness.policy.ts', /DUPLICATE_SOURCE_EVENT/), 'blocker',
   'Legacy payments and duplicate source-event journals require review');
 check('2M-C-migration-disposition', existsSync(resolve(root, migration)) &&
-  !has(migration, /if \\(db\\?\\.name !== 'kora_test'\\) return/), 'blocker',
+  !has(migration, /db\?\.name !== 'kora_test'/), 'blocker',
   'Test-only Phase 2L migration is a no-op outside kora_test. Production requires a new approved migration and rollout plan');
 check('2M-C-startup-migration-safety', !/migrationsRun:\s*true/.test(app), 'blocker',
   'API currently auto-runs migrations at boot; require a reviewed and explicitly executed production migration process');
