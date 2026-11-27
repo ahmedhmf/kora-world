@@ -18,7 +18,7 @@ export class AcademyAdminComponent {
  id:number|null=null;
  draft=emptyDraft();
  saved:AcademySave|null=null;
- routes=['/suppliers','/products','/purchase-orders','/purchase-orders/new','/accounts','/warehouse','/warehouse/equipment','/calendar','/experiences','/accounting/simple'];
+ routes=['/suppliers','/products','/purchase-orders','/purchase-orders/new','/accounts','/warehouse','/warehouse/equipment','/calendar','/experiences','/accounting/simple','/accounting/founders','/accounting/journal','/accounting/chart-of-accounts'];
  constructor(){this.reload();}
  reload(){this.busy.set(true);forkJoin({categories:this.api.categories(),rows:this.api.adminList()}).subscribe({next:r=>{this.categories.set(r.categories);this.rows.set(r.rows);this.busy.set(false);},error:e=>this.failed(e)});}
  failed(e:unknown){this.error.set(academyError(e));this.busy.set(false);}
