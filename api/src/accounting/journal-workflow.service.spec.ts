@@ -5,6 +5,7 @@ import { JournalEntryType } from './entities/journal-entry.entity';
 
 describe('JournalWorkflowService', () => {
   const manager = {
+    query: jest.fn(),
     findOne: jest.fn(),
     find: jest.fn(),
     exists: jest.fn(),
@@ -23,6 +24,7 @@ describe('JournalWorkflowService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    manager.query.mockReset().mockResolvedValue([{present:false}]);
     manager.findOne.mockImplementation(async (cls, opts) => {
       if (cls.name === 'User') return { id: opts.where.id, role: opts.where.id === 2 ? 'accountant' : 'employee' };
       if (cls.name === 'AccountingAccount') {
@@ -89,6 +91,17 @@ describe('JournalWorkflowService', () => {
     expect(result.postingStatus).toBe('posted');
     expect(result.approvedById).toBe(4);
     expect(result.sourceEventKey).toBe('manual:journal:5:posted:v1');
+  });
+
+  it('blocks founder self-approval even for administrators', async () => {
+    manager.findOne.mockImplementation(async (cls, opts) => {
+      if (cls.name === 'User') return { id: opts.where.id, role: 'admin' };
+      if (cls.name === 'JournalEntry') return { id: opts.where.id, type: JournalEntryType.MANUAL, postingStatus: 'pending_approval', createdById: 4, submittedById: 4 };
+      return null;
+    });
+    manager.query.mockResolvedValueOnce([{present:true}]).mockResolvedValueOnce([{account_id:1,kind:'expense'}]).mockResolvedValueOnce([{account_id:1}]);
+    await expect(service.approveAndPost(5,4)).rejects.toThrow(ForbiddenException);
+    expect(manager.save).not.toHaveBeenCalled();
   });
 
   it('allows an administrator to submit a draft created by another employee', async () => {
