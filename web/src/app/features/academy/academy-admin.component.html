@@ -1,6 +1,6 @@
 <div class="mx-auto max-w-6xl space-y-6 p-4 md:p-8">
   <a routerLink="/academy" class="text-sm text-zinc-500">← Academy library</a>
-  <header class="flex flex-wrap items-center justify-between gap-3"><div><h1 class="text-3xl font-bold">Manage Academy</h1><p class="text-zinc-500">Review, edit and publish versioned procedures.</p></div><button type="button" (click)="start()" [disabled]="busy()" class="rounded-lg bg-zinc-900 px-4 py-2 text-white">New procedure</button></header>
+  <header class="flex flex-wrap items-center justify-between gap-3"><div><h1 class="text-3xl font-bold">Manage Academy</h1><a routerLink="/academy/admin/training" class="underline">Training management & feedback</a><p class="text-zinc-500">Review, edit and publish versioned procedures.</p></div><button type="button" (click)="start()" [disabled]="busy()" class="rounded-lg bg-zinc-900 px-4 py-2 text-white">New procedure</button></header>
   @if(error()){<p role="alert" class="rounded-lg border border-red-300 p-3 text-red-600">{{error()}}</p>}
   @if(notice()){<p role="status" class="rounded-lg border border-green-300 p-3 text-green-700">{{notice()}}</p>}
   @if(!editing()){
