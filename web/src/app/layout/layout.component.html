@@ -113,7 +113,9 @@
             <div>
               @if (item.subItems) {
                 <button
+                  type="button"
                   (click)="toggleSubmenu(item.label)"
+                  [attr.aria-expanded]="isSubmenuOpen(item.label)"
                   class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors text-sm font-medium cursor-pointer text-left"
                 >
                   <div class="flex items-center gap-3">
@@ -127,8 +129,8 @@
                     ▶
                   </span>
                 </button>
-                @if (isSubmenuOpen(item.label)) {
-                  <div
+                <div
+                    [class.hidden]="!isSubmenuOpen(item.label)"
                     class="pl-4 pr-1 py-1 space-y-1 bg-zinc-950/20 border-l border-zinc-800 ml-5 mt-1 rounded-r-lg"
                   >
                     @for (sub of item.subItems; track sub.route) {
@@ -144,7 +146,6 @@
                       </a>
                     }
                   </div>
-                }
               } @else {
                 <a
                   [routerLink]="item.route"
