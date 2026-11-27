@@ -119,12 +119,10 @@ export class Phase2LBankService {
         // An opening balance must predate ALL journal activity for that account,
         // not merely earlier openings or previous fiscal years.
         const existing = await m.createQueryBuilder(JournalLine, 'line')
-          .innerJoin(JournalEntry, 'entry', 'entry.id = line.journal_entry_id')
           .where('line.account_id = :accountId', { accountId: l.accountId })
-          .andWhere("entry.posting_status IN ('posted','reversed')")
           .getCount();
         if (existing > 0) {
-          throw new ConflictException(`Account ${acc.code} already has journal history. Do not backfill an opening entry into a used account; investigate and migrate separately.`);
+          throw new ConflictException(`Account ${acc.code} already has journal lines (including drafts). Do not backfill an opening entry into a used account; investigate and migrate separately.`);
         }
       }
       const row = await m.save(JournalEntry, m.create(JournalEntry, {
@@ -259,6 +257,8 @@ export class Phase2LBankService {
         FROM journal_lines l JOIN journal_entries j ON j.id=l.journal_entry_id
         LEFT JOIN accounting_bank_statement_rows r ON r.matched_journal_line_id=l.id
         WHERE l.account_id=$1 AND j.posting_status IN ('posted','reversed')
+          AND l.currency='EGP' AND l.exchange_rate=1
+          AND ROUND(l.amount_base*100)=ROUND((l.debit-l.credit)*100)
           AND r.id IS NULL
         ORDER BY j.date DESC, l.id DESC LIMIT 500`, [accountId]);
       return { imports, rows, events, candidates };
@@ -283,12 +283,15 @@ export class Phase2LBankService {
       }
       const [line] = await m.query(`
         SELECT l.id, l.account_id AS "accountId", j.date,
-          j.posting_status AS "postingStatus",
+          j.posting_status AS "postingStatus", l.currency, l.exchange_rate AS "exchangeRate",
+          ROUND(l.amount_base*100)::bigint::text AS "baseCents",
           ROUND((l.debit-l.credit)*100)::bigint::text AS "amountCents"
         FROM journal_lines l JOIN journal_entries j ON j.id=l.journal_entry_id
         WHERE l.id=$1`, [journalLineId]);
       if (!line || line.accountId !== row.accountId ||
           !['posted', 'reversed'].includes(line.postingStatus) ||
+          line.currency !== 'EGP' || Number(line.exchangeRate) !== 1 ||
+          line.baseCents !== line.amountCents ||
           line.amountCents !== row.amountCents ||
           String(line.date).slice(0, 10) !== String(row.date).slice(0, 10)) {
         throw new ConflictException('Match requires same bank account, signed amount and date in a posted/reversed journal');
