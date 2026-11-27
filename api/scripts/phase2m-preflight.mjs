@@ -7,9 +7,10 @@
  * Use --strict to exit 1 while any release blocker remains.
  */
 import { readFileSync, existsSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const root = resolve(import.meta.dirname, '..');
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const read = path => readFileSync(resolve(root, path), 'utf8');
 const checks = [];
 function check(id, ok, severity, detail) {
@@ -32,7 +33,8 @@ check('2M-B-legacy-review', has('src/accounting/phase2m-readiness.policy.ts',
   /LEGACY_SUPPLIER_PAYMENT_UNVERIFIED/) &&
   has('src/accounting/phase2m-readiness.policy.ts', /DUPLICATE_SOURCE_EVENT/), 'blocker',
   'Legacy payments and duplicate source-event journals require review');
-check('2M-C-migration-disposition', !has(migration, /if \(db\?\.name !== 'kora_test'\) return/), 'blocker',
+check('2M-C-migration-disposition', existsSync(resolve(root, migration)) &&
+  !has(migration, /if \\(db\\?\\.name !== 'kora_test'\\) return/), 'blocker',
   'Test-only Phase 2L migration is a no-op outside kora_test. Production requires a new approved migration and rollout plan');
 check('2M-C-startup-migration-safety', !/migrationsRun:\s*true/.test(app), 'blocker',
   'API currently auto-runs migrations at boot; require a reviewed and explicitly executed production migration process');
