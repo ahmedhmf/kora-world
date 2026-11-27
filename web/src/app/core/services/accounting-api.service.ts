@@ -175,7 +175,9 @@ export interface Phase2LRow {
 export interface Phase2LView {
   imports: Array<{ id: number; accountId: number; statementKey: string;
     openingBalanceCents: string | null; closingBalanceCents: string | null;
-    importedAt: string }>;
+    importedAt: string; throughDate: string; rowCount: number;
+    matchedCount: number; movementCents: string;
+    ledgerBalanceCents: string; varianceCents: string | null }>;
   rows: Phase2LRow[];
   candidates: Array<{ lineId: number; journalId: number; date: string;
     description: string; reference: string; amountCents: string }>;
