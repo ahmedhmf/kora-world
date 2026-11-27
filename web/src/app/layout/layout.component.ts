@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { ChangeDetectorRef, Component, inject, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService } from '../core/services/auth.service';
 import { FormsModule } from '@angular/forms';
@@ -29,6 +29,7 @@ interface NavItem {
 })
 export class LayoutComponent {
   readonly authService = inject(AuthService);
+  private readonly cdr = inject(ChangeDetectorRef);
   readonly isMobileOpen = signal(false);
 
   readonly navItems: NavItem[] = [
@@ -81,16 +82,18 @@ export class LayoutComponent {
     { label: 'Dropdown Settings', route: '/settings/dropdowns', icon: 'settings', roles: ['admin'] },
   ];
 
-  // Collapsible submenus state
-  // Keep the primary accounting actions visible on initial load.
-  // Users can still collapse the section with the Accounting button.
-  openSubmenus = signal<Record<string, boolean>>({ Accounting: true });
+  // All submenus start closed; user controls whether they are expanded.
+  // Keep submenu links mounted to prevent delayed label rendering when reopened.
+  openSubmenus = signal<Record<string, boolean>>({});
 
   toggleSubmenu(label: string) {
     this.openSubmenus.update((m) => ({
       ...m,
       [label]: !m[label],
     }));
+    // Ensure the sidebar renders the new state immediately, even after
+    // a previous navigation, rather than waiting for another click.
+    this.cdr.detectChanges();
   }
 
   isSubmenuOpen(label: string): boolean {
