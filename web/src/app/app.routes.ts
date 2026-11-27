@@ -246,6 +246,11 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/accounting/reconciliation-dashboard.component').then((m) => m.ReconciliationDashboardComponent),
       },
+      {
+        path: 'accounting/bank-reconciliation',
+        loadComponent: () =>
+          import('./features/accounting/phase2l-bank.component').then(m => m.Phase2LBankComponent),
+      },
     ],
   },
 ];
