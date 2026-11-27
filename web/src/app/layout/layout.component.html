@@ -334,6 +334,11 @@
 
         <!-- Main content -->
         <main class="flex-1 overflow-auto print:overflow-visible">
+          @if (academyHelpCategory(); as category) {
+            <div class="flex justify-end px-4 pt-3 print:hidden">
+              <a routerLink="/academy" [queryParams]="{category: category}" target="_blank" rel="noopener" class="rounded border border-zinc-500 px-3 py-1.5 text-sm">How to do this · Academy ↗</a>
+            </div>
+          }
           <router-outlet />
         </main>
       </div>

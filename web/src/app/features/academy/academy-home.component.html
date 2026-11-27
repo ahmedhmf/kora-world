@@ -1,0 +1,19 @@
+<div class="mx-auto max-w-6xl space-y-6 p-4 md:p-8">
+  <header class="flex flex-wrap items-center justify-between gap-4">
+    <div><p class="text-sm font-medium text-zinc-500">KORA WORLD / LEARNING</p><h1 class="text-3xl font-bold">Kora World Academy</h1><p class="mt-2 text-zinc-500">Learn the right process. Follow the steps. Work confidently.</p></div>
+    @if(auth.currentUser()?.role === 'admin'){<a routerLink="/academy/admin" class="rounded-lg bg-zinc-900 px-4 py-2 text-white">Manage Academy</a>}
+  </header>
+  @if(error()){<p role="alert" class="rounded-lg border border-red-300 p-4 text-red-600">{{error()}}</p>}
+  @if(loading()){<p>Loading Academy...</p>} @else {
+    <input type="search" aria-label="Search procedures" placeholder="Search procedures, SOP codes or departments..." class="w-full rounded-lg border border-zinc-300 bg-transparent p-3" [ngModel]="search()" (ngModelChange)="search.set($event)">
+    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <button type="button" (click)="category.set(null)" [class.ring-2]="category()===null" class="rounded-xl border border-zinc-300 p-4 text-left ring-zinc-500"><strong>All procedures</strong><p class="text-sm text-zinc-500">{{lessons().length}} lessons</p></button>
+      @for(c of categories();track c.id){<button type="button" (click)="category.set(c.id)" [class.ring-2]="category()===c.id" class="rounded-xl border border-zinc-300 p-4 text-left ring-zinc-500"><strong>{{c.name}}</strong><p class="text-sm text-zinc-500">{{count(c.id)}} lessons</p></button>}
+    </div>
+    <nav class="flex flex-wrap gap-4"><a routerLink="/academy/my-learning" class="underline">My learning</a><a routerLink="/academy/checklists" class="underline">My checklists</a></nav><h2 class="text-xl font-semibold">Procedure library</h2>
+    <div class="grid gap-4 md:grid-cols-2">
+      @for(l of filtered();track l.slug){<a [routerLink]="['/academy/processes',l.slug]" class="block rounded-xl border border-zinc-300 p-5 hover:border-zinc-700"><p class="text-xs text-zinc-500">{{l.code}} · Version {{l.version}}</p><h3 class="mt-2 text-lg font-semibold">{{l.title}}</h3><p class="mt-2 text-sm text-zinc-500">{{l.summary}}</p><span class="mt-4 block text-sm font-medium">Open procedure →</span></a>}
+      @empty {<p class="text-zinc-500">No published procedures match your search. Administrators can review and publish starter drafts in Manage Academy.</p>}
+    </div>
+  }
+</div>

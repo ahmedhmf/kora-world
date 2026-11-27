@@ -25,3 +25,11 @@
   scrollbar-width: thin;
   scrollbar-color: #27272a #09090b;
 }
+
+/* Native dropdown menus: readable on light system popup backgrounds.
+   Preserve the existing dark-theme styling of the closed select control. */
+select option,
+select optgroup {
+  color: #000 !important;
+  background-color: #fff !important;
+}

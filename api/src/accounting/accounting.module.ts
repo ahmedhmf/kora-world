@@ -26,6 +26,8 @@ import { Phase2LBankController } from './phase2l-bank.controller';
 import { Phase2MReadinessService } from './phase2m-readiness.service';
 import { Phase2MReadinessController } from './phase2m-readiness.controller';
 
+import { FounderAccountsController } from './founder-accounts.controller';
+
 @Module({
   imports: [
     TypeOrmModule.forFeature([
@@ -37,7 +39,7 @@ import { Phase2MReadinessController } from './phase2m-readiness.controller';
     forwardRef(() => InvoicesModule),
     forwardRef(() => PaymentsModule),
   ],
-  controllers: [AccountingController, JournalController, ReportsController, ManualJournalsController, SimpleAccountingController, InvoicePaymentReconciliationController, Phase2JReportController, Phase2LBankController, Phase2MReadinessController],
+  controllers: [FounderAccountsController, AccountingController, JournalController, ReportsController, ManualJournalsController, SimpleAccountingController, InvoicePaymentReconciliationController, Phase2JReportController, Phase2LBankController, Phase2MReadinessController],
   providers: [AccountingService, AccountingPostingService, JournalWorkflowService, SimpleAccountingService, JournalService, ReportsService, InvoicePaymentReconciliationService, Phase2JReportService, Phase2LBankService, Phase2MReadinessService],
   exports: [AccountingService, AccountingPostingService, JournalWorkflowService, JournalService, ReportsService, TypeOrmModule],
 })

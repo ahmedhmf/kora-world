@@ -18,6 +18,12 @@ export const routes: Routes = [
     canActivate: [authGuard],
     children: [
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
+      { path: 'academy/admin/training', canActivate: [roleGuard], loadComponent: () => import('./features/academy/academy-training-admin.component').then(m=>m.AcademyTrainingAdminComponent) },
+      { path: 'academy/my-learning', canActivate: [() => { const role=inject(AuthService).currentUser()?.role; return role==='admin'||role==='employee'||inject(Router).createUrlTree(['/dashboard']); }], loadComponent: () => import('./features/academy/academy-learning.component').then(m=>m.AcademyLearningComponent) },
+      { path: 'academy/checklists', canActivate: [() => { const role=inject(AuthService).currentUser()?.role; return role==='admin'||role==='employee'||inject(Router).createUrlTree(['/dashboard']); }], loadComponent: () => import('./features/academy/academy-runs.component').then(m=>m.AcademyRunsComponent) },
+      { path: 'academy/admin', canActivate: [roleGuard], loadComponent: () => import('./features/academy/academy-admin.component').then(m=>m.AcademyAdminComponent) },
+      { path: 'academy/processes/:slug', canActivate: [() => { const role=inject(AuthService).currentUser()?.role; return role==='admin'||role==='employee'||inject(Router).createUrlTree(['/dashboard']); }], loadComponent: () => import('./features/academy/academy-process.component').then(m=>m.AcademyProcessComponent) },
+      { path: 'academy', canActivate: [() => { const role=inject(AuthService).currentUser()?.role; return role==='admin'||role==='employee'||inject(Router).createUrlTree(['/dashboard']); }], loadComponent: () => import('./features/academy/academy-home.component').then(m=>m.AcademyHomeComponent) },
       {
         path: 'warehouse/equipment',
         canActivate: [() => {
@@ -242,6 +248,7 @@ export const routes: Routes = [
           import('./features/b2c-requests/b2c-request-form.component').then((m) => m.B2cRequestFormComponent),
       },
       // Accounting Routes
+      { path: 'accounting/founders', canActivate: [() => { const role=inject(AuthService).currentUser()?.role; return role==='admin'||role==='accountant'||inject(Router).createUrlTree(['/dashboard']); }], loadComponent: () => import('./features/accounting/founder-accounts.component').then(m=>m.FounderAccountsComponent) },
       {
         path: 'accounting',
         pathMatch: 'full',

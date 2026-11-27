@@ -1,5 +1,5 @@
 import { ChangeDetectorRef, Component, inject, signal } from '@angular/core';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService } from '../core/services/auth.service';
 import { FormsModule } from '@angular/forms';
 import { Observable } from 'rxjs';
@@ -29,11 +29,24 @@ interface NavItem {
 })
 export class LayoutComponent {
   readonly authService = inject(AuthService);
+  private readonly router = inject(Router);
+  academyHelpCategory(): string | null {
+    const role = this.authService.currentUser()?.role;
+    if (role !== 'admin' && role !== 'employee') return null;
+    const path = this.router.url.split(/[?#]/)[0];
+    if (/^\/purchase-orders(?:\/|$)/.test(path)) return 'purchasing';
+    if (/^\/accounts(?:\/|$)/.test(path)) return 'sales';
+    if (/^\/warehouse(?:\/|$)/.test(path)) return 'warehouse';
+    if (/^\/(calendar|experiences)(?:\/|$)/.test(path)) return 'events';
+    if (/^\/accounting(?:\/|$)/.test(path)) return 'finance';
+    return null;
+  }
   private readonly cdr = inject(ChangeDetectorRef);
   readonly isMobileOpen = signal(false);
 
   readonly navItems: NavItem[] = [
     { label: 'Dashboard', route: '/dashboard', icon: 'layout-dashboard' },
+    { label: 'Academy', route: '/academy', icon: 'book-open', roles: ['admin', 'employee'] },
     {
       label: 'Sourcing & Development',
       route: '/sourcing',
@@ -67,6 +80,7 @@ export class LayoutComponent {
       icon: 'landmark',
       subItems: [
         { label: 'Simple Accounting', route: '/accounting/simple', icon: 'wallet' },
+        { label: 'Founder Accounts', route: '/accounting/founders', icon: 'wallet', roles: ['admin','accountant'] },
         { label: 'Chart of Accounts', route: '/accounting/chart-of-accounts', icon: 'bar-chart-3' },
         { label: 'Journal Entries', route: '/accounting/journal', icon: 'book-open' },
         { label: 'Invoices', route: '/accounting/invoices', icon: 'receipt' },

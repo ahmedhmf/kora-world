@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AcademyModule } from './academy/academy.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
@@ -124,6 +125,7 @@ import { DropdownOptionsModule } from './dropdown-options/dropdown-options.modul
       }),
       inject: [ConfigService],
     }),
+    AcademyModule,
     SuppliersModule,
     ProductsModule,
     SamplesModule,
