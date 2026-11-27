@@ -48,7 +48,7 @@ jobs:
         run: npm run build
       - name: Accounting regression tests
         working-directory: api
-        run: npm test -- --runInBand phase2m-readiness.policy.spec.ts phase2m-readiness.service.spec.ts phase2j-report.policy.spec.ts phase2l-bank.service.spec.ts
+        run: npm test -- --runInBand phase2m-readiness.policy.spec.ts phase2m-readiness.service.spec.ts phase2m-permissions.spec.ts phase2j-report.policy.spec.ts phase2l-bank.service.spec.ts
       - name: Offline source preflight (diagnostic, not approval)
         working-directory: api
         run: node scripts/phase2m-preflight.mjs
