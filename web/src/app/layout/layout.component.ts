@@ -69,7 +69,6 @@ export class LayoutComponent {
         { label: 'Chart of Accounts', route: '/accounting/chart-of-accounts', icon: 'bar-chart-3' },
         { label: 'Journal Entries', route: '/accounting/journal', icon: 'book-open' },
         { label: 'Invoices', route: '/accounting/invoices', icon: 'receipt' },
-        { label: 'Payments', route: '/accounting/payments', icon: 'credit-card' },
         { label: 'Financial Reports', route: '/accounting/reports', icon: 'trending-up' },
         { label: 'Reconciliation Dashboard', route: '/accounting/reconciliation', icon: 'clipboard-check', roles: ['admin'] },
         { label: 'Bank Reconciliation', route: '/accounting/bank-reconciliation', icon: 'landmark', roles: ['admin'] },
