@@ -95,7 +95,13 @@ export function buildPhase2JReport(input: {
       const booking = linked.filter(j => j.type === JournalEntryType.INVOICE);
       const paymentsFor = payments.filter(p => p.invoiceId === inv.id && dateKey(p.date) <= asOfDate);
       const originals = linked.filter(j => j.type === JournalEntryType.PAYMENT && !j.reversalOfId && dateKey(j.date) <= asOfDate);
-      const reversals = linked.filter(j => j.type === JournalEntryType.PAYMENT && !!j.reversalOfId && dateKey(j.date) <= asOfDate);
+      const allReversals = linked.filter(j => j.type === JournalEntryType.PAYMENT && !!j.reversalOfId);
+      const reversals = allReversals.filter(j => dateKey(j.date) <= asOfDate);
+      if (issues.some(issue => issue.invoiceId === inv.id &&
+          ['reversal_history_inconsistent', 'unbalanced_journal', 'invalid_journal_amount',
+           'missing_account', 'manual_fx_review'].includes(issue.code))) {
+        warn('invoice_journal_review', 'Invoice has a journal integrity warning; verify before calculating balances');
+      }
       if (booking.length !== 1 || booking[0].postingStatus !== 'posted') {
         warn('invoice_booking_ambiguous', 'Invoice has no single posted booking journal');
       }
@@ -113,7 +119,7 @@ export function buildPhase2JReport(input: {
         }
         const original = matches[0];
         linkedJournalIds.add(original.id);
-        const reverse = reversals.filter(j => j.reversalOfId === original.id);
+        const reverse = allReversals.filter(j => j.reversalOfId === original.id);
         // Effective as-of state uses posting dates, not merely the original
         // journal's CURRENT reversed flag. A later reversal cannot erase a
         // payment from an earlier balance sheet date.
@@ -121,7 +127,9 @@ export function buildPhase2JReport(input: {
         if (dateKey(original.date) > asOfDate) {
           warn('payment_date_mismatch', `Payment #${p.id} predates its journal posting date`);
         } else if (effectiveReversals.length === 0 &&
-                   (original.postingStatus === 'posted' || original.postingStatus === 'reversed')) {
+                   (original.postingStatus === 'posted' ||
+                    (original.postingStatus === 'reversed' && reverse.length === 1 &&
+                     dateKey(reverse[0].date) > asOfDate && reverse[0].postingStatus === 'posted'))) {
           paidCents += cents(p.amount);
         } else if (effectiveReversals.length === 1 &&
                    original.postingStatus === 'reversed' &&
