@@ -232,11 +232,6 @@ export const routes: Routes = [
           import('./features/accounting/invoices.component').then((m) => m.InvoicesComponent),
       },
       {
-        path: 'accounting/payments',
-        loadComponent: () =>
-          import('./features/accounting/payments.component').then((m) => m.PaymentsComponent),
-      },
-      {
         path: 'accounting/reports',
         loadComponent: () =>
           import('./features/accounting/reports.component').then((m) => m.ReportsComponent),
