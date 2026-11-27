@@ -162,8 +162,14 @@
                   <p class="text-xs">Assets: {{ report.balanceSheet.totalAssets | number:'1.2-2' }}</p>
                   <p class="text-xs">Liabilities: {{ report.balanceSheet.totalLiabilities | number:'1.2-2' }}</p>
                   <p class="text-xs">Posted equity: {{ report.balanceSheet.totalEquity | number:'1.2-2' }}</p>
-                  <p class="text-sm font-bold">Difference: {{ report.balanceSheet.difference | number:'1.2-2' }}</p>
-                  <p class="text-xs text-amber-300">Review unclosed income / retained earnings before relying on this balance.</p>
+                  <p class="text-xs">Current-year unclosed earnings: {{ report.balanceSheet.currentYearEarnings | number:'1.2-2' }}</p>
+                  <p class="text-xs">Prior-year unclosed earnings: {{ report.balanceSheet.priorUnclosedEarnings | number:'1.2-2' }}</p>
+                  <p class="text-sm font-semibold border-t border-zinc-800 pt-2">Adjusted equity (presentation only): {{ report.balanceSheet.adjustedEquity | number:'1.2-2' }}</p>
+                  <p class="text-sm font-bold" [class.text-emerald-400]="report.balanceSheet.isBalanced"
+                    [class.text-amber-300]="!report.balanceSheet.isBalanced">
+                    Adjusted difference: {{ report.balanceSheet.difference | number:'1.2-2' }}
+                  </p>
+                  <p class="text-xs text-zinc-400">Unclosed earnings are calculated from recorded nominal-account journal balances through the as-of date. No closing entry is created. A zero difference does not verify bank balances or opening funding.</p>
                 </div>
               </div>
               <div>
