@@ -1,4 +1,7 @@
-import { Body, Controller, Get, Post, Req, UseGuards, BadRequestException, ForbiddenException, ConflictException, ServiceUnavailableException } from '@nestjs/common';
+import { Body, Controller, Get, Post, Req, UseGuards, Param, ParseIntPipe, UploadedFile, UseInterceptors, StreamableFile, NotFoundException, BadRequestException, ForbiddenException, ConflictException, ServiceUnavailableException } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { validateFounderEvidence } from './founder-evidence';
+import type { EvidenceUpload } from './founder-evidence';
 import { DataSource, EntityManager } from 'typeorm';
 import { AuthGuard } from '../auth/auth.guard';
 import type { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
@@ -53,7 +56,8 @@ export class FounderAccountsController{
   const accounts=await this.db.query(`SELECT a.id,a.code,a.name,a.type FROM accounting_accounts a WHERE a.is_active AND upper(a.currency)='EGP'
     AND NOT EXISTS(SELECT 1 FROM accounting_accounts c WHERE c.parent_id=a.id)
     AND NOT EXISTS(SELECT 1 FROM founder_accounts f WHERE f.account_id=a.id) ORDER BY a.code`);
-  return {founders,transactions,accounts};
+  const attachments=await this.db.query('SELECT id,transaction_id,filename,mime_type,octet_length(content) AS size,uploaded_at FROM founder_evidence ORDER BY id');
+  return {founders,transactions,accounts,attachments};
  }
  @Post()
  async register(@Req() req:AuthenticatedRequest,@Body() body:unknown){
@@ -92,5 +96,29 @@ export class FounderAccountsController{
    await tx.query('INSERT INTO founder_transactions(account_id,journal_id,kind,evidence_reference,request_key,created_by) VALUES($1,$2,$3,$4,$5,$6)',[founder,journal.id,kind,evidence,key,actor]);
    return {journalId:journal.id,status:'draft'};
   });
+ }
+
+ @Post('transactions/:id/evidence')
+ @UseInterceptors(FileInterceptor('file',{limits:{fileSize:10*1024*1024,files:1,fields:0,parts:2}}))
+ async uploadEvidence(@Req() req:AuthenticatedRequest,@Param('id',ParseIntPipe) transactionId:number,@UploadedFile() file:EvidenceUpload){
+  const actor=await this.actor(req);
+  const evidence=validateFounderEvidence(file);
+  return this.db.transaction(async tx=>{
+   const [transaction]=await tx.query('SELECT id FROM founder_transactions WHERE id=$1 FOR UPDATE',[transactionId]);
+   if(!transaction)throw new NotFoundException('Founder transaction not found');
+   const [count]=await tx.query('SELECT COUNT(*)::int AS total FROM founder_evidence WHERE transaction_id=$1',[transactionId]);
+   if(count.total>=10)throw new BadRequestException('Maximum 10 attachments per transaction');
+   const [row]=await tx.query(`INSERT INTO founder_evidence(transaction_id,filename,mime_type,content,sha256,uploaded_by)
+    VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(transaction_id,sha256) DO NOTHING RETURNING id,filename`,[transactionId,evidence.filename,evidence.mime,evidence.content,evidence.hash,actor]);
+   if(!row)throw new ConflictException('This document is already attached');
+   return row;
+  });
+ }
+ @Get('transactions/:id/evidence/:fileId')
+ async downloadEvidence(@Req() req:AuthenticatedRequest,@Param('id',ParseIntPipe) transactionId:number,@Param('fileId',ParseIntPipe) fileId:number){
+  await this.actor(req);
+  const [file]=await this.db.query('SELECT filename,content FROM founder_evidence WHERE id=$1 AND transaction_id=$2',[fileId,transactionId]);
+  if(!file)throw new NotFoundException('Attachment not found');
+  return new StreamableFile(file.content,{type:'application/octet-stream',disposition:"attachment; filename*=UTF-8''"+encodeURIComponent(file.filename).replace(/['()*]/g,c=>'%'+c.charCodeAt(0).toString(16)),length:file.content.length});
  }
 }
