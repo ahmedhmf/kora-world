@@ -1,0 +1,86 @@
+<div class="p-8 max-w-7xl mx-auto space-y-6">
+  <header class="flex flex-wrap justify-between items-start gap-4">
+    <div>
+      <h1 class="text-2xl font-bold text-white">Accounting Production Readiness</h1>
+      <p class="text-sm mt-1 text-zinc-400">Phase 2M · local historical diagnostic · not production release approval</p>
+    </div>
+    <a routerLink="/accounting/reconciliation" class="text-blue-300 text-xs underline">Reconciliation dashboard</a>
+  </header>
+  @if (!allowed()) {
+    <p role="alert" class="border border-amber-900 text-amber-300 p-4 rounded">
+      This diagnostic is restricted to administrators using the local application. Production remains disabled.
+    </p>
+  } @else {
+    <div class="border border-amber-900/70 rounded-xl p-4 text-sm text-amber-200 bg-amber-950/20">
+      <strong>Production release blocked.</strong> This screen evaluates historical accounting data only.
+      It does not validate external bank statements, backup restoration, production schema compatibility,
+      manual EUR/USD rates, or approval signatures. It cannot deploy or edit data.
+    </div>
+    <div class="flex flex-wrap gap-3 items-center">
+      <button type="button" (click)="refresh()" [disabled]="busy()"
+        class="px-4 py-2 text-xs bg-white text-zinc-900 rounded font-bold disabled:opacity-40">
+        {{ busy() ? 'Auditing…' : 'Run read-only audit' }}
+      </button>
+      <button type="button" (click)="exportAudit()" [disabled]="!audit() || busy()"
+        class="px-4 py-2 text-xs border border-zinc-700 rounded text-white disabled:opacity-40">
+        Export diagnostic JSON
+      </button>
+    </div>
+    @if (error(); as message) {
+      <p role="alert" class="border border-red-900 p-3 rounded text-red-200 text-sm">{{ message }}</p>
+    }
+    @if (audit(); as result) {
+      <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        <div class="border border-zinc-800 bg-zinc-950 rounded p-3"><span class="text-xs text-zinc-400">Invoices</span><p class="text-xl font-bold text-white">{{ result.counts.invoices }}</p></div>
+        <div class="border border-zinc-800 bg-zinc-950 rounded p-3"><span class="text-xs text-zinc-400">Payments</span><p class="text-xl font-bold text-white">{{ result.counts.payments }}</p></div>
+        <div class="border border-zinc-800 bg-zinc-950 rounded p-3"><span class="text-xs text-zinc-400">Journals</span><p class="text-xl font-bold text-white">{{ result.counts.journals }}</p></div>
+        <div class="border border-zinc-800 bg-zinc-950 rounded p-3"><span class="text-xs text-zinc-400">Blocker findings</span><p class="text-xl font-bold text-red-300">{{ result.blockerCount }}</p></div>
+        <div class="border border-zinc-800 bg-zinc-950 rounded p-3"><span class="text-xs text-zinc-400">Review warnings</span><p class="text-xl font-bold text-amber-300">{{ result.warningCount }}</p></div>
+      </div>
+      <p class="text-xs text-zinc-400">Audit snapshot: {{ result.generatedAt | date:'medium' }} · Findings may repeat per record. A zero blocker count does not grant production approval.</p>
+      <section class="space-y-3 border border-zinc-800 bg-zinc-950 rounded-xl p-4">
+        <h2 class="text-lg text-white font-bold">Historical reconciliation findings</h2>
+        <div class="flex gap-3 flex-wrap">
+          <label class="text-xs text-zinc-400">Severity
+            <select [ngModel]="filter()" (ngModelChange)="filter.set($event)"
+              class="block mt-1 p-2 bg-zinc-900 text-white border border-zinc-700 rounded">
+              <option value="all">All</option><option value="blocker">Blocker</option><option value="warning">Warning</option>
+            </select>
+          </label>
+          <label class="text-xs text-zinc-400 flex-1 min-w-52">Search
+            <input type="search" [ngModel]="search()" (ngModelChange)="search.set($event)"
+              placeholder="Code, journal, invoice, proposed action…"
+              class="block mt-1 w-full p-2 bg-zinc-900 text-white border border-zinc-700 rounded"/>
+          </label>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs text-left">
+            <thead class="border-b border-zinc-800 text-zinc-400">
+              <tr><th class="p-2">Severity</th><th class="p-2">Finding</th><th class="p-2">Record</th><th class="p-2">Proposed investigation</th></tr>
+            </thead>
+            <tbody class="divide-y divide-zinc-900">
+              @for (finding of filtered(); track $index) {
+                <tr>
+                  <td class="p-2" [class.text-red-300]="finding.severity === 'blocker'"
+                    [class.text-amber-300]="finding.severity === 'warning'">{{ finding.severity }}</td>
+                  <td class="p-2 text-zinc-200"><strong>{{ finding.code }}</strong><p class="mt-1 text-zinc-400">{{ finding.detail }}</p></td>
+                  <td class="p-2 text-zinc-300">{{ finding.subjectType }} #{{ finding.subjectId ?? '—' }}</td>
+                  <td class="p-2 text-zinc-300">{{ finding.proposedAction }}</td>
+                </tr>
+              } @empty {
+                <tr><td colspan="4" class="p-6 text-zinc-400 text-center">
+                  No findings match filters. This does not certify historical balances or production readiness.
+                </td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <p class="text-xs text-zinc-400">
+        Next release gate: run the offline Phase 2M preflight, verify backup/restore,
+        resolve or accept audited historical findings, test production-compatible migrations in staging,
+        and obtain written finance, engineering and release-owner sign-off.
+      </p>
+    }
+  }
+</div>
