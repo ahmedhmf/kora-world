@@ -37,7 +37,7 @@ export class AcademyController {
   async process(@Req() req: AuthenticatedRequest, @Param('slug') slug: string) {
     const role = await this.authorize(req);
     const [lesson] = await this.db.query(`SELECT p.code,p.slug,p.category_id,v.id AS version_id,v.version,
-      v.title,v.summary,v.trigger,v.prerequisites,v.warnings,v.success_criteria,v.video_url,v.published_at
+      v.title,v.summary,v.trigger,v.prerequisites,v.warnings,v.success_criteria,v.video_url,v.transcript,v.published_at
       FROM academy_processes p
       JOIN LATERAL (SELECT * FROM academy_process_versions x WHERE x.process_id=p.id
         AND x.published_at IS NOT NULL ORDER BY x.version DESC LIMIT 1) v ON true
@@ -45,7 +45,8 @@ export class AcademyController {
     if (!lesson) throw new NotFoundException('Published procedure not found');
     const steps = await this.db.query('SELECT id,position,title,instructions,app_route,evidence FROM academy_steps WHERE version_id=$1 ORDER BY position', [lesson.version_id]);
     const [completion] = await this.db.query('SELECT 1 FROM academy_training_completions WHERE user_id=$1 AND version_id=$2', [req.user.sub, lesson.version_id]);
-    return { ...lesson, steps, completed: !!completion };
+    const [progress] = await this.db.query('SELECT step_ids FROM academy_training_progress WHERE user_id=$1 AND version_id=$2', [req.user.sub, lesson.version_id]);
+    return { ...lesson, steps, completed: !!completion, step_ids: progress?.step_ids || [] };
   }
 
   @Post('training/:versionId/complete')
