@@ -248,6 +248,7 @@ export const routes: Routes = [
           import('./features/b2c-requests/b2c-request-form.component').then((m) => m.B2cRequestFormComponent),
       },
       // Accounting Routes
+      { path: 'accounting/founders', canActivate: [() => { const role=inject(AuthService).currentUser()?.role; return role==='admin'||role==='accountant'||inject(Router).createUrlTree(['/dashboard']); }], loadComponent: () => import('./features/accounting/founder-accounts.component').then(m=>m.FounderAccountsComponent) },
       {
         path: 'accounting',
         pathMatch: 'full',
