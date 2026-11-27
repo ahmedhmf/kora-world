@@ -34,6 +34,7 @@ export class LayoutComponent {
 
   readonly navItems: NavItem[] = [
     { label: 'Dashboard', route: '/dashboard', icon: 'layout-dashboard' },
+    { label: 'Academy', route: '/academy', icon: 'book-open', roles: ['admin', 'employee'] },
     {
       label: 'Sourcing & Development',
       route: '/sourcing',
