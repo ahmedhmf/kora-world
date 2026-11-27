@@ -2,7 +2,7 @@ import { requireAcademyMigrationTarget, requireAcademyRelease, academyReleaseMig
 import type { DataSource, QueryRunner } from 'typeorm';
 
 describe('Academy production release safety',()=>{
- const flags=['KORA_ACADEMY_EXPLICIT_MIGRATION','KORA_ACADEMY_ENABLED','KORA_FOUNDER_ACCOUNTS_ENABLED'];
+ const flags=['KORA_ACADEMY_EXPLICIT_MIGRATION'];
  const previous:Record<string,string|undefined>={};
  beforeEach(()=>{for(const f of flags){previous[f]=process.env[f];delete process.env[f];}});
  afterEach(()=>{for(const f of flags){if(previous[f]===undefined)delete process.env[f];else process.env[f]=previous[f];}});
@@ -18,13 +18,11 @@ describe('Academy production release safety',()=>{
   await expect(requireAcademyMigrationTarget(runner('kora_test'))).resolves.toBeUndefined();
   await expect(requireAcademyRelease(db('kora_test'),'academy')).resolves.toBeUndefined();
  });
- it('requires the feature-specific flag and full migration history',async()=>{
-  await expect(requireAcademyRelease(db('kora_world'),'academy')).rejects.toThrow();
-  process.env.KORA_ACADEMY_ENABLED='true';
+ it('enables both modules automatically after full migration history',async()=>{
   await expect(requireAcademyRelease(db('kora_world',0),'academy')).rejects.toThrow();
   await expect(requireAcademyRelease(db('kora_world'),'academy')).resolves.toBeUndefined();
-  await expect(requireAcademyRelease(db('kora_world'),'founders')).rejects.toThrow();
-  process.env.KORA_FOUNDER_ACCOUNTS_ENABLED='true';
+  await expect(requireAcademyRelease(db('kora_world',0),'founders')).rejects.toThrow();
+  await expect(requireAcademyRelease(db('other_db'),'academy')).rejects.toThrow();
   await expect(requireAcademyRelease(db('kora_world'),'founders')).resolves.toBeUndefined();
  });
 });
