@@ -92,7 +92,8 @@ export function buildPhase2JReport(input: {
         add(code, message, inv.id);
       };
       const linked = journals.filter(j => j.invoiceId === inv.id);
-      const booking = linked.filter(j => j.type === JournalEntryType.INVOICE);
+      const booking = linked.filter(j => j.type === JournalEntryType.INVOICE &&
+        dateKey(j.date) <= asOfDate);
       const paymentsFor = payments.filter(p => p.invoiceId === inv.id && dateKey(p.date) <= asOfDate);
       const originals = linked.filter(j => j.type === JournalEntryType.PAYMENT && !j.reversalOfId && dateKey(j.date) <= asOfDate);
       const allReversals = linked.filter(j => j.type === JournalEntryType.PAYMENT && !!j.reversalOfId);
@@ -104,6 +105,18 @@ export function buildPhase2JReport(input: {
       }
       if (booking.length !== 1 || booking[0].postingStatus !== 'posted') {
         warn('invoice_booking_ambiguous', 'Invoice has no single posted booking journal');
+      }
+      if (booking.length === 1 && booking[0].postingStatus === 'posted' &&
+          inv.currency === 'EGP') {
+        const requiredCode = type === InvoiceType.INCOMING ? '2100' : '1200';
+        const bookedCents = booking[0].lines
+          .filter(l => accountById.get(l.accountId)?.code === requiredCode)
+          .reduce((sum, l) => sum + (type === InvoiceType.INCOMING
+            ? cents(l.credit) - cents(l.debit) : cents(l.debit) - cents(l.credit)), 0);
+        if (bookedCents !== cents(inv.total)) {
+          warn('invoice_booking_amount_mismatch',
+            `Invoice total disagrees with posted ${requiredCode} balance`);
+        }
       }
       if (inv.currency !== 'EGP' || paymentsFor.some(p => p.currency !== 'EGP')) {
         warn('manual_fx_review', 'Foreign-currency invoice/payment requires manual valuation; no rate inferred');
