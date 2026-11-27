@@ -142,8 +142,11 @@
 
         <div class="rounded-lg border border-zinc-800 p-4 text-xs text-zinc-400">
           <strong class="text-white">Financial statement check:</strong>
-          Balance Sheet difference {{ reportData.balanceSheet.difference | number:'1.2-2' }} EGP.
-          {{ reportData.balanceSheet.isBalanced ? 'Posted accounts meet the numerical balance tolerance.' : 'Review posted equity and any unclosed income.' }}
+          Posted equity {{ reportData.balanceSheet.totalEquity | number:'1.2-2' }} EGP;
+          current-year earnings {{ reportData.balanceSheet.currentYearEarnings | number:'1.2-2' }} EGP;
+          prior unclosed earnings {{ reportData.balanceSheet.priorUnclosedEarnings | number:'1.2-2' }} EGP.
+          Adjusted difference {{ reportData.balanceSheet.difference | number:'1.2-2' }} EGP.
+          {{ reportData.balanceSheet.isBalanced ? 'Adjusted equity reconciles numerically; opening cash and bank balances still require verification.' : 'Unexplained balance-sheet difference remains after unclosed earnings.' }}
           <a routerLink="/accounting/reports" class="text-blue-300 underline ml-2">See detailed reports</a>.
           This screen never changes invoices, payments, journal entries or exchange rates.
         </div>
