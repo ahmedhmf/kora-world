@@ -21,7 +21,8 @@
         <label class="block text-sm">Stop / escalate<textarea name="warnings" rows="3" [(ngModel)]="draft.warnings" (ngModelChange)="changed()" class="mt-1 w-full rounded border p-2 bg-transparent"></textarea></label>
         <label class="block text-sm">Done when<textarea name="success" rows="2" [(ngModel)]="draft.successCriteria" (ngModelChange)="changed()" class="mt-1 w-full rounded border p-2 bg-transparent"></textarea></label>
         <div class="flex gap-4">@for(r of ['admin','employee'];track r){<label class="text-sm"><input type="checkbox" [checked]="draft.allowedRoles.includes(r)" (change)="role(r,$any($event.target).checked)"> {{r}}</label>}</div>
-        <p class="text-sm text-zinc-500">Video: placeholder until a secure provider is approved.</p>
+        <label class="block text-sm">Approved HTTPS video URL<input name="videoUrl" type="url" [(ngModel)]="draft.videoUrl" (ngModelChange)="changed()" class="mt-1 w-full rounded border p-2 bg-transparent"></label>
+<label class="block text-sm">Transcript / captions text<textarea name="transcript" rows="5" [(ngModel)]="draft.transcript" (ngModelChange)="changed()" class="mt-1 w-full rounded border p-2 bg-transparent"></textarea></label><p class="text-sm text-zinc-500">Only configured company-approved video hosts are accepted. Access to recordings is controlled by the provider.</p>
       </section>
       <section class="space-y-3"><h2 class="text-xl font-semibold">Checklist steps</h2>
         @for(s of draft.steps;track s;let i=$index){<article class="space-y-3 rounded-xl border border-zinc-300 p-4">
