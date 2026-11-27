@@ -145,6 +145,8 @@ export interface Phase2JReport {
     liabilities: Array<{ code: string; name: string; amount: number }>;
     equity: Array<{ code: string; name: string; amount: number }>;
     totalAssets: number; totalLiabilities: number; totalEquity: number;
+    currentYearEarnings: number; priorUnclosedEarnings: number;
+    unclosedEarnings: number; adjustedEquity: number;
     difference: number; isBalanced: boolean;
   };
   cashFlow: Array<{ period: string; inflows: number; outflows: number; netChange: number }>;
