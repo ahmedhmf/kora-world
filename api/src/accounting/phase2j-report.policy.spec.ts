@@ -151,9 +151,95 @@ describe('Phase 2J report reconciliation', () => {
     expect(r.cashFlow[0].outflows).toBe(40);
   });
 
-  it('does not silently assert an unclosed balance sheet is balanced', () => {
-    const r = report();
+  it('shows a single Marketing Money Out as current-year loss without a false balance-sheet warning', () => {
+    const marketing = a(6, '5300', AccountType.EXPENSE);
+    const moneyOut = journal(30, JournalEntryType.MANUAL, [
+      line(6, 2345, 0), line(3, 0, 2345),
+    ], { invoiceId: null, date: '2026-11-27' });
+    const r = report({
+      invoices: [], payments: [], journals: [moneyOut],
+      accounts: [...accounts, marketing],
+    });
+    expect(r.profitLoss.netProfit).toBe(-2345);
+    expect(r.balanceSheet.totalAssets).toBe(-2345);
+    expect(r.balanceSheet.totalEquity).toBe(0);
+    expect(r.balanceSheet.currentYearEarnings).toBe(-2345);
+    expect(r.balanceSheet.priorUnclosedEarnings).toBe(0);
+    expect(r.balanceSheet.adjustedEquity).toBe(-2345);
+    expect(r.balanceSheet.difference).toBe(0);
+    expect(r.balanceSheet.isBalanced).toBe(true);
+    expect(r.issues.some(x => x.code === 'balance_sheet_difference')).toBe(false);
+    expect(r.cashFlow[0].netChange).toBe(-2345);
+  });
+
+  it('includes a Money In revenue as positive unclosed earnings', () => {
+    const moneyIn = journal(31, JournalEntryType.MANUAL, [
+      line(3, 800, 0), line(4, 0, 800),
+    ], { invoiceId: null, date: '2026-08-10' });
+    const r = report({ invoices: [], payments: [], journals: [moneyIn] });
+    expect(r.profitLoss.netProfit).toBe(800);
+    expect(r.balanceSheet.totalAssets).toBe(800);
+    expect(r.balanceSheet.currentYearEarnings).toBe(800);
+    expect(r.balanceSheet.adjustedEquity).toBe(800);
+    expect(r.balanceSheet.isBalanced).toBe(true);
+    expect(r.issues.some(x => x.code === 'balance_sheet_difference')).toBe(false);
+  });
+
+  it('calculates current-year earnings independent of the selected P&L period', () => {
+    const priorMonth = journal(32, JournalEntryType.MANUAL, [
+      line(3, 600, 0), line(4, 0, 600),
+    ], { invoiceId: null, date: '2026-01-20' });
+    const r = buildPhase2JReport({
+      startDate: '2026-11-01', endDate: '2026-11-30', asOfDate: '2026-12-31',
+      invoices: [], payments: [], journals: [priorMonth], accounts,
+    });
+    expect(r.profitLoss.netProfit).toBe(0);
+    expect(r.balanceSheet.currentYearEarnings).toBe(600);
+    expect(r.balanceSheet.difference).toBe(0);
+    expect(r.balanceSheet.isBalanced).toBe(true);
+  });
+
+  it('shows prior-year unclosed earnings separately from current-year earnings', () => {
+    const priorYear = journal(33, JournalEntryType.MANUAL, [
+      line(3, 400, 0), line(4, 0, 400),
+    ], { invoiceId: null, date: '2025-07-10' });
+    const currentYear = journal(34, JournalEntryType.MANUAL, [
+      line(1, 100, 0), line(3, 0, 100),
+    ], { invoiceId: null, date: '2026-03-10' });
+    const r = report({ invoices: [], payments: [], journals: [priorYear, currentYear] });
+    expect(r.balanceSheet.priorUnclosedEarnings).toBe(400);
+    expect(r.balanceSheet.currentYearEarnings).toBe(-100);
+    expect(r.balanceSheet.unclosedEarnings).toBe(300);
+    expect(r.balanceSheet.adjustedEquity).toBe(300);
+    expect(r.balanceSheet.difference).toBe(0);
+  });
+
+  it('does not double count nominal accounts after a genuine closing journal', () => {
+    const revenue = journal(35, JournalEntryType.MANUAL, [
+      line(3, 100, 0), line(4, 0, 100),
+    ], { invoiceId: null, date: '2026-06-01' });
+    const closing = journal(36, JournalEntryType.MANUAL, [
+      line(4, 100, 0), line(6, 0, 100),
+    ], { invoiceId: null, date: '2026-12-31' });
+    const retained = a(6, '3100', AccountType.EQUITY);
+    const r = report({
+      invoices: [], payments: [], journals: [revenue, closing],
+      accounts: [...accounts, retained],
+    });
+    expect(r.balanceSheet.currentYearEarnings).toBe(0);
+    expect(r.balanceSheet.totalEquity).toBe(100);
+    expect(r.balanceSheet.adjustedEquity).toBe(100);
+    expect(r.balanceSheet.difference).toBe(0);
+  });
+
+  it('still flags a genuinely unbalanced balance sheet after including earnings', () => {
+    const unmatched = journal(37, JournalEntryType.MANUAL, [
+      line(3, 99, 0),
+    ], { invoiceId: null });
+    const r = report({ invoices: [], payments: [], journals: [unmatched] });
     expect(r.balanceSheet.isBalanced).toBe(false);
+    expect(r.balanceSheet.difference).toBe(99);
     expect(r.issues.some(x => x.code === 'balance_sheet_difference')).toBe(true);
+    expect(r.issues.some(x => x.code === 'unbalanced_journal')).toBe(true);
   });
 });
