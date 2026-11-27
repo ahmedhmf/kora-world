@@ -79,6 +79,15 @@ export class JournalWorkflowService {
     }
   }
 
+  // The founder tables are deliberately absent before the explicit release.
+  private async founderTransaction(m: EntityManager, journalId: number): Promise<{account_id:number;kind:string}|undefined> {
+    const [schema] = await m.query("SELECT to_regclass('public.founder_transactions') IS NOT NULL AS present");
+    if (!schema?.present) return undefined;
+    const [founder] = await m.query('SELECT account_id,kind FROM founder_transactions WHERE journal_id=$1',[journalId]);
+    if (founder) await m.query('SELECT account_id FROM founder_accounts WHERE account_id=$1 FOR UPDATE',[founder.account_id]);
+    return founder;
+  }
+
   private async lockedJournal(m: EntityManager, id: number): Promise<JournalEntry> {
     if (!Number.isSafeInteger(id) || id <= 0) throw new BadRequestException('Invalid journal ID');
     const journal = await m.findOne(JournalEntry, {
@@ -179,9 +188,10 @@ export class JournalWorkflowService {
       if (journal.type !== JournalEntryType.MANUAL || journal.postingStatus !== 'pending_approval') {
         throw new BadRequestException('Journal is not awaiting approval');
       }
-      // Administrators may perform any workflow action; accountants retain maker-checker separation.
-      if (actor.role !== 'admin' && (journal.createdById === userId || journal.submittedById === userId)) {
-        throw new ForbiddenException('Accountants cannot approve a journal they created or submitted');
+      const founder = await this.founderTransaction(m,id);
+      // Preserve existing non-founder admin behavior. Founder journals always require a second actor.
+      if ((founder || actor.role !== 'admin') && (journal.createdById === userId || journal.submittedById === userId)) {
+        throw new ForbiddenException('Cannot approve a journal you created or submitted');
       }
       const lines = await m.find(JournalLine, { where: { journalEntryId: id }, order: { id: 'ASC' } });
       const cents = (value: number) => {
@@ -209,6 +219,13 @@ export class JournalWorkflowService {
         throw new BadRequestException('Unsupported currency or journal base-amount mismatch');
       }
       await this.checkAccounts(m, inputs);
+      if (founder?.kind === 'repayment') {
+        const [balance] = await m.query(`SELECT COALESCE(SUM((l.credit-l.debit)*100),0)::text AS available
+          FROM journal_lines l JOIN journal_entries j ON j.id=l.journal_entry_id
+          WHERE l.account_id=$1 AND l.currency='EGP' AND j.posting_status IN ('posted','reversed')`,[founder.account_id]);
+        const debit = inputs.filter(l=>l.accountId===founder.account_id).reduce((n,l)=>n+l.debitCents-l.creditCents,0);
+        if(debit<=0 || Number(balance.available)<debit) throw new BadRequestException('Repayment exceeds current posted founder liability');
+      }
       journal.postingStatus = 'posted';
       journal.postedAt = new Date();
       journal.approvedById = userId;

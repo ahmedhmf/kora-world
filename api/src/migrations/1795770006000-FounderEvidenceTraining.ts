@@ -1,10 +1,10 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
+import { requireAcademyMigrationTarget } from '../academy/academy-release.policy';
 
 export class FounderEvidenceTraining1795770006000 implements MigrationInterface {
  name='FounderEvidenceTraining1795770006000';
  async up(q:QueryRunner):Promise<void>{
-  const [db]=await q.query('SELECT current_database() AS name');
-  if(db?.name!=='kora_test')throw new Error('Founder evidence training requires kora_test');
+  await requireAcademyMigrationTarget(q);
   for(const code of ['FIN-009','FIN-010','FIN-011']){
    const [p]=await q.query('SELECT id FROM academy_processes WHERE code=$1 AND archived_at IS NULL FOR UPDATE',[code]);
    if(!p)continue;

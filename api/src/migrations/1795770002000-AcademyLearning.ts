@@ -1,10 +1,10 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
+import { requireAcademyMigrationTarget } from '../academy/academy-release.policy';
 
 export class AcademyLearning1795770002000 implements MigrationInterface {
  name='AcademyLearning1795770002000';
  async up(q:QueryRunner):Promise<void>{
-  const [db]=await q.query('SELECT current_database() AS name');
-  if(db?.name!=='kora_test')throw new Error('Academy learning pilot requires kora_test');
+  await requireAcademyMigrationTarget(q);
   await q.query("ALTER TABLE academy_process_versions ADD COLUMN transcript TEXT NOT NULL DEFAULT ''");
   await q.query(`CREATE TABLE academy_training_assignments (
    id SERIAL PRIMARY KEY,user_id INTEGER NOT NULL,version_id INTEGER NOT NULL REFERENCES academy_process_versions(id),

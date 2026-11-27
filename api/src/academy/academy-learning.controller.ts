@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Post, Put, Param, ParseIntPipe, Req, UseGuards, BadRequestException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { requireAcademyRelease } from './academy-release.policy';
+import { Body, Controller, Get, Post, Put, Param, ParseIntPipe, Req, UseGuards, BadRequestException, NotFoundException } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { AuthGuard } from '../auth/auth.guard';
 import type { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
@@ -28,8 +29,7 @@ export class AcademyLearningController {
  constructor(private readonly db:DataSource){}
  private async actor(req:AuthenticatedRequest,admin=false){
   requireAcademyRole(req.user.role,admin);
-  const [db]=await this.db.query('SELECT current_database() AS name');
-  if(db?.name!=='kora_test')throw new ServiceUnavailableException('Academy pilot requires kora_test');
+  await requireAcademyRelease(this.db,'academy');
   return req.user;
  }
  private async version(tx:EntityManager,id:number,role:string,current=true){

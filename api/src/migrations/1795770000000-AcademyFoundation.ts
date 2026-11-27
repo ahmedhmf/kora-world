@@ -1,4 +1,5 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
+import { requireAcademyMigrationTarget } from '../academy/academy-release.policy';
 
 export class AcademyFoundation1795770000000 implements MigrationInterface {
   name = 'AcademyFoundation1795770000000';
@@ -11,7 +12,7 @@ export class AcademyFoundation1795770000000 implements MigrationInterface {
   }
 
   async up(q: QueryRunner): Promise<void> {
-    await this.requireTestDb(q);
+    await requireAcademyMigrationTarget(q);
     await q.query(`CREATE TABLE academy_categories (
       id SERIAL PRIMARY KEY, code VARCHAR(40) UNIQUE NOT NULL,
       name VARCHAR(120) NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0

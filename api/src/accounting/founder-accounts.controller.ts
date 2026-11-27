@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Post, Req, UseGuards, Param, ParseIntPipe, UploadedFile, UseInterceptors, StreamableFile, NotFoundException, BadRequestException, ForbiddenException, ConflictException, ServiceUnavailableException } from '@nestjs/common';
+import { requireAcademyRelease } from '../academy/academy-release.policy';
+import { Body, Controller, Get, Post, Req, UseGuards, Param, ParseIntPipe, UploadedFile, UseInterceptors, StreamableFile, NotFoundException, BadRequestException, ForbiddenException, ConflictException } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { validateFounderEvidence } from './founder-evidence';
 import type { EvidenceUpload } from './founder-evidence';
@@ -30,8 +31,7 @@ export function founderLines(kind:unknown,founder:number,other:number,amount:num
 export class FounderAccountsController{
  constructor(private readonly db:DataSource,private readonly workflow:JournalWorkflowService){}
  private async actor(req:AuthenticatedRequest){
-  const [db]=await this.db.query('SELECT current_database() AS name');
-  if(db?.name!=='kora_test')throw new ServiceUnavailableException('Founder pilot requires kora_test');
+  await requireAcademyRelease(this.db,'founders');
   const [u]=await this.db.query("SELECT id FROM users WHERE id=$1 AND role IN ('admin','accountant')",[req.user.sub]);
   if(!u)throw new ForbiddenException('Finance access required');
   return u.id as number;
@@ -55,6 +55,7 @@ export class FounderAccountsController{
     FROM founder_transactions t JOIN journal_entries j ON j.id=t.journal_id ORDER BY t.id DESC`);
   const accounts=await this.db.query(`SELECT a.id,a.code,a.name,a.type FROM accounting_accounts a WHERE a.is_active AND upper(a.currency)='EGP'
     AND NOT EXISTS(SELECT 1 FROM accounting_accounts c WHERE c.parent_id=a.id)
+    AND a.code NOT IN ('2000','2100','2200','1103')
     AND NOT EXISTS(SELECT 1 FROM founder_accounts f WHERE f.account_id=a.id) ORDER BY a.code`);
   const attachments=await this.db.query('SELECT id,transaction_id,filename,mime_type,octet_length(content) AS size,uploaded_at FROM founder_evidence ORDER BY id');
   return {founders,transactions,accounts,attachments};
@@ -64,7 +65,7 @@ export class FounderAccountsController{
   const actor=await this.actor(req),b=obj(body),name=str(b.name,120),accountId=id(b.accountId);
   return this.db.transaction(async tx=>{
    const a=await this.leaf(tx,accountId);
-   if(a.type!=='liability')throw new BadRequestException('Founder account must be a liability');
+   if(a.type!=='liability'||['2000','2100','2200'].includes(a.code))throw new BadRequestException('Choose a dedicated founder liability account, not a general, supplier or tax account');
    const [row]=await tx.query('INSERT INTO founder_accounts(account_id,founder_name,created_by) VALUES($1,$2,$3) ON CONFLICT DO NOTHING RETURNING account_id',[accountId,name,actor]);
    if(!row)throw new ConflictException('Founder name or liability account already registered');
    return row;
@@ -85,7 +86,7 @@ export class FounderAccountsController{
    if(sameEvidence)throw new ConflictException('Evidence reference already used for this founder and transaction type');
    const fa=await this.leaf(tx,founder),oa=await this.leaf(tx,other);
    if(fa.type!=='liability')throw new BadRequestException('Founder liability account is no longer valid');
-   if(kind==='expense' ? oa.type!=='expense' : oa.type!=='asset'||!oa.code.startsWith('11'))throw new BadRequestException('Use an expense account or an eligible company cash/bank account');
+   if(kind==='expense' ? oa.type!=='expense' : oa.type!=='asset'||!oa.code.startsWith('11')||oa.code==='1103')throw new BadRequestException('Use an expense account or an eligible company cash/bank account');
    if(kind==='repayment'){
     const [balance]=await tx.query(`SELECT COALESCE(SUM(CASE WHEN j.posting_status IN ('posted','reversed') THEN (l.credit-l.debit)*100
       WHEN j.posting_status IN ('draft','pending_approval') AND l.debit>0 THEN -l.debit*100 ELSE 0 END),0)::text AS available

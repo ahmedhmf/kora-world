@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Body, Param, ParseIntPipe, Req, UseGuards, BadRequestException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { requireAcademyRelease } from './academy-release.policy';
+import { Controller, Get, Post, Body, Param, ParseIntPipe, Req, UseGuards, BadRequestException, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { AuthGuard } from '../auth/auth.guard';
 import type { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
@@ -11,8 +12,7 @@ export class AcademyController {
 
   private async authorize(req: AuthenticatedRequest): Promise<string> {
     requireAcademyRole(req.user.role);
-    const [db] = await this.db.query('SELECT current_database() AS name');
-    if (db?.name !== 'kora_test') throw new ServiceUnavailableException('Academy pilot requires kora_test');
+    await requireAcademyRelease(this.db,'academy');
     return req.user.role;
   }
 
