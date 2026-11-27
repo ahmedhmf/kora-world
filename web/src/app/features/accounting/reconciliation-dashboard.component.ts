@@ -5,7 +5,7 @@ import { RouterLink } from '@angular/router';
 import { forkJoin } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 import {
-  AccountingApiService, InvoiceAuditRow, Phase2JReport, ReconciliationAudit,
+  AccountingApiService, Phase2JReport, ReconciliationAudit,
 } from '../../core/services/accounting-api.service';
 
 interface DashboardIssue {
@@ -37,9 +37,8 @@ export class ReconciliationDashboardComponent implements OnInit {
   startDate = `${new Date().getFullYear()}-01-01`;
   endDate = `${new Date().getFullYear()}-12-31`;
   asOfDate = `${new Date().getFullYear()}-12-31`;
-  search = '';
-  category = 'All';
-  showOnlyIssues = true;
+  readonly search = signal('');
+  readonly category = signal('All');
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
   readonly audit = signal<ReconciliationAudit | null>(null);
@@ -85,8 +84,8 @@ export class ReconciliationDashboardComponent implements OnInit {
   });
 
   readonly visibleExceptions = computed(() => {
-    const q = this.search.trim().toLowerCase();
-    const group = this.category;
+    const q = this.search().trim().toLowerCase();
+    const group = this.category();
     return this.exceptionRows().filter(row =>
       (group === 'All' || row.category === group) &&
       (!q || [row.code, row.detail, row.invoiceNumber, row.invoiceId,
