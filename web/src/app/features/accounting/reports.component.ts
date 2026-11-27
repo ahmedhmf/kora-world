@@ -33,10 +33,10 @@ export class ReportsComponent implements OnInit {
   asOfDate = '2026-12-31';
 
   readonly tabs = [
-    { id: 'pl', label: 'Profit & Loss' },
-    { id: 'bs', label: 'Balance Sheet' },
-    { id: 'cf', label: 'Cash Flow' },
-    { id: '2j', label: 'Phase 2J Reconciliation' },
+    { id: '2j', label: 'Verified EGP Preview (Local)' },
+    { id: 'pl', label: 'Legacy Profit & Loss' },
+    { id: 'bs', label: 'Legacy Balance Sheet' },
+    { id: 'cf', label: 'Legacy Cash Flow' },
   ];
 
   ngOnInit() {
