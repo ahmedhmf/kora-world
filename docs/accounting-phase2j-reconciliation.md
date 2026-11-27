@@ -86,3 +86,48 @@ The fixture is removed by its own invoice and bank account IDs, with reversal jo
 - Cash Flow is a journal-based view of 11-prefix asset account movements, not an independently verified cash-flow classification or bank reconciliation.
 - `asOfDate` determines snapshot cutoffs for invoice/payment settlement and ledger balances. The reporting time window governs Profit & Loss and Cash Flow.
 - Non-EGP source entries appear in financial statement base-amount totals exactly as recorded, with explicit manual-review flags. Their correctness must be verified manually; the report does not infer or substitute rates.
+
+
+## Phase 2J-E — Balance Sheet current-year and prior unclosed earnings
+
+**Purpose:** Remove the false `balance_sheet_difference` warning for legitimate Money Out expense and Money In revenue postings while retaining warnings for real mismatches.
+
+The Balance Sheet now presents these independent **EGP** figures as of `asOfDate`:
+
+- `totalEquity`: equity accounts already posted to the ledger, unchanged.
+- `currentYearEarnings`: net unclosed revenue minus expenses posted from January 1 of the as-of year through the as-of date.
+- `priorUnclosedEarnings`: net unclosed nominal-account balances from before January 1 of the as-of year. This is shown separately to avoid silently calling old unclosed income current-year earnings.
+- `unclosedEarnings`: sum of the two earnings components.
+- `adjustedEquity`: posted equity plus all unclosed earnings, **presentation only**.
+- `difference`: assets minus liabilities minus adjusted equity.
+- `isBalanced`: true if absolute adjusted difference is no greater than EGP 0.02.
+
+The source is the **same** existing set of posted or reversed journal lines used by Phase 2J financial statements. Draft/pending journals are ignored; an original reversed journal and its posted reversing journal remain represented. A true closing journal that zeros the nominal-account balances removes the corresponding unclosed earnings naturally, preventing double-counting. No SQL writes, closing journals, transaction amendments, exchange-rate calculations, or database migrations were added.
+
+The **selected Profit & Loss period** continues to determine the displayed P&L income; Balance Sheet earnings are computed independently from the January 1 calendar-year boundary through `asOfDate`, with earlier unclosed amounts disclosed separately. The result may therefore differ from the net profit in a short date range.
+
+For the verified local screenshot scenario (Marketing Money Out, EGP 2,345, no other entries), expected figures are assets `-2,345.00`, liabilities `0.00`, posted equity `0.00`, current-year earnings `-2,345.00`, adjusted equity `-2,345.00`, adjusted difference `0.00`. **A negative cash/bank balance still requires funding/opening-balance investigation.**
+
+The implementation updates the Phase 2J report type, financial reports preview, and reconciliation dashboard summary. The old production-facing `GET /accounting/reports/balance-sheet` is intentionally **unchanged**.
+
+Regression tests in `phase2j-report.policy.spec.ts` cover:
+- Single Marketing Money Out and Cash Flow consistency.
+- Single Money In revenue.
+- Earnings calculated independently of a shorter P&L date range.
+- Prior-year unclosed earnings shown separately.
+- Proper journal-closing entries that move earnings to posted equity.
+- Truly unbalanced journals still showing `balance_sheet_difference`.
+
+Run:
+```powershell
+cd D:\Ahmed\project\kora-world
+git pull --ff-only origin feature/accounting-redesign
+cd api
+npm run build
+npm test -- --runInBand phase2j-report.policy.spec.ts phase2j-report.service.spec.ts
+
+cd ..\web
+npm run build
+```
+
+**Status:** Committed; the assistant has not executed a local TypeScript build, Jest run, or PostgreSQL/browser check. Confirm the tests and refresh the Phase 2J Reconciliation tab and dashboard on local `kora_test` before treating this reporting calculation as validated.
