@@ -216,6 +216,28 @@ export class Phase2LBankService {
           opening_balance_cents::text AS "openingBalanceCents",
           closing_balance_cents::text AS "closingBalanceCents", imported_at AS "importedAt"
         FROM accounting_bank_statement_imports WHERE account_id=$1 ORDER BY id DESC`, [accountId]);
+      // Independently compare bank-statement closing totals with posted bank
+      // ledger balance through the statement's final transaction date.
+      // Missing opening entries will remain visible as a real variance.
+      for (const item of imports) {
+        const [summary] = await m.query(`
+          SELECT MAX(txn_date) AS "throughDate",
+            COUNT(*)::int AS "rowCount",
+            COUNT(matched_journal_line_id)::int AS "matchedCount",
+            COALESCE(SUM(amount_cents), 0)::bigint::text AS "movementCents"
+          FROM accounting_bank_statement_rows WHERE import_id=$1`, [item.id]);
+        const [ledger] = await m.query(`
+          SELECT COALESCE(SUM(ROUND(l.amount_base * 100)),0)::bigint::text AS "balanceCents"
+          FROM journal_lines l JOIN journal_entries j ON j.id=l.journal_entry_id
+          WHERE l.account_id=$1 AND j.posting_status IN ('posted','reversed')
+            AND j.date <= $2`, [accountId, summary.throughDate]);
+        item.throughDate = summary.throughDate;
+        item.rowCount = summary.rowCount;
+        item.matchedCount = summary.matchedCount;
+        item.ledgerBalanceCents = ledger.balanceCents;
+        item.varianceCents = item.closingBalanceCents == null
+          ? null : String(BigInt(item.closingBalanceCents) - BigInt(ledger.balanceCents));
+      }
       const rows = await m.query(`
         SELECT r.id, r.import_id AS "importId", r.txn_date AS "date", r.reference,
           r.description, r.amount_cents::text AS "amountCents",
