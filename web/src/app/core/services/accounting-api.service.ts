@@ -186,6 +186,21 @@ export interface Phase2LView {
     detail: string; createdAt: string }>;
 }
 
+export interface Phase2MFinding {
+  code: string; severity: 'blocker' | 'warning';
+  subjectType: 'journal' | 'invoice' | 'payment' | 'account' | 'system';
+  subjectId?: number; detail: string; proposedAction: string;
+}
+export interface Phase2MReadiness {
+  scope: 'local-kora-test';
+  reportType: 'phase2m-diagnostic-not-release-approval';
+  generatedAt: string;
+  counts: { invoices: number; payments: number; journals: number; journalLines: number; accounts: number };
+  findings: Phase2MFinding[];
+  blockerCount: number; warningCount: number;
+  readyForProduction: false;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AccountingApiService {
   private readonly http = inject(HttpClient);
@@ -391,6 +406,11 @@ export class AccountingApiService {
   unmatchBankRow(rowId: number, reason: string): Observable<unknown> {
     return this.http.post(`${this.base}/accounting/phase2l/rows/${rowId}/unmatch`,
       { reason });
+  }
+
+  /** Phase 2M admin-only local read-only diagnostics. Never grants release approval. */
+  getPhase2MReadiness(): Observable<Phase2MReadiness> {
+    return this.http.get<Phase2MReadiness>(`${this.base}/accounting/phase2m-readiness`);
   }
 
   // Reports
