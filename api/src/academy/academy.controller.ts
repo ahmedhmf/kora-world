@@ -1,7 +1,7 @@
 import { Controller, Get, Param, Req, UseGuards, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { AuthGuard } from '../auth/auth.guard';
-import { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
+import type { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
 import { requireAcademyRole } from './academy.policy';
 
 @Controller('academy')
