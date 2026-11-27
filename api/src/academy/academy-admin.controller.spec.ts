@@ -1,4 +1,5 @@
 import { AcademyAdminController } from './academy-admin.controller';
+import { academyReleaseMigrations } from './academy-release.policy';
 import type { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
 import type { DataSource } from 'typeorm';
 
@@ -11,11 +12,25 @@ describe('Academy admin authorization', () => {
     await expect(controller.list(request('supplier'))).rejects.toThrow('Academy access denied');
     expect(query).not.toHaveBeenCalled();
   });
-  it('rejects non-test database before authoring', async () => {
-    const query = jest.fn().mockResolvedValue([{name:'kora_world'}]);
+  it('rejects production authoring before release migrations are installed', async () => {
+    const query = jest.fn().mockResolvedValueOnce([{name:'kora_world'}]).mockResolvedValueOnce([{count:0}]);
     const transaction = jest.fn();
     const controller = new AcademyAdminController({query,transaction} as unknown as DataSource);
-    await expect(controller.create(request('admin'),{})).rejects.toThrow('Academy pilot requires kora_test');
+    await expect(controller.create(request('admin'),{})).rejects.toThrow('Academy release schema is not installed');
+    expect(transaction).not.toHaveBeenCalled();
+  });
+  it('allows production admin listing after all release migrations are installed', async () => {
+    const query = jest.fn().mockResolvedValueOnce([{name:'kora_world'}])
+      .mockResolvedValueOnce([{count:academyReleaseMigrations.length}]).mockResolvedValue([]);
+    const controller = new AcademyAdminController({query} as unknown as DataSource);
+    await expect(controller.list(request('admin'))).resolves.toEqual([]);
+    expect(query).toHaveBeenCalledTimes(3);
+  });
+  it('rejects unsupported databases before authoring', async () => {
+    const query = jest.fn().mockResolvedValue([{name:'other_db'}]);
+    const transaction = jest.fn();
+    const controller = new AcademyAdminController({query,transaction} as unknown as DataSource);
+    await expect(controller.create(request('admin'),{})).rejects.toThrow('Unsupported database');
     expect(transaction).not.toHaveBeenCalled();
   });
   it('rejects publishing a stale or already-published version', async () => {
