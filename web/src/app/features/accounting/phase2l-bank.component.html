@@ -124,6 +124,27 @@
           <div class="border border-zinc-800 rounded p-3"><span class="block text-zinc-400">Statement rows</span><strong class="text-lg text-white">{{ data.rows.length }}</strong></div>
           <div class="border border-zinc-800 rounded p-3"><span class="block text-zinc-400">Unmatched</span><strong class="text-lg text-amber-300">{{ unmatchedCount }}</strong></div>
         </div>
+        <div class="space-y-2">
+          <h3 class="text-sm font-bold text-white">Statement closing-balance checks</h3>
+          @for (statement of data.imports; track statement.id) {
+            <div class="border border-zinc-800 rounded p-3 text-xs space-y-1">
+              <p class="font-bold text-white">{{ statement.statementKey }} · Through {{ statement.throughDate | date:'dd MMM yyyy' }}</p>
+              <p class="text-zinc-400">Matched {{ statement.matchedCount }} / {{ statement.rowCount }} rows</p>
+              <p class="text-zinc-300">Ledger bank balance: {{ +statement.ledgerBalanceCents / 100 | number:'1.2-2' }} EGP</p>
+              <p class="text-zinc-300">Statement closing balance:
+                {{ statement.closingBalanceCents === null ? 'Not supplied' : ((+statement.closingBalanceCents / 100 | number:'1.2-2') + ' EGP') }}
+              </p>
+              <p [class.text-emerald-300]="statement.varianceCents === '0'"
+                [class.text-amber-300]="statement.varianceCents !== '0'">
+                Closing-to-ledger variance:
+                {{ statement.varianceCents === null ? 'Not available' : ((+statement.varianceCents / 100 | number:'1.2-2') + ' EGP') }}
+              </p>
+              <p class="text-zinc-500">A zero variance alone does not certify individual transactions; verify matched rows and statement authenticity.</p>
+            </div>
+          } @empty {
+            <p class="text-xs text-zinc-500">Import a bank statement to see balance comparisons.</p>
+          }
+        </div>
         <div class="overflow-x-auto">
           <table class="w-full text-xs text-left">
             <thead class="border-b border-zinc-800 text-zinc-400"><tr>
