@@ -1,5 +1,5 @@
 import { ChangeDetectorRef, Component, inject, signal } from '@angular/core';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService } from '../core/services/auth.service';
 import { FormsModule } from '@angular/forms';
 import { Observable } from 'rxjs';
@@ -29,6 +29,18 @@ interface NavItem {
 })
 export class LayoutComponent {
   readonly authService = inject(AuthService);
+  private readonly router = inject(Router);
+  academyHelpCategory(): string | null {
+    const role = this.authService.currentUser()?.role;
+    if (role !== 'admin' && role !== 'employee') return null;
+    const path = this.router.url.split(/[?#]/)[0];
+    if (/^\/purchase-orders(?:\/|$)/.test(path)) return 'purchasing';
+    if (/^\/accounts(?:\/|$)/.test(path)) return 'sales';
+    if (/^\/warehouse(?:\/|$)/.test(path)) return 'warehouse';
+    if (/^\/(calendar|experiences)(?:\/|$)/.test(path)) return 'events';
+    if (/^\/accounting(?:\/|$)/.test(path)) return 'finance';
+    return null;
+  }
   private readonly cdr = inject(ChangeDetectorRef);
   readonly isMobileOpen = signal(false);
 
