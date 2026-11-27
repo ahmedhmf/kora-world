@@ -46,6 +46,12 @@ cd api
 npm run build
 npm test -- --runInBand phase2j-report.policy.spec.ts phase2j-report.service.spec.ts reports.service.spec.ts
 
+# Real PostgreSQL integration checks (only disposable local kora_test)
+cd ..\api
+$env:DATABASE_NAME = 'kora_test'
+$env:DATABASE_HOST = '127.0.0.1'
+npm run test:accounting:integration -- phase2j-report.integration.ts
+
 cd ..\web
 npm run build
 ```
@@ -63,3 +69,20 @@ npm run start:dev
 Sign in to localhost as an admin/accountant, open Accounting → Reports → Phase 2J Reconciliation, select period and as-of dates, click **Generate Report**, and review the warning list and excluded invoice counts.
 
 Do **not** set this flag on production. Do not modify production reports or migrate historical data until the preview is reconciled and approved.
+
+
+## Database integration tests
+
+`api/src/accounting/phase2j-report.integration.ts` adds **two PostgreSQL integration tests** using a unique disposable supplier invoice, a payment and controlled posted journal:
+1. Verifies AP outstanding balance plus period expense/cash-flow coverage from the read-only reporting endpoint.
+2. Posts a fixture reversal, checks the full outstanding amount is restored and the original payment remains, and checks an earlier as-of report still counts the payment before the reversal.
+
+The fixture is removed by its own invoice and bank account IDs, with reversal journals removed before their originals. Integration tests have **not** been executed in the local PostgreSQL runtime by the assistant.
+
+## Review limitations
+
+- This report does not claim to make legacy accounting history clean. Ambiguous legacy payments or synthetic journals require manual investigation. Unverified invoice balances are null and excluded from the verified total.
+- A balance sheet can remain imbalanced if closing entries have not transferred revenue/expense into equity. This preview reports the difference rather than inventing an entry.
+- Cash Flow is a journal-based view of 11-prefix asset account movements, not an independently verified cash-flow classification or bank reconciliation.
+- `asOfDate` determines snapshot cutoffs for invoice/payment settlement and ledger balances. The reporting time window governs Profit & Loss and Cash Flow.
+- Non-EGP source entries appear in financial statement base-amount totals exactly as recorded, with explicit manual-review flags. Their correctness must be verified manually; the report does not infer or substitute rates.
