@@ -241,6 +241,11 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/accounting/reports.component').then((m) => m.ReportsComponent),
       },
+      {
+        path: 'accounting/reconciliation',
+        loadComponent: () =>
+          import('./features/accounting/reconciliation-dashboard.component').then((m) => m.ReconciliationDashboardComponent),
+      },
     ],
   },
 ];
