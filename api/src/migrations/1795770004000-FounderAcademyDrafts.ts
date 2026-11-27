@@ -1,4 +1,5 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
+import { requireAcademyMigrationTarget } from '../academy/academy-release.policy';
 
 const lessons=[
  {code:'FIN-009',slug:'founder-paid-expense',title:'Record an expense paid by a founder',trigger:'A founder pays a legitimate Kora operating expense with personal funds.',pre:'Receipt, personal payment proof, approved business purpose, dedicated EGP founder liability account and expense category.',warn:'Do not use Money Out or record the expense twice. Already-booked supplier invoices, assets, inventory, foreign currency and tax treatment require accountant review.',done:'Journal posted, evidence retained and founder liability increased without changing company cash.',steps:[
@@ -22,8 +23,7 @@ const lessons=[
 export class FounderAcademyDrafts1795770004000 implements MigrationInterface {
  name='FounderAcademyDrafts1795770004000';
  async up(q:QueryRunner):Promise<void>{
-  const [db]=await q.query('SELECT current_database() AS name');
-  if(db?.name!=='kora_test')throw new Error('Founder Academy drafts require kora_test');
+  await requireAcademyMigrationTarget(q);
   const [category]=await q.query("SELECT id FROM academy_categories WHERE code='finance'");
   if(!category)throw new Error('Finance Academy category missing');
   for(const s of lessons){
