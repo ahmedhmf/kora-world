@@ -1,10 +1,10 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
+import { requireAcademyMigrationTarget } from '../academy/academy-release.policy';
 
 export class FounderAccounts1795770003000 implements MigrationInterface {
  name='FounderAccounts1795770003000';
  async up(q:QueryRunner):Promise<void>{
-  const [db]=await q.query('SELECT current_database() AS name');
-  if(db?.name!=='kora_test')throw new Error('Founder accounts pilot requires kora_test');
+  await requireAcademyMigrationTarget(q);
   await q.query(`CREATE TABLE founder_accounts (
     account_id INTEGER PRIMARY KEY REFERENCES accounting_accounts(id) ON DELETE RESTRICT,
     founder_name VARCHAR(120) NOT NULL, created_by INTEGER NOT NULL,
