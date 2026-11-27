@@ -94,8 +94,8 @@ export function buildPhase2JReport(input: {
       const linked = journals.filter(j => j.invoiceId === inv.id);
       const booking = linked.filter(j => j.type === JournalEntryType.INVOICE);
       const paymentsFor = payments.filter(p => p.invoiceId === inv.id && dateKey(p.date) <= asOfDate);
-      const originals = linked.filter(j => j.type === JournalEntryType.PAYMENT && !j.reversalOfId);
-      const reversals = linked.filter(j => j.type === JournalEntryType.PAYMENT && !!j.reversalOfId);
+      const originals = linked.filter(j => j.type === JournalEntryType.PAYMENT && !j.reversalOfId && dateKey(j.date) <= asOfDate);
+      const reversals = linked.filter(j => j.type === JournalEntryType.PAYMENT && !!j.reversalOfId && dateKey(j.date) <= asOfDate);
       if (booking.length !== 1 || booking[0].postingStatus !== 'posted') {
         warn('invoice_booking_ambiguous', 'Invoice has no single posted booking journal');
       }
@@ -140,7 +140,7 @@ export function buildPhase2JReport(input: {
       }
       const totalCents = cents(inv.total);
       if (!Number.isSafeInteger(totalCents) || totalCents < 0 ||
-          paidCents > totalCents || (inv.status === 'paid' && paidCents !== totalCents)) {
+          paidCents > totalCents) {
         warn('invoice_balance_mismatch', 'Invoice total and verified settlements disagree');
       }
       const reviewRequired = issueCodes.size > 0;
