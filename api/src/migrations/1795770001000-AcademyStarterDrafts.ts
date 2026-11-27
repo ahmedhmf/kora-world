@@ -1,4 +1,5 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
+import { requireAcademyMigrationTarget } from '../academy/academy-release.policy';
 
 type Step = [string,string,string?,string?];
 type Starter = {code:string;slug:string;category:string;title:string;trigger:string;prerequisites:string;warnings:string;done:string;steps:Step[];finance?:boolean};
@@ -55,8 +56,7 @@ const starters: Starter[] = [
 export class AcademyStarterDrafts1795770001000 implements MigrationInterface {
  name='AcademyStarterDrafts1795770001000';
  async up(q:QueryRunner):Promise<void>{
-  const [db]=await q.query('SELECT current_database() AS name');
-  if(db?.name!=='kora_test')throw new Error('Academy starter drafts require kora_test');
+  await requireAcademyMigrationTarget(q);
   // Never overwrite an existing procedure. Seed drafts only, never publish.
   for(const s of starters){
    const [category]=await q.query('SELECT id FROM academy_categories WHERE code=$1',[s.category]);
