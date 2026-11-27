@@ -152,6 +152,19 @@ export interface Phase2JReport {
   journalCount: number; needsReview: boolean;
 }
 
+/** Independent local audit snapshot; not a bank reconciliation or certified financial report. */
+export interface InvoiceAuditRow {
+  invoiceId: number; invoiceNumber: string; currency: string; status: string;
+  invoiceTotal: number; invoiceJournalIds: number[]; paymentIds: number[];
+  paymentJournalIds: number[]; reversalJournalIds: number[];
+  issues: string[]; clean: boolean;
+}
+export interface ReconciliationAudit {
+  scope: 'local-kora-test'; totalInvoices: number; flaggedInvoices: number;
+  unassignedPayments: number[]; unassignedJournals: number[];
+  invoices: InvoiceAuditRow[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class AccountingApiService {
   private readonly http = inject(HttpClient);
@@ -327,6 +340,11 @@ export class AccountingApiService {
   }
 
   // Reports
+  /** Admin-only, opt-in read-only audit of disposable local kora_test. */
+  getReconciliationAudit(): Observable<ReconciliationAudit> {
+    return this.http.get<ReconciliationAudit>(`${this.base}/accounting/reconciliation-audit`);
+  }
+
   getPhase2JReport(startDate: string, endDate: string, asOfDate: string): Observable<Phase2JReport> {
     const params = new URLSearchParams({ startDate, endDate, asOfDate });
     return this.http.get<Phase2JReport>(`${this.base}/accounting/phase2j-report?${params.toString()}`);
