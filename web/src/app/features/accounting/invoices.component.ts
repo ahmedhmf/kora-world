@@ -5,8 +5,9 @@ import { AccountingStore } from '../../store/accounting.store';
 import { SuppliersStore } from '../../store/suppliers.store';
 import { PurchaseOrdersStore } from '../../store/purchase-orders.store';
 import { ProductsStore } from '../../store/products.store';
-import { Invoice, InvoiceLine, AccountingApiService } from '../../core/services/accounting-api.service';
+import { Invoice, InvoiceLine, SupplierPilotInvoiceBalance, AccountingApiService } from '../../core/services/accounting-api.service';
 import { ApiService } from '../../core/services/api.service';
+import { AuthService } from '../../core/services/auth.service';
 import { LucideAngularModule } from 'lucide-angular';
 
 @Component({
@@ -22,6 +23,287 @@ export class InvoicesComponent implements OnInit {
   readonly productsStore = inject(ProductsStore);
   readonly accountingApi = inject(AccountingApiService);
   readonly apiService = inject(ApiService);
+  readonly auth = inject(AuthService);
+
+  // Local-only presentation. The server separately enforces the pilot flag,
+  // verified kora_test identity and accountant/admin authorization.
+  readonly canViewSupplierPilot = computed(() => {
+    const host = window.location.hostname;
+    const role = this.auth.currentUser()?.role;
+    return (host === 'localhost' || host === '127.0.0.1') &&
+      (role === 'admin' || role === 'accountant');
+  });
+  readonly pilotCanCreate = computed(() => this.canViewSupplierPilot() &&
+    this.auth.currentUser()?.role === 'admin');
+  // Controlled invoice issuance is a separate backend feature flag.
+  // The frontend only limits visibility; it never assumes the flag is enabled.
+  readonly pilotBookingInvoice = signal<Invoice | null>(null);
+  readonly pilotBookingBusy = signal(false);
+  readonly pilotBookingError = signal<string | null>(null);
+  readonly pilotBookingSuccess = signal<string | null>(null);
+  readonly pilotBookingUncertain = signal(false);
+  private pilotBookingRequest = 0;
+
+  openControlledSupplierBooking(invoice: Invoice) {
+    if (!this.pilotCanCreate() || this.pilotBookingBusy() ||
+        this.pilotBookingUncertain() || this.pilotRetryPending() ||
+        invoice.type !== 'incoming' || invoice.currency !== 'EGP' ||
+        invoice.status !== 'draft') return;
+    this.pilotBookingInvoice.set(invoice);
+    this.pilotBookingError.set(null);
+    this.pilotBookingSuccess.set(null);
+  }
+
+  cancelControlledSupplierBooking() {
+    if (this.pilotBookingBusy() || this.pilotBookingUncertain()) return;
+    ++this.pilotBookingRequest;
+    this.pilotBookingInvoice.set(null);
+    this.pilotBookingError.set(null);
+  }
+
+  confirmControlledSupplierBooking() {
+    const invoice = this.pilotBookingInvoice();
+    if (!this.pilotCanCreate() || !invoice || this.pilotBookingBusy() ||
+        invoice.type !== 'incoming' || invoice.currency !== 'EGP' ||
+        invoice.status !== 'draft') return;
+    const request = ++this.pilotBookingRequest;
+    this.pilotBookingBusy.set(true);
+    this.pilotBookingError.set(null);
+    this.accountingApi.bookControlledSupplierInvoice(invoice.id).subscribe({
+      next: result => {
+        if (request !== this.pilotBookingRequest) return;
+        this.pilotBookingBusy.set(false);
+        this.pilotBookingUncertain.set(false);
+        this.pilotBookingInvoice.set(null);
+        this.pilotBookingSuccess.set(
+          `Invoice ${invoice.number} booked (journal #${result.journalId})${result.replayed ? ' — confirmed replay' : ''}.`,
+        );
+        this.store.loadInvoices();
+        this.store.loadJournalEntries();
+      },
+      error: () => {
+        if (request !== this.pilotBookingRequest) return;
+        this.pilotBookingBusy.set(false);
+        this.pilotBookingUncertain.set(true);
+        this.pilotBookingError.set(
+          'Booking could not be confirmed. The request might have succeeded. Retry this SAME invoice to check its verified booking; do not edit or issue it through the legacy flow.',
+        );
+      },
+    });
+  }
+
+  // The backend returns the original journal for an identical booking replay.
+  // Never switch invoice identity after an uncertain booking response.
+  dismissControlledSupplierBookingWarning() {
+    if (this.pilotBookingBusy() || !this.pilotBookingUncertain()) return;
+    if (!confirm('The booking may have succeeded. Verify the invoice and journal history before starting any other action. Close this warning?')) return;
+    this.pilotBookingUncertain.set(false);
+    this.pilotBookingInvoice.set(null);
+    this.pilotBookingError.set(null);
+    this.store.loadInvoices();
+    this.store.loadJournalEntries();
+  }
+
+  readonly pilotBanks = computed(() => {
+    const accounts = this.store.accounts();
+    return accounts.filter(a => a.isActive && a.currency === 'EGP' &&
+      a.type === 'asset' && a.code.startsWith('11') &&
+      !accounts.some(child => child.parentId === a.id));
+  });
+  readonly pilotWriteBusy = signal(false);
+  readonly pilotWriteError = signal<string | null>(null);
+  readonly pilotWriteSuccess = signal<string | null>(null);
+  readonly pilotConfirmReverseId = signal<number | null>(null);
+  pilotReverseReason = '';
+  pilotPaymentAmount = '';
+  pilotPaymentDate = new Date().toISOString().slice(0, 10);
+  pilotPaymentBankId = 0;
+  pilotPaymentDescription = '';
+  // Retain the exact payload/UUID after an uncertain failure. A retry must
+  // never create a new UUID or apply changed fields.
+  private pilotPendingPayment: {
+    invoiceId: number; bankAccountId: number; amountCents: number;
+    date: string; requestKey: string; description?: string;
+  } | null = null;
+  readonly pilotRetryPending = signal(false);
+
+  private readPilotAmountCents(): number | null {
+    const raw = this.pilotPaymentAmount.trim();
+    if (!/^(?:0|[1-9]\d*)(?:\.\d{1,2})?$/.test(raw)) return null;
+    const [whole, fraction = ''] = raw.split('.');
+    const amount = Number(whole) * 100 + Number(fraction.padEnd(2, '0'));
+    return Number.isSafeInteger(amount) && amount > 0 ? amount : null;
+  }
+
+  submitSupplierPilotPayment() {
+    const balance = this.pilotBalance();
+    if (!this.pilotCanCreate() || !balance || this.pilotWriteBusy() ||
+        this.pilotBalanceLoading() || (balance.outstandingCents <= 0 && !this.pilotRetryPending())) return;
+    let dto = this.pilotPendingPayment;
+    if (!dto) {
+      const amountCents = this.readPilotAmountCents();
+      const bankId = Number(this.pilotPaymentBankId);
+      if (!amountCents || amountCents > balance.outstandingCents ||
+          !this.pilotBanks().some(a => a.id === bankId) ||
+          !/^\d{4}-\d{2}-\d{2}$/.test(this.pilotPaymentDate) ||
+          Number.isNaN(Date.parse(this.pilotPaymentDate)) ||
+          new Date(this.pilotPaymentDate).toISOString().slice(0, 10) !== this.pilotPaymentDate ||
+          this.pilotPaymentDescription.length > 255) {
+        this.pilotWriteError.set('Enter a valid amount within the outstanding balance, date and active EGP bank account.');
+        return;
+      }
+      // A fresh UUID is generated only for a NEW submission, not retries.
+      dto = {
+        invoiceId: balance.invoiceId, bankAccountId: bankId,
+        amountCents, date: this.pilotPaymentDate,
+        requestKey: crypto.randomUUID(),
+        description: this.pilotPaymentDescription.trim() || undefined,
+      };
+      this.pilotPendingPayment = dto;
+      this.pilotRetryPending.set(false);
+    }
+    if (dto.invoiceId !== balance.invoiceId) return;
+    this.pilotWriteBusy.set(true);
+    this.pilotWriteError.set(null);
+    this.accountingApi.createSupplierPilotPayment(dto).subscribe({
+      next: result => {
+        this.pilotWriteBusy.set(false);
+        this.pilotPendingPayment = null;
+        this.pilotRetryPending.set(false);
+        this.pilotPaymentAmount = '';
+        this.pilotPaymentDescription = '';
+        this.pilotWriteSuccess.set(result.replayed
+          ? `Previous payment #${result.paymentId} confirmed; no duplicate created.`
+          : `Payment #${result.paymentId} recorded successfully.`);
+        this.store.loadInvoices();
+        this.refreshSupplierPilotBalance();
+      },
+      error: () => {
+        this.pilotWriteBusy.set(false);
+        this.pilotRetryPending.set(true);
+        this.pilotWriteError.set('Submission could not be confirmed. Retry the SAME request without changing its details, or verify the payment history before starting another payment.');
+      },
+    });
+  }
+
+  // Discarding after a network failure can risk duplicates; require confirmation.
+  discardSupplierPilotRetry() {
+    if (this.pilotWriteBusy() || !this.pilotPendingPayment) return;
+    if (!confirm('An earlier request may have succeeded. Check payment history before making a NEW payment. Discard this retry identity?')) return;
+    this.pilotPendingPayment = null;
+    this.pilotRetryPending.set(false);
+    this.pilotWriteError.set(null);
+    this.refreshSupplierPilotBalance();
+  }
+
+  selectSupplierPilotReversal(paymentId: number) {
+    if (!this.canViewSupplierPilot() || this.pilotWriteBusy() || this.pilotRetryPending()) return;
+    this.pilotConfirmReverseId.set(paymentId);
+    this.pilotReverseReason = '';
+    this.pilotWriteError.set(null);
+    this.pilotWriteSuccess.set(null);
+  }
+
+  cancelSupplierPilotReversal() {
+    if (this.pilotWriteBusy()) return;
+    this.pilotConfirmReverseId.set(null);
+    this.pilotReverseReason = '';
+  }
+
+  confirmSupplierPilotReversal() {
+    const id = this.pilotConfirmReverseId();
+    const reason = this.pilotReverseReason.trim();
+    if (!this.canViewSupplierPilot() || !this.pilotBalance() ||
+        this.pilotWriteBusy() || this.pilotRetryPending() || id === null) return;
+    if (!reason || reason.length > 500) {
+      this.pilotWriteError.set('A reversal reason of 1–500 characters is required.');
+      return;
+    }
+    if (!this.pilotBalance()!.payments.some(p => p.paymentId === id && p.status === 'active')) return;
+    this.pilotWriteBusy.set(true);
+    this.pilotWriteError.set(null);
+    this.accountingApi.reverseSupplierPilotPayment(id, reason).subscribe({
+      next: result => {
+        this.pilotWriteBusy.set(false);
+        this.pilotConfirmReverseId.set(null);
+        this.pilotReverseReason = '';
+        this.pilotWriteSuccess.set(`Payment #${result.paymentId} reversed by journal #${result.reversalJournalId}.`);
+        this.store.loadInvoices();
+        this.refreshSupplierPilotBalance();
+      },
+      error: () => {
+        this.pilotWriteBusy.set(false);
+        this.pilotConfirmReverseId.set(null);
+        this.pilotReverseReason = '';
+        this.pilotWriteError.set('Reversal could not be confirmed. Refresh history before retrying; do not submit a new payment to compensate.');
+        this.refreshSupplierPilotBalance();
+      },
+    });
+  }
+
+  readonly pilotBalanceInvoice = signal<Invoice | null>(null);
+  readonly pilotBalance = signal<SupplierPilotInvoiceBalance | null>(null);
+  readonly pilotBalanceLoading = signal(false);
+  readonly pilotBalanceError = signal<string | null>(null);
+  private pilotBalanceRequest = 0;
+
+  openSupplierPilotBalance(invoice: Invoice) {
+    if (!this.canViewSupplierPilot() || invoice.type !== 'incoming' || invoice.currency !== 'EGP' ||
+        (this.pilotRetryPending() && this.pilotBalanceInvoice()?.id !== invoice.id)) return;
+    const request = ++this.pilotBalanceRequest;
+    if (this.pilotBalanceInvoice()?.id !== invoice.id) {
+      this.pilotPendingPayment = null;
+      this.pilotRetryPending.set(false);
+      this.pilotPaymentAmount = '';
+      this.pilotPaymentDescription = '';
+      this.pilotPaymentBankId = 0;
+      this.pilotConfirmReverseId.set(null);
+      this.pilotWriteError.set(null);
+      this.pilotWriteSuccess.set(null);
+    }
+    this.pilotBalanceInvoice.set(invoice);
+    this.pilotBalance.set(null);
+    this.pilotBalanceError.set(null);
+    this.pilotBalanceLoading.set(true);
+    this.accountingApi.getSupplierPilotInvoiceBalance(invoice.id).subscribe({
+      next: balance => {
+        if (request !== this.pilotBalanceRequest) return;
+        this.pilotBalance.set(balance);
+        this.pilotBalanceLoading.set(false);
+      },
+      error: () => {
+        if (request !== this.pilotBalanceRequest) return;
+        this.pilotBalanceError.set(
+          'Pilot balance is unavailable. This invoice may not belong to the local EGP pilot, or pilot access is disabled. No legacy payment totals were substituted.',
+        );
+        this.pilotBalanceLoading.set(false);
+      },
+    });
+  }
+
+  closeSupplierPilotBalance() {
+    if (this.pilotWriteBusy() || this.pilotRetryPending()) {
+      if (this.pilotRetryPending()) this.pilotWriteError.set('Resolve the unconfirmed payment request or explicitly discard its retry identity before closing.');
+      return;
+    }
+    ++this.pilotBalanceRequest;
+    this.pilotBalanceInvoice.set(null);
+    this.pilotBalance.set(null);
+    this.pilotBalanceError.set(null);
+    this.pilotBalanceLoading.set(false);
+    this.pilotPendingPayment = null;
+    this.pilotRetryPending.set(false);
+    this.pilotConfirmReverseId.set(null);
+  }
+
+  refreshSupplierPilotBalance() {
+    const invoice = this.pilotBalanceInvoice();
+    if (invoice) this.openSupplierPilotBalance(invoice);
+  }
+
+  egpCents(cents: number): number {
+    return cents / 100;
+  }
 
   numberLoading = signal(false);
 
@@ -49,6 +331,7 @@ export class InvoicesComponent implements OnInit {
 
   ngOnInit() {
     this.store.loadInvoices();
+    this.store.loadAccounts();
     this.suppliersStore.loadSuppliers();
     this.poStore.loadPurchaseOrders();
     this.productsStore.loadProducts({});
@@ -163,8 +446,8 @@ export class InvoicesComponent implements OnInit {
 
     this.formInvoice = {
       number: inv.number,
-      type: 'outgoing',
-      supplierId: null,
+      type: inv.type,
+      supplierId: inv.supplierId || null,
       customerName: inv.customerName || '',
       date: new Date(inv.date).toISOString().split('T')[0],
       dueDate: new Date(inv.dueDate).toISOString().split('T')[0],

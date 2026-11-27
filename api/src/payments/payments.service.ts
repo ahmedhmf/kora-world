@@ -1,6 +1,7 @@
 import {
   Injectable,
   BadRequestException,
+  ConflictException,
   NotFoundException,
   Inject,
   forwardRef,
@@ -12,6 +13,7 @@ import { CreatePaymentDto } from './dto/create-payment.dto';
 import { InvoicesService } from '../invoices/invoices.service';
 import { AccountingService } from '../accounting/accounting.service';
 import { Invoice, InvoiceStatus } from '../invoices/entities/invoice.entity';
+import { blockLegacySupplierPilotWrite } from './legacy-supplier-pilot.policy';
 import { JournalEntryType } from '../accounting/entities/journal-entry.entity';
 import { CreateJournalLineDto } from '../accounting/dto/create-journal-line.dto';
 
@@ -36,6 +38,8 @@ export class PaymentsService {
         );
       }
     }
+
+    blockLegacySupplierPilotWrite(invoice, 'Payment creation');
 
     const currency = dto.currency.toUpperCase();
     let rate = dto.exchangeRate;
@@ -132,7 +136,18 @@ export class PaymentsService {
 
   async remove(id: number): Promise<void> {
     const payment = await this.findOne(id);
+    // Refuse destructive legacy corrections for a supplier invoice while
+    // the controlled local pilot is active, even for older payment references.
+    if (payment.invoiceId) {
+      const relatedInvoice = await this.invoicesService.findOne(payment.invoiceId);
+      blockLegacySupplierPilotWrite(relatedInvoice, 'Payment deletion');
+    }
     const invoiceId = payment.invoiceId;
+
+    // Pilot settlements must be reversed, never hard-deleted by the legacy route.
+    if (payment.reference?.startsWith('SUP-PAY-')) {
+      throw new ConflictException('Pilot supplier payments must be reversed, not deleted');
+    }
 
     // Delete payment
     await this.paymentRepo.remove(payment);

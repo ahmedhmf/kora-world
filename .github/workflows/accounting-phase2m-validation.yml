@@ -1,0 +1,60 @@
+name: Accounting Phase 2M validation (no deployment)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/accounting-redesign
+    paths:
+      - 'api/src/accounting/**'
+      - 'api/src/invoices/**'
+      - 'api/src/payments/**'
+      - 'api/scripts/phase2m-preflight.mjs'
+      - 'web/src/app/features/accounting/**'
+      - 'web/src/app/core/services/accounting-api.service.ts'
+      - '.github/workflows/accounting-phase2m-validation.yml'
+  pull_request:
+    paths:
+      - 'api/src/accounting/**'
+      - 'api/src/invoices/**'
+      - 'api/src/payments/**'
+      - 'api/scripts/phase2m-preflight.mjs'
+      - 'web/src/app/features/accounting/**'
+      - 'web/src/app/core/services/accounting-api.service.ts'
+
+permissions:
+  contents: read
+
+jobs:
+  source-validation:
+    name: Source compilation, unit tests and offline preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Deliberately no database connection, production credentials or deployment.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            api/package-lock.json
+            web/package-lock.json
+      - name: Install backend packages
+        working-directory: api
+        run: npm ci --legacy-peer-deps
+      - name: Build backend
+        working-directory: api
+        run: npm run build
+      - name: Accounting regression tests
+        working-directory: api
+        run: npm test -- --runInBand phase2m-readiness.policy.spec.ts phase2m-readiness.service.spec.ts phase2m-permissions.spec.ts phase2j-report.policy.spec.ts phase2l-bank.service.spec.ts
+      - name: Offline source preflight (diagnostic, not approval)
+        working-directory: api
+        run: node scripts/phase2m-preflight.mjs
+      - name: Install frontend packages
+        working-directory: web
+        run: npm ci --legacy-peer-deps
+      - name: Build frontend
+        working-directory: web
+        run: npm run build

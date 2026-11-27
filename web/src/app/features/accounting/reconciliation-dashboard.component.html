@@ -1,0 +1,156 @@
+<div class="p-8 max-w-7xl mx-auto space-y-6">
+  <header class="flex flex-wrap justify-between gap-4 items-start">
+    <div>
+      <h1 class="text-2xl font-bold text-white">Accounting Reconciliation Dashboard</h1>
+      <p class="text-sm text-zinc-400 mt-1">Read-only diagnostics for the disposable local test database. Flags require accountant review; no repairs are made here.</p>
+    </div>
+    <a routerLink="/accounting/reports" class="text-xs text-blue-300 underline">Financial reports</a>
+  </header>
+
+  @if (!allowed()) {
+    <p role="alert" class="border border-amber-900 rounded-lg p-4 text-amber-200 text-sm">
+      This dashboard is available only to administrators using the local application.
+      The backend independently restricts access to kora_test.
+    </p>
+  } @else {
+    <div class="rounded-xl border border-zinc-800 bg-zinc-950 p-4 space-y-3">
+      <div class="flex flex-wrap items-end gap-3">
+        <label class="text-xs text-zinc-400 space-y-1">
+          <span class="block">Period start</span>
+          <input type="date" [(ngModel)]="startDate" class="bg-zinc-900 border border-zinc-700 text-white rounded p-2"/>
+        </label>
+        <label class="text-xs text-zinc-400 space-y-1">
+          <span class="block">Period end</span>
+          <input type="date" [(ngModel)]="endDate" class="bg-zinc-900 border border-zinc-700 text-white rounded p-2"/>
+        </label>
+        <label class="text-xs text-zinc-400 space-y-1">
+          <span class="block">As-of date</span>
+          <input type="date" [(ngModel)]="asOfDate" class="bg-zinc-900 border border-zinc-700 text-white rounded p-2"/>
+        </label>
+        <button type="button" (click)="refresh()" [disabled]="loading()"
+          class="bg-white text-zinc-900 font-bold px-4 py-2 rounded disabled:opacity-50 text-xs">
+          {{ loading() ? 'Checking…' : 'Refresh reconciliation' }}
+        </button>
+      </div>
+      <p class="text-[11px] text-amber-300">
+        The structural audit covers all invoices; the financial report uses the selected period and as-of date.
+        These are two separate read-only snapshots and may differ if transactions change during refresh.
+        No bank statement or manual FX verification is performed.
+      </p>
+    </div>
+
+    @if (error(); as message) {
+      <div role="alert" class="p-4 border border-red-900 bg-red-950/30 rounded-lg text-sm text-red-200">
+        {{ message }} Verify both <code>ACCOUNTING_RECONCILIATION_AUDIT=true</code>
+        and <code>ACCOUNTING_PHASE2J_REPORT=true</code> in your local backend session.
+      </div>
+    }
+    @if (audit(); as snapshot) {
+      @if (report(); as reportData) {
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div class="rounded-lg bg-zinc-950 border border-zinc-800 p-4">
+            <p class="text-xs text-zinc-400">Invoices audited</p>
+            <p class="text-2xl font-bold text-white">{{ checkedInvoices() }}</p>
+          </div>
+          <div class="rounded-lg bg-zinc-950 border border-zinc-800 p-4">
+            <p class="text-xs text-zinc-400">Invoices flagged</p>
+            <p class="text-2xl font-bold text-amber-300">{{ flaggedInvoices() }}</p>
+          </div>
+          <div class="rounded-lg bg-zinc-950 border border-zinc-800 p-4">
+            <p class="text-xs text-zinc-400">Exception findings (not unique transactions)</p>
+            <p class="text-2xl font-bold text-white">{{ exceptionRows().length }}</p>
+          </div>
+          <div class="rounded-lg bg-zinc-950 border border-zinc-800 p-4">
+            <p class="text-xs text-zinc-400">Subledger rows excluded</p>
+            <p class="text-2xl font-bold text-amber-300">{{ verifiedBalances().excluded }}</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div class="rounded-xl bg-zinc-950 border border-zinc-800 p-4">
+            <p class="text-zinc-400 text-xs">Verified AP outstanding · EGP</p>
+            <p class="text-xl font-bold text-white mt-1">{{ verifiedBalances().ap | number:'1.2-2' }}</p>
+            <p class="text-xs text-amber-300">Excludes {{ reportData.ap.reviewCount }} invoices requiring review</p>
+          </div>
+          <div class="rounded-xl bg-zinc-950 border border-zinc-800 p-4">
+            <p class="text-zinc-400 text-xs">Verified AR outstanding · EGP</p>
+            <p class="text-xl font-bold text-white mt-1">{{ verifiedBalances().ar | number:'1.2-2' }}</p>
+            <p class="text-xs text-amber-300">Excludes {{ reportData.ar.reviewCount }} invoices requiring review</p>
+          </div>
+        </div>
+
+        <div class="bg-zinc-950 border border-zinc-800 rounded-xl p-4 space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <h2 class="text-base font-bold text-white">Issues and exceptions</h2>
+            <span class="text-[11px] text-zinc-500">Last checked {{ loadedAt() | date:'medium' }}</span>
+          </div>
+          <div class="flex flex-wrap gap-3">
+            <label class="text-xs text-zinc-400">
+              Category
+              <select [ngModel]="category()" (ngModelChange)="category.set($event)"
+                class="block bg-zinc-900 border border-zinc-700 rounded text-white p-2 mt-1">
+                <option value="All">All</option>
+                <option value="Invoices">Invoices</option>
+                <option value="Payments">Payments</option>
+                <option value="Journals">Journals</option>
+                <option value="Currency / Other">Currency / Other</option>
+              </select>
+            </label>
+            <label class="text-xs text-zinc-400 flex-1 min-w-48">
+              Search invoice number, ID or issue
+              <input type="search" [ngModel]="search()" (ngModelChange)="search.set($event)"
+                placeholder="Search findings…" class="block w-full mt-1 bg-zinc-900 border border-zinc-700 rounded text-white p-2"/>
+            </label>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="text-zinc-500 uppercase border-b border-zinc-800">
+                <tr>
+                  <th class="p-3">Source / category</th><th class="p-3">Issue</th>
+                  <th class="p-3">Invoice</th><th class="p-3">Journal</th><th class="p-3">Investigation</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-zinc-900">
+                @for (issue of visibleExceptions(); track issue.key) {
+                  <tr>
+                    <td class="p-3 text-zinc-400">{{ issue.source }} · {{ issue.category }}</td>
+                    <td class="p-3 text-amber-200">
+                      <strong>{{ issue.code }}</strong>
+                      <p class="font-normal text-zinc-400 mt-1">{{ issue.detail }}</p>
+                    </td>
+                    <td class="p-3 font-mono text-zinc-200">{{ issue.invoiceNumber || (issue.invoiceId ?? '—') }}</td>
+                    <td class="p-3 font-mono text-zinc-300">{{ issue.journalId ?? '—' }}</td>
+                    <td class="p-3">
+                      @if (issue.invoiceId !== null) {
+                        <a routerLink="/accounting/invoices" class="text-blue-300 underline">Invoices</a>
+                      }
+                      @if (issue.journalId !== null) {
+                        <a routerLink="/accounting/journal" class="text-blue-300 underline ml-2">Journal</a>
+                      }
+                      @if (issue.invoiceId === null && issue.journalId === null) {
+                        <a routerLink="/accounting/payments" class="text-blue-300 underline">Payments</a>
+                      }
+                    </td>
+                  </tr>
+                } @empty {
+                  <tr><td colspan="5" class="p-8 text-zinc-400 text-center">No findings match these filters. This does not prove bank or foreign-currency reconciliation.</td></tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="rounded-lg border border-zinc-800 p-4 text-xs text-zinc-400">
+          <strong class="text-white">Financial statement check:</strong>
+          Posted equity {{ reportData.balanceSheet.totalEquity | number:'1.2-2' }} EGP;
+          current-year earnings {{ reportData.balanceSheet.currentYearEarnings | number:'1.2-2' }} EGP;
+          prior unclosed earnings {{ reportData.balanceSheet.priorUnclosedEarnings | number:'1.2-2' }} EGP.
+          Adjusted difference {{ reportData.balanceSheet.difference | number:'1.2-2' }} EGP.
+          {{ reportData.balanceSheet.isBalanced ? 'Adjusted equity reconciles numerically; opening cash and bank balances still require verification.' : 'Unexplained balance-sheet difference remains after unclosed earnings.' }}
+          <a routerLink="/accounting/reports" class="text-blue-300 underline ml-2">See detailed reports</a>.
+          This screen never changes invoices, payments, journal entries or exchange rates.
+        </div>
+      }
+    }
+  }
+</div>

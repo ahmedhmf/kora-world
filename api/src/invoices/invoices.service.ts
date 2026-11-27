@@ -14,6 +14,7 @@ import { UpdateInvoiceDto } from './dto/update-invoice.dto';
 import { AccountingService } from '../accounting/accounting.service';
 import { JournalEntryType } from '../accounting/entities/journal-entry.entity';
 import { CreateJournalLineDto } from '../accounting/dto/create-journal-line.dto';
+import { blockLegacySupplierPilotWrite, isLocalSupplierPilotMode } from '../payments/legacy-supplier-pilot.policy';
 
 @Injectable()
 export class InvoicesService {
@@ -57,6 +58,13 @@ export class InvoicesService {
   }
 
   async create(dto: CreateInvoiceDto): Promise<Invoice> {
+    // The legacy PAID state generates a synthetic bank/payment journal. In the
+    // local pilot, payments must be real transactions through the pilot route.
+    if (dto.status === InvoiceStatus.PAID ||
+        (process.env.CONTROLLED_INVOICE_BOOKING === 'true' &&
+         dto.status === InvoiceStatus.SENT)) {
+      blockLegacySupplierPilotWrite(dto, 'Creating an already-booked invoice');
+    }
     let invoiceNumber = dto.number;
     if (!invoiceNumber) {
       const generated = await this.generateNextNumber();
@@ -125,6 +133,30 @@ export class InvoicesService {
     });
     if (!invoice) {
       throw new NotFoundException(`Invoice with ID ${id} not found`);
+    }
+
+    // Forbid synthetic payment journals and edits of booked supplier invoice
+    // amounts while the isolated local pilot is active. The pilot's own
+    // transactional status updates bypass this legacy service.
+    const isPilotInvoice = isLocalSupplierPilotMode() &&
+      invoice.type === InvoiceType.INCOMING && invoice.currency === 'EGP';
+    const becomesPilotInvoice = isLocalSupplierPilotMode() &&
+      (dto.type || invoice.type) === InvoiceType.INCOMING &&
+      (dto.currency || invoice.currency).toUpperCase() === 'EGP';
+    if (becomesPilotInvoice &&
+        (dto.status === InvoiceStatus.PAID ||
+         (process.env.CONTROLLED_INVOICE_BOOKING === 'true' &&
+          invoice.status === InvoiceStatus.DRAFT && dto.status === InvoiceStatus.SENT))) {
+      blockLegacySupplierPilotWrite(
+        { type: InvoiceType.INCOMING, currency: 'EGP' },
+        'Changing invoice status through legacy booking',
+      );
+    }
+    if (isPilotInvoice && invoice.status !== InvoiceStatus.DRAFT &&
+        (dto.lines !== undefined || dto.tax !== undefined || dto.currency !== undefined ||
+         dto.type !== undefined || dto.supplierId !== undefined || dto.poId !== undefined ||
+         dto.number !== undefined || dto.date !== undefined)) {
+      blockLegacySupplierPilotWrite(invoice, 'Editing a booked supplier invoice');
     }
 
     if (dto.number && dto.number !== invoice.number) {
@@ -205,6 +237,7 @@ export class InvoicesService {
 
   async remove(id: number): Promise<void> {
     const invoice = await this.findOne(id);
+    blockLegacySupplierPilotWrite(invoice, 'Invoice deletion');
     await this.invoiceRepo.remove(invoice);
   }
 

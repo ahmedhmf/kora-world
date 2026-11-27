@@ -8,8 +8,12 @@ import {
   Query,
   UseGuards,
   ParseIntPipe,
+  GoneException,
+  Req,
 } from '@nestjs/common';
 import { AccountingService } from './accounting.service';
+import { JournalWorkflowService } from './journal-workflow.service';
+import type { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
 import { AuthGuard } from '../auth/auth.guard';
 import { CreateAccountingAccountDto } from './dto/create-accounting-account.dto';
 import { UpdateAccountingAccountDto } from './dto/update-accounting-account.dto';
@@ -19,7 +23,10 @@ import { CreateExchangeRateDto } from './dto/create-exchange-rate.dto';
 @Controller('accounting')
 @UseGuards(AuthGuard)
 export class AccountingController {
-  constructor(private readonly accountingService: AccountingService) {}
+  constructor(
+    private readonly accountingService: AccountingService,
+    private readonly journalWorkflow: JournalWorkflowService,
+  ) {}
 
   // --- Accounts ---
   @Post('accounts')
@@ -70,17 +77,20 @@ export class AccountingController {
 
   // --- Journal Entries ---
   @Post('journal-entries')
-  createJournalEntry(@Body() dto: CreateJournalEntryDto) {
-    return this.accountingService.createJournalEntry(dto);
+  createJournalEntry(@Body() _dto: CreateJournalEntryDto) {
+    throw new GoneException('Legacy manual journal posting is disabled. Use /accounting/manual-journals/drafts and the approval workflow.');
   }
 
   @Get('journal-entries')
-  findAllJournalEntries() {
-    return this.accountingService.findAllJournalEntries();
+  findAllJournalEntries(@Req() req: AuthenticatedRequest) {
+    return this.journalWorkflow.listVisible(req.user.sub);
   }
 
   @Get('journal-entries/:id')
-  findJournalEntryById(@Param('id', ParseIntPipe) id: number) {
-    return this.accountingService.findJournalEntryById(id);
+  findJournalEntryById(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.journalWorkflow.getVisible(id, req.user.sub);
   }
 }

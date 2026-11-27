@@ -69,7 +69,7 @@ import { DropdownOptionsModule } from './dropdown-options/dropdown-options.modul
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true, envFilePath: ['../.env', '.env'] }),
+ ConfigModule.forRoot({ isGlobal: true, envFilePath: ['../.env', '.env'] }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (config: ConfigService) => ({

@@ -36,6 +36,16 @@ export interface JournalEntry {
   invoiceId?: number | null;
   attachment?: string | null;
   createdAt: string;
+  postingStatus?: 'draft' | 'pending_approval' | 'posted' | 'reversed';
+  createdById?: number | null;
+  submittedById?: number | null;
+  submittedAt?: string | null;
+  approvedById?: number | null;
+  postedAt?: string | null;
+  reversedById?: number | null;
+  reversedAt?: string | null;
+  reversalOfId?: number | null;
+  sourceEventKey?: string | null;
   lines: JournalLine[];
 }
 
@@ -85,6 +95,112 @@ export interface Payment {
   invoice?: Invoice | null;
 }
 
+/** Local EGP supplier pilot reporting. All monetary fields are integer cents. */
+export interface SupplierPilotPaymentHistory {
+  paymentId: number;
+  reference: string | null;
+  date: string;
+  amountCents: number;
+  status: 'active' | 'reversed';
+  originalJournalId: number;
+  reversal: {
+    journalId: number;
+    byUserId: number | null;
+    at: string | null;
+    reason: string | null;
+  } | null;
+}
+
+export interface SupplierPilotInvoiceBalance {
+  invoiceId: number;
+  invoiceNumber: string;
+  supplierId: number | null;
+  currency: 'EGP';
+  invoiceStatus: string;
+  totalCents: number;
+  paidCents: number;
+  reversedCents: number;
+  outstandingCents: number;
+  payments: SupplierPilotPaymentHistory[];
+}
+
+/** Phase 2J: local read-only snapshot. Null balances mean manual review required. */
+export interface Phase2JInvoiceRow {
+  invoiceId: number; number: string; counterparty: string;
+  currency: string; status: string; total: number;
+  paid: number | null; reversed: number | null; outstanding: number | null;
+  reviewRequired: boolean; issues: string[];
+}
+export interface Phase2JReport {
+  currency: 'EGP'; startDate: string; endDate: string; asOfDate: string;
+  ap: { invoices: Phase2JInvoiceRow[]; outstandingEgp: number; reviewCount: number };
+  ar: { invoices: Phase2JInvoiceRow[]; outstandingEgp: number; reviewCount: number };
+  profitLoss: {
+    revenue: Array<{ code: string; name: string; amount: number }>;
+    expenses: Array<{ code: string; name: string; amount: number }>;
+    grossProfit: number; netProfit: number;
+  };
+  balanceSheet: {
+    assets: Array<{ code: string; name: string; amount: number }>;
+    liabilities: Array<{ code: string; name: string; amount: number }>;
+    equity: Array<{ code: string; name: string; amount: number }>;
+    totalAssets: number; totalLiabilities: number; totalEquity: number;
+    currentYearEarnings: number; priorUnclosedEarnings: number;
+    unclosedEarnings: number; adjustedEquity: number;
+    difference: number; isBalanced: boolean;
+  };
+  cashFlow: Array<{ period: string; inflows: number; outflows: number; netChange: number }>;
+  issues: Array<{ code: string; detail: string; invoiceId?: number; journalId?: number }>;
+  journalCount: number; needsReview: boolean;
+}
+
+/** Independent local audit snapshot; not a bank reconciliation or certified financial report. */
+export interface InvoiceAuditRow {
+  invoiceId: number; invoiceNumber: string; currency: string; status: string;
+  invoiceTotal: number; invoiceJournalIds: number[]; paymentIds: number[];
+  paymentJournalIds: number[]; reversalJournalIds: number[];
+  issues: string[]; clean: boolean;
+}
+export interface ReconciliationAudit {
+  scope: 'local-kora-test'; totalInvoices: number; flaggedInvoices: number;
+  unassignedPayments: number[]; unassignedJournals: number[];
+  invoices: InvoiceAuditRow[];
+}
+
+export interface Phase2LRow {
+  id: number; importId: number; date: string; reference: string;
+  description: string; amountCents: string; matchedJournalLineId: number | null;
+  matchedAt: string | null; matchReason: string | null;
+}
+export interface Phase2LView {
+  imports: Array<{ id: number; accountId: number; statementKey: string;
+    openingBalanceCents: string | null; closingBalanceCents: string | null;
+    importedAt: string; throughDate: string; rowCount: number;
+    matchedCount: number; movementCents: string;
+    ledgerBalanceCents: string; varianceCents: string | null }>;
+  rows: Phase2LRow[];
+  candidates: Array<{ lineId: number; journalId: number; date: string;
+    description: string; reference: string; amountCents: string }>;
+  events: Array<{ id: number; action: string; actorId: number;
+    rowId: number | null; importId: number | null; journalLineId: number | null;
+    detail: string; createdAt: string }>;
+}
+
+export interface Phase2MFinding {
+  code: string; severity: 'blocker' | 'warning';
+  subjectType: 'journal' | 'invoice' | 'payment' | 'account' | 'system';
+  subjectId?: number; detail: string; proposedAction: string;
+}
+export interface Phase2MReadiness {
+  scope: 'local-kora-test';
+  reportType: 'phase2m-diagnostic-not-release-approval';
+  generatedAt: string;
+  counts: { invoices: number; payments: number; journals: number; journalLines: number; accounts: number };
+  findings: Phase2MFinding[];
+  blockerCount: number; warningCount: number;
+  readyForProduction: false;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AccountingApiService {
   private readonly http = inject(HttpClient);
@@ -127,6 +243,46 @@ export class AccountingApiService {
     return this.http.post<JournalEntry>(`${this.base}/accounting/journal/manual`, dto);
   }
 
+  getWorkflowJournalEntries(): Observable<JournalEntry[]> {
+    return this.http.get<JournalEntry[]>(`${this.base}/accounting/manual-journals`);
+  }
+
+  createSimpleTransaction(dto: {
+    kind: 'expense' | 'income' | 'transfer';
+    date: string;
+    description: string;
+    amountCents: number;
+    cashAccountId: number;
+    categoryAccountId?: number;
+    destinationAccountId?: number;
+  }): Observable<{ journalId: number; status: 'posted' | 'pending_approval' }> {
+    return this.http.post<{ journalId: number; status: 'posted' | 'pending_approval' }>(
+      `${this.base}/accounting/simple/transactions`, dto,
+    );
+  }
+
+  // New controlled manual journal workflow; amounts use integer EGP cents.
+  createManualDraft(dto: {
+    date: string;
+    reference?: string;
+    description: string;
+    lines: Array<{ accountId: number; debitCents: number; creditCents: number }>;
+  }): Observable<JournalEntry> {
+    return this.http.post<JournalEntry>(`${this.base}/accounting/manual-journals/drafts`, dto);
+  }
+
+  submitManualDraft(id: number): Observable<JournalEntry> {
+    return this.http.post<JournalEntry>(`${this.base}/accounting/manual-journals/${id}/submit`, {});
+  }
+
+  approveManualJournal(id: number): Observable<JournalEntry> {
+    return this.http.post<JournalEntry>(`${this.base}/accounting/manual-journals/${id}/approve`, {});
+  }
+
+  reverseManualJournal(id: number, reason: string): Observable<JournalEntry> {
+    return this.http.post<JournalEntry>(`${this.base}/accounting/manual-journals/${id}/reverse`, { reason });
+  }
+
   getExchangeRate(from: string, to: string, date: string): Observable<number> {
     return this.http.get<number>(`${this.base}/accounting/exchange-rates/rate?from=${from}&to=${to}&date=${date}`);
   }
@@ -156,6 +312,21 @@ export class AccountingApiService {
     return this.http.delete<void>(`${this.base}/invoices/${id}`);
   }
 
+  /** Admin-only, default-off; backend verifies disposable local kora_test. */
+  bookControlledSupplierInvoice(id: number): Observable<{
+    invoiceId: number;
+    journalId: number;
+    status: 'sent';
+    replayed: boolean;
+  }> {
+    return this.http.post<{
+      invoiceId: number;
+      journalId: number;
+      status: 'sent';
+      replayed: boolean;
+    }>(`${this.base}/invoices/controlled-egp-pilot/${id}/book`, {});
+  }
+
   // Payments
   getPayments(): Observable<Payment[]> {
     return this.http.get<Payment[]>(`${this.base}/payments`);
@@ -169,7 +340,90 @@ export class AccountingApiService {
     return this.http.delete<void>(`${this.base}/payments/${id}`);
   }
 
+  /** Read-only and test-only: API rejects requests unless on local kora_test. */
+  getSupplierPilotInvoiceBalance(id: number): Observable<SupplierPilotInvoiceBalance> {
+    return this.http.get<SupplierPilotInvoiceBalance>(
+      `${this.base}/payments/supplier-egp-pilot/invoices/${id}/balance`,
+    );
+  }
+
+  /** Pilot writes remain server-restricted to local kora_test. */
+  createSupplierPilotPayment(dto: {
+    invoiceId: number;
+    bankAccountId: number;
+    amountCents: number;
+    date: string;
+    requestKey: string;
+    description?: string;
+  }): Observable<{
+    paymentId: number; journalId: number; status: string;
+    remainingCents: number; replayed: boolean;
+  }> {
+    return this.http.post<{
+      paymentId: number; journalId: number; status: string;
+      remainingCents: number; replayed: boolean;
+    }>(`${this.base}/payments/supplier-egp-pilot`, dto);
+  }
+
+  reverseSupplierPilotPayment(paymentId: number, reason: string): Observable<{
+    paymentId: number; originalJournalId: number; reversalJournalId: number;
+    status: string; remainingCents: number;
+  }> {
+    return this.http.post<{
+      paymentId: number; originalJournalId: number; reversalJournalId: number;
+      status: string; remainingCents: number;
+    }>(`${this.base}/payments/supplier-egp-pilot/${paymentId}/reverse`, { reason });
+  }
+
+  // Phase 2L — explicit EGP-only local bank and opening-balance pilot.
+  postOpeningBalances(input: {
+    date: string; reference: string;
+    lines: Array<{ accountId: number; debitCents: number; creditCents: number }>;
+  }): Observable<{ journalId: number; replayed: boolean }> {
+    return this.http.post<{ journalId: number; replayed: boolean }>(
+      `${this.base}/accounting/phase2l/opening`, input);
+  }
+
+  importBankStatement(input: {
+    accountId: number; statementKey: string;
+    openingBalanceCents?: number | null; closingBalanceCents?: number | null;
+    rows: Array<{ date: string; amountCents: number; reference?: string; description?: string }>;
+  }): Observable<{ importId: number; rowCount: number }> {
+    return this.http.post<{ importId: number; rowCount: number }>(
+      `${this.base}/accounting/phase2l/statements`, input);
+  }
+
+  getBankReconciliation(accountId: number): Observable<Phase2LView> {
+    return this.http.get<Phase2LView>(
+      `${this.base}/accounting/phase2l/statements?accountId=${encodeURIComponent(accountId)}`);
+  }
+
+  matchBankRow(rowId: number, journalLineId: number, reason: string): Observable<unknown> {
+    return this.http.post(`${this.base}/accounting/phase2l/rows/${rowId}/match`,
+      { journalLineId, reason });
+  }
+
+  unmatchBankRow(rowId: number, reason: string): Observable<unknown> {
+    return this.http.post(`${this.base}/accounting/phase2l/rows/${rowId}/unmatch`,
+      { reason });
+  }
+
+  /** Phase 2M admin-only local read-only diagnostics. Never grants release approval. */
+  getPhase2MReadiness(): Observable<Phase2MReadiness> {
+    return this.http.get<Phase2MReadiness>(`${this.base}/accounting/phase2m-readiness`);
+  }
+
   // Reports
+  /** Admin-only, opt-in read-only audit of disposable local kora_test. */
+  getReconciliationAudit(): Observable<ReconciliationAudit> {
+    return this.http.get<ReconciliationAudit>(`${this.base}/accounting/reconciliation-audit`);
+  }
+
+  getPhase2JReport(startDate: string, endDate: string, asOfDate: string): Observable<Phase2JReport> {
+    const params = new URLSearchParams({ startDate, endDate, asOfDate });
+    return this.http.get<Phase2JReport>(`${this.base}/accounting/phase2j-report?${params.toString()}`);
+  }
+
   getProfitAndLoss(startDate: string, endDate: string, currency?: string): Observable<any> {
     let url = `${this.base}/accounting/reports/profit-loss?startDate=${startDate}&endDate=${endDate}`;
     if (currency) url += `&currency=${currency}`;

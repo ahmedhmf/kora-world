@@ -57,6 +57,52 @@ describe('PaymentsService', () => {
     expect(service).toBeDefined();
   });
 
+  describe('Phase 2I: local supplier pilot isolation', () => {
+    const prior = {
+      flag: process.env.SUPPLIER_EGP_PILOT,
+      name: process.env.DATABASE_NAME,
+      host: process.env.DATABASE_HOST,
+    };
+    beforeEach(() => {
+      process.env.SUPPLIER_EGP_PILOT = 'true';
+      process.env.DATABASE_NAME = 'kora_test';
+      process.env.DATABASE_HOST = '127.0.0.1';
+    });
+    afterEach(() => {
+      if (prior.flag === undefined) delete process.env.SUPPLIER_EGP_PILOT;
+      else process.env.SUPPLIER_EGP_PILOT = prior.flag;
+      if (prior.name === undefined) delete process.env.DATABASE_NAME;
+      else process.env.DATABASE_NAME = prior.name;
+      if (prior.host === undefined) delete process.env.DATABASE_HOST;
+      else process.env.DATABASE_HOST = prior.host;
+    });
+
+    it('blocks legacy incoming EGP payment before any database write', async () => {
+      mockInvoicesService.findOne.mockResolvedValue({
+        id: 10, type: 'incoming', currency: 'EGP',
+      } as Invoice);
+      await expect(service.create({
+        invoiceId: 10, date: '2026-11-11', amount: 5,
+        currency: 'EGP', method: 'bank_transfer',
+        paidFromAccountId: 11, categoryAccountId: 21,
+      })).rejects.toThrow('controlled supplier workflow');
+      expect(mockPaymentRepo.save).not.toHaveBeenCalled();
+      expect(mockAccountingService.createJournalEntry).not.toHaveBeenCalled();
+    });
+
+    it('blocks legacy deletion of incoming EGP supplier payment even without pilot reference', async () => {
+      mockPaymentRepo.findOne.mockResolvedValue({
+        id: 9, invoiceId: 10, reference: 'OLD-9',
+      } as Payment);
+      mockInvoicesService.findOne.mockResolvedValue({
+        id: 10, type: 'incoming', currency: 'EGP',
+      } as Invoice);
+      await expect(service.remove(9)).rejects.toThrow('controlled supplier workflow');
+      expect(mockPaymentRepo.remove).not.toHaveBeenCalled();
+      expect(mockAccountingService.deleteJournalEntryByReference).not.toHaveBeenCalled();
+    });
+  });
+
   describe('create', () => {
     it('should successfully create a payment and update invoice status', async () => {
       const dto = {
@@ -104,6 +150,51 @@ describe('PaymentsService', () => {
       });
       expect(mockAccountingService.createJournalEntry).toHaveBeenCalled();
       expect(result).toEqual(mockPayment);
+    });
+
+    it('characterizes the double-posting risk: invoice PAID update and payment journal are both triggered', async () => {
+      const dto = {
+        invoiceId: 10,
+        date: '2026-11-11',
+        amount: 100,
+        currency: 'EGP',
+        exchangeRate: 1,
+        method: 'bank_transfer',
+        reference: 'PAY-TEST-10',
+        paidFromAccountId: 101,
+        categoryAccountId: 102,
+      };
+      const invoice = {
+        id: 10, type: 'incoming', currency: 'EGP',
+        total: 100, status: InvoiceStatus.SENT,
+      } as Invoice;
+      const payment = {
+        id: 77, invoiceId: 10, amount: 100,
+        currency: 'EGP', exchangeRate: 1,
+        paidFromAccountId: 101, categoryAccountId: 102,
+        reference: 'PAY-TEST-10', date: new Date(dto.date),
+      } as Payment;
+      mockInvoicesService.findOne.mockResolvedValue(invoice);
+      mockPaymentRepo.create.mockReturnValue(payment);
+      mockPaymentRepo.save.mockResolvedValue(payment);
+      mockPaymentRepo.find.mockResolvedValue([payment]);
+
+      await service.create(dto);
+
+      // InvoicesService.update(status=PAID) separately invokes its synthetic
+      // invoice-payment journal path. PaymentsService ALSO creates a journal.
+      // This is a characterization test, not approval of the accounting behavior.
+      expect(mockInvoicesService.update).toHaveBeenCalledWith(10, {
+        status: InvoiceStatus.PAID,
+      });
+      expect(mockAccountingService.createJournalEntry).toHaveBeenCalledWith(
+        expect.objectContaining({
+          reference: 'PAY-TEST-10',
+          invoiceId: 10,
+        }),
+      );
+      expect(mockInvoicesService.update.mock.invocationCallOrder[0])
+        .toBeLessThan(mockAccountingService.createJournalEntry.mock.invocationCallOrder[0]);
     });
 
     it('should throw NotFoundException if invoiceId is provided but not found', async () => {
@@ -182,6 +273,17 @@ describe('PaymentsService', () => {
   });
 
   describe('remove', () => {
+    it('refuses hard deletion of a supplier pilot payment and preserves its journal', async () => {
+      const pilot = {
+        id: 55, invoiceId: 10, reference: 'SUP-PAY-55', amount: 100, currency: 'EGP',
+      } as Payment;
+      mockPaymentRepo.findOne.mockResolvedValue(pilot);
+      await expect(service.remove(55)).rejects.toThrow('must be reversed');
+      expect(mockPaymentRepo.remove).not.toHaveBeenCalled();
+      expect(mockAccountingService.deleteJournalEntryByReference).not.toHaveBeenCalled();
+      expect(mockInvoicesService.update).not.toHaveBeenCalled();
+    });
+
     it('should successfully remove a payment, delete journal entry, and recalculate invoice status', async () => {
       const mockPayment = {
         id: 1,

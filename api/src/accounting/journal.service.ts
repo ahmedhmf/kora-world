@@ -149,7 +149,8 @@ export class JournalService {
       .innerJoin('line.journalEntry', 'entry')
       .select('SUM(line.debit)', 'totalDebit')
       .addSelect('SUM(line.credit)', 'totalCredit')
-      .where('line.accountId = :accountId', { accountId });
+      .where('line.accountId = :accountId', { accountId })
+      .andWhere('entry.posting_status IN (:...includedStatuses)', { includedStatuses: ['posted', 'reversed'] });
 
     if (startDate) {
       query.andWhere('entry.date >= :startDate', {
@@ -228,6 +229,7 @@ export class JournalService {
         .createQueryBuilder('line')
         .innerJoin('line.journalEntry', 'entry')
         .where('line.accountId = :accountId', { accountId })
+      .andWhere('entry.posting_status IN (:...includedStatuses)', { includedStatuses: ['posted', 'reversed'] })
         .andWhere('entry.date < :startDate', {
           startDate: new Date(startDate).toISOString().split('T')[0],
         })
@@ -243,6 +245,7 @@ export class JournalService {
       .createQueryBuilder('line')
       .innerJoinAndSelect('line.journalEntry', 'entry')
       .where('line.accountId = :accountId', { accountId })
+      .andWhere('entry.posting_status IN (:...includedStatuses)', { includedStatuses: ['posted', 'reversed'] })
       .addOrderBy('entry.date', 'ASC')
       .addOrderBy('line.id', 'ASC');
 

@@ -243,6 +243,16 @@ export const routes: Routes = [
       },
       // Accounting Routes
       {
+        path: 'accounting',
+        pathMatch: 'full',
+        redirectTo: 'accounting/simple',
+      },
+      {
+        path: 'accounting/simple',
+        loadComponent: () =>
+          import('./features/accounting/simple-accounting.component').then(m => m.SimpleAccountingComponent),
+      },
+      {
         path: 'accounting/chart-of-accounts',
         loadComponent: () =>
           import('./features/accounting/chart-of-accounts.component').then((m) => m.ChartOfAccountsComponent),
@@ -258,14 +268,24 @@ export const routes: Routes = [
           import('./features/accounting/invoices.component').then((m) => m.InvoicesComponent),
       },
       {
-        path: 'accounting/payments',
-        loadComponent: () =>
-          import('./features/accounting/payments.component').then((m) => m.PaymentsComponent),
-      },
-      {
         path: 'accounting/reports',
         loadComponent: () =>
           import('./features/accounting/reports.component').then((m) => m.ReportsComponent),
+      },
+      {
+        path: 'accounting/reconciliation',
+        loadComponent: () =>
+          import('./features/accounting/reconciliation-dashboard.component').then((m) => m.ReconciliationDashboardComponent),
+      },
+      {
+        path: 'accounting/bank-reconciliation',
+        loadComponent: () =>
+          import('./features/accounting/phase2l-bank.component').then(m => m.Phase2LBankComponent),
+      },
+      {
+        path: 'accounting/production-readiness',
+        loadComponent: () =>
+          import('./features/accounting/phase2m-readiness.component').then(m => m.Phase2MReadinessComponent),
       },
     ],
   },

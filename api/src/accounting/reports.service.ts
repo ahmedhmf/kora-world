@@ -61,6 +61,7 @@ export class ReportsService {
       .innerJoinAndSelect('line.journalEntry', 'entry')
       .innerJoinAndSelect('line.account', 'account')
       .where('entry.date >= :startDate', { startDate: formattedStartDate })
+      .andWhere('entry.posting_status IN (:...includedStatuses)', { includedStatuses: ['posted', 'reversed'] })
       .andWhere('entry.date <= :endDate', { endDate: formattedEndDate })
       .andWhere('account.type IN (:...types)', {
         types: [AccountType.REVENUE, AccountType.EXPENSE],
@@ -180,6 +181,7 @@ export class ReportsService {
       .select('line.accountId', 'accountId')
       .addSelect('SUM(line.amount_base)', 'totalAmountBase')
       .where('entry.date <= :asOfDate', { asOfDate: formattedAsOf })
+      .andWhere('entry.posting_status IN (:...includedStatuses)', { includedStatuses: ['posted', 'reversed'] })
       .groupBy('line.accountId')
       .getRawMany()) as unknown as Array<{
       accountId: string;
@@ -279,6 +281,7 @@ export class ReportsService {
       .innerJoinAndSelect('line.journalEntry', 'entry')
       .innerJoinAndSelect('line.account', 'account')
       .where('entry.date >= :startDate', { startDate: formattedStartDate })
+      .andWhere('entry.posting_status IN (:...includedStatuses)', { includedStatuses: ['posted', 'reversed'] })
       .andWhere('entry.date <= :endDate', { endDate: formattedEndDate })
       .andWhere('account.code IN (:...codes)', {
         codes: ['1101', '1102', '1103'],

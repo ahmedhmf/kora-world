@@ -2,6 +2,7 @@ import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Payment } from './entities/payment.entity';
 import { PaymentsService } from './payments.service';
+import { SupplierEgpPilotService } from './supplier-egp-pilot.service';
 import { PaymentsController } from './payments.controller';
 import { InvoicesModule } from '../invoices/invoices.module';
 import { AccountingModule } from '../accounting/accounting.module';
@@ -13,7 +14,7 @@ import { AccountingModule } from '../accounting/accounting.module';
     forwardRef(() => AccountingModule),
   ],
   controllers: [PaymentsController],
-  providers: [PaymentsService],
+  providers: [PaymentsService, SupplierEgpPilotService],
   exports: [PaymentsService, TypeOrmModule],
 })
 export class PaymentsModule {}

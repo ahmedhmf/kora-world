@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { ChangeDetectorRef, Component, inject, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService } from '../core/services/auth.service';
 import { FormsModule } from '@angular/forms';
@@ -12,7 +12,7 @@ interface NavItem {
   route: string;
   icon: string;
   roles?: string[];
-  subItems?: { label: string; route: string; icon: string }[];
+  subItems?: { label: string; route: string; icon: string; roles?: string[] }[];
 }
 
 @Component({
@@ -29,6 +29,7 @@ interface NavItem {
 })
 export class LayoutComponent {
   readonly authService = inject(AuthService);
+  private readonly cdr = inject(ChangeDetectorRef);
   readonly isMobileOpen = signal(false);
 
   readonly navItems: NavItem[] = [
@@ -65,11 +66,14 @@ export class LayoutComponent {
       route: '/accounting',
       icon: 'landmark',
       subItems: [
+        { label: 'Simple Accounting', route: '/accounting/simple', icon: 'wallet' },
         { label: 'Chart of Accounts', route: '/accounting/chart-of-accounts', icon: 'bar-chart-3' },
         { label: 'Journal Entries', route: '/accounting/journal', icon: 'book-open' },
         { label: 'Invoices', route: '/accounting/invoices', icon: 'receipt' },
-        { label: 'Payments', route: '/accounting/payments', icon: 'credit-card' },
         { label: 'Financial Reports', route: '/accounting/reports', icon: 'trending-up' },
+        { label: 'Reconciliation Dashboard', route: '/accounting/reconciliation', icon: 'clipboard-check', roles: ['admin'] },
+        { label: 'Bank Reconciliation', route: '/accounting/bank-reconciliation', icon: 'landmark', roles: ['admin'] },
+        { label: 'Production Readiness', route: '/accounting/production-readiness', icon: 'shield-check', roles: ['admin'] },
       ],
     },
     { label: 'Warehouse', route: '/warehouse', icon: 'package', roles: ['admin', 'employee'] },
@@ -81,7 +85,8 @@ export class LayoutComponent {
     { label: 'Dropdown Settings', route: '/settings/dropdowns', icon: 'settings', roles: ['admin'] },
   ];
 
-  // Collapsible submenus state
+  // All submenus start closed; user controls whether they are expanded.
+  // Keep submenu links mounted to prevent delayed label rendering when reopened.
   openSubmenus = signal<Record<string, boolean>>({});
 
   toggleSubmenu(label: string) {
@@ -89,6 +94,9 @@ export class LayoutComponent {
       ...m,
       [label]: !m[label],
     }));
+    // Ensure the sidebar renders the new state immediately, even after
+    // a previous navigation, rather than waiting for another click.
+    this.cdr.detectChanges();
   }
 
   isSubmenuOpen(label: string): boolean {
@@ -164,6 +172,12 @@ export class LayoutComponent {
         { label: 'Purchase Orders', route: '/purchase-orders', icon: 'clipboard-list' },
       ];
     }
-    return this.navItems.filter((item) => !item.roles || (role && item.roles.includes(role)));
+    return this.navItems
+      .filter(item => !item.roles || (!!role && item.roles.includes(role)))
+      .map(item => !item.subItems ? item : ({
+        ...item,
+        subItems: item.subItems.filter(sub => !sub.roles ||
+          (!!role && sub.roles.includes(role))),
+      }));
   }
 }
