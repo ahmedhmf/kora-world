@@ -8,6 +8,7 @@
       <!-- Tabs Navigation -->
       <div class="flex border-b border-zinc-800 mb-6 gap-2 shrink-0">
         @for (tab of tabs; track tab.id) {
+          @if (tab.id !== '2j' || phase2jVisible()) {
           <button
             (click)="activeTab.set(tab.id)"
             class="px-4 py-2.5 text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer focus:outline-none"
@@ -19,12 +20,13 @@
           >
             {{ tab.label }}
           </button>
+          }
         }
       </div>
 
       <!-- Controls (Parameters Card) -->
       <div class="bg-zinc-950 border border-zinc-800 rounded-xl p-5 mb-8 flex flex-col md:flex-row gap-4 items-end">
-        @if (activeTab() === 'pl' || activeTab() === 'cf') {
+        @if (activeTab() === 'pl' || activeTab() === 'cf' || activeTab() === '2j') {
           <div class="space-y-1 w-full md:w-auto">
             <label class="block text-[10px] text-zinc-550 uppercase tracking-wider font-bold">Start Date</label>
             <input 
@@ -54,6 +56,13 @@
               </select>
             </div>
           }
+          @if (activeTab() === '2j') {
+            <div class="space-y-1 w-full md:w-auto">
+              <label class="block text-[10px] text-zinc-550 uppercase tracking-wider font-bold">As-of date (must be after period end)</label>
+              <input type="date" [(ngModel)]="asOfDate"
+                class="w-full md:w-44 bg-zinc-900 border border-zinc-850 rounded px-3 py-1.5 text-xs text-white"/>
+            </div>
+          }
         } @else if (activeTab() === 'bs') {
           <div class="space-y-1 w-full md:w-auto">
             <label class="block text-[10px] text-zinc-550 uppercase tracking-wider font-bold">As of Date</label>
@@ -75,6 +84,126 @@
 
       <!-- Report Display Card -->
       <div class="bg-zinc-950 border border-zinc-800 rounded-xl p-6 shadow-2xl">
+        <!-- Phase 2J: isolated read-only EGP snapshot; do not present mixed or ambiguous balances as facts. -->
+        @if (activeTab() === '2j' && phase2jVisible()) {
+          <div class="space-y-6">
+            <div class="border-b border-zinc-800 pb-3">
+              <h3 class="font-bold text-white">Phase 2J — Reconciliation Preview</h3>
+              <p class="text-xs text-amber-300 mt-1">Local kora_test only. Read-only reconciliation; not approved production financial statements. EGP stored base values only, no automatic FX.</p>
+            </div>
+            @if (phase2jLoading()) {
+              <p role="status" class="text-sm text-zinc-400">Loading reconciled accounting snapshot…</p>
+            } @else if (phase2jError(); as message) {
+              <p role="alert" class="border border-amber-800 rounded p-3 text-sm text-amber-200">{{ message }}</p>
+            } @else if (phase2jReport(); as report) {
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div class="border border-zinc-800 rounded-lg p-3">
+                  <p class="text-xs text-zinc-400">Verified AP outstanding (EGP)</p>
+                  <p class="text-xl font-bold text-white">{{ report.ap.outstandingEgp | number:'1.2-2' }}</p>
+                  <p class="text-xs text-amber-300">{{ report.ap.reviewCount }} invoice(s) excluded for manual review</p>
+                </div>
+                <div class="border border-zinc-800 rounded-lg p-3">
+                  <p class="text-xs text-zinc-400">Verified AR outstanding (EGP)</p>
+                  <p class="text-xl font-bold text-white">{{ report.ar.outstandingEgp | number:'1.2-2' }}</p>
+                  <p class="text-xs text-amber-300">{{ report.ar.reviewCount }} invoice(s) excluded for manual review</p>
+                </div>
+                <div class="border border-zinc-800 rounded-lg p-3">
+                  <p class="text-xs text-zinc-400">Journal review flags</p>
+                  <p class="text-xl font-bold text-white">{{ report.issues.length }}</p>
+                  <p class="text-xs text-zinc-500">Not a bank reconciliation</p>
+                </div>
+              </div>
+
+              @for (ledger of [{label:'Accounts Payable', data:report.ap},{label:'Accounts Receivable',data:report.ar}]; track ledger.label) {
+                <div class="space-y-2">
+                  <h4 class="text-sm font-bold text-white">{{ ledger.label }}</h4>
+                  <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                      <thead class="text-zinc-400 border-b border-zinc-800">
+                        <tr><th class="p-2">Invoice</th><th class="p-2">Counterparty</th><th class="p-2 text-right">Total</th>
+                          <th class="p-2 text-right">Paid / Reversed</th><th class="p-2 text-right">Outstanding</th><th class="p-2">Review</th></tr>
+                      </thead>
+                      <tbody>
+                        @for (inv of ledger.data.invoices; track inv.invoiceId) {
+                          <tr class="border-b border-zinc-900">
+                            <td class="p-2 text-zinc-200">{{ inv.number }}</td>
+                            <td class="p-2 text-zinc-200">{{ inv.counterparty }}</td>
+                            <td class="p-2 text-right font-mono">{{ inv.total | number:'1.2-2' }} {{ inv.currency }}</td>
+                            <td class="p-2 text-right font-mono">
+                              {{ inv.paid === null ? '—' : (inv.paid | number:'1.2-2') }}
+                              / {{ inv.reversed === null ? '—' : (inv.reversed | number:'1.2-2') }}
+                            </td>
+                            <td class="p-2 text-right font-mono">{{ inv.outstanding === null ? 'Manual review' : (inv.outstanding | number:'1.2-2') }}</td>
+                            <td class="p-2 text-amber-300">{{ inv.issues.length ? inv.issues.join(', ') : 'Verified structural link' }}</td>
+                          </tr>
+                        } @empty {
+                          <tr><td colspan="6" class="p-3 text-zinc-500">No issued invoices in this category.</td></tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              }
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="border border-zinc-800 p-4 rounded-lg space-y-2">
+                  <h4 class="font-bold text-sm text-white">Profit &amp; Loss — stored EGP amounts</h4>
+                  @for (item of report.profitLoss.revenue; track item.code) {
+                    <div class="flex justify-between text-xs"><span>{{ item.code }} {{ item.name }}</span><span>{{ item.amount | number:'1.2-2' }}</span></div>
+                  }
+                  @for (item of report.profitLoss.expenses; track item.code) {
+                    <div class="flex justify-between text-xs"><span>{{ item.code }} {{ item.name }}</span><span>{{ item.amount | number:'1.2-2' }}</span></div>
+                  }
+                  <p class="text-sm font-bold border-t border-zinc-700 pt-2">Gross profit: {{ report.profitLoss.grossProfit | number:'1.2-2' }}</p>
+                  <p class="text-sm font-bold">Net profit: {{ report.profitLoss.netProfit | number:'1.2-2' }}</p>
+                </div>
+                <div class="border border-zinc-800 p-4 rounded-lg space-y-2">
+                  <h4 class="font-bold text-sm text-white">Balance Sheet — stored EGP amounts</h4>
+                  <p class="text-xs">Assets: {{ report.balanceSheet.totalAssets | number:'1.2-2' }}</p>
+                  <p class="text-xs">Liabilities: {{ report.balanceSheet.totalLiabilities | number:'1.2-2' }}</p>
+                  <p class="text-xs">Posted equity: {{ report.balanceSheet.totalEquity | number:'1.2-2' }}</p>
+                  <p class="text-sm font-bold">Difference: {{ report.balanceSheet.difference | number:'1.2-2' }}</p>
+                  <p class="text-xs text-amber-300">Review unclosed income / retained earnings before relying on this balance.</p>
+                </div>
+              </div>
+              <div>
+                <h4 class="font-bold text-sm text-white mb-2">Cash Flow — recorded bank movements (EGP)</h4>
+                <table class="w-full text-xs">
+                  <thead><tr class="text-zinc-400 border-b border-zinc-800">
+                    <th class="p-2 text-left">Month</th><th class="p-2 text-right">Inflows</th>
+                    <th class="p-2 text-right">Outflows</th><th class="p-2 text-right">Net</th>
+                  </tr></thead>
+                  <tbody>
+                    @for (month of report.cashFlow; track month.period) {
+                      <tr class="border-b border-zinc-900">
+                        <td class="p-2">{{ month.period }}</td><td class="p-2 text-right">{{ month.inflows | number:'1.2-2' }}</td>
+                        <td class="p-2 text-right">{{ month.outflows | number:'1.2-2' }}</td>
+                        <td class="p-2 text-right">{{ month.netChange | number:'1.2-2' }}</td>
+                      </tr>
+                    } @empty {
+                      <tr><td colspan="4" class="p-3 text-zinc-500">No recorded bank movements.</td></tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+              <div class="space-y-2">
+                <h4 class="font-bold text-sm text-white">Issues requiring review ({{ report.issues.length }})</h4>
+                @for (issue of report.issues; track $index) {
+                  <p class="text-xs p-2 border border-amber-900/50 rounded text-amber-200">
+                    {{ issue.code }} · {{ issue.detail }}
+                    @if (issue.invoiceId) { Invoice #{{ issue.invoiceId }} }
+                    @if (issue.journalId) { Journal #{{ issue.journalId }} }
+                  </p>
+                } @empty {
+                  <p class="text-xs text-zinc-400">No structural issues detected. External bank and manual FX reconciliation are still required.</p>
+                }
+              </div>
+            } @else {
+              <p class="text-xs text-zinc-500">Set the report period and click Generate Report. The backend flag must be enabled on local kora_test.</p>
+            }
+          </div>
+        }
+
         <!-- 1. PROFIT & LOSS -->
         @if (activeTab() === 'pl') {
           @if (store.profitLoss(); as pl) {
