@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Post, Req, UseGuards, Param, ParseIntPipe, UploadedFile, UseInterceptors, StreamableFile, NotFoundException, BadRequestException, ForbiddenException, ConflictException, ServiceUnavailableException } from '@nestjs/common';
+import { requireAcademyRelease } from '../academy/academy-release.policy';
+import { Body, Controller, Get, Post, Req, UseGuards, Param, ParseIntPipe, UploadedFile, UseInterceptors, StreamableFile, NotFoundException, BadRequestException, ForbiddenException, ConflictException } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { validateFounderEvidence } from './founder-evidence';
 import type { EvidenceUpload } from './founder-evidence';
@@ -30,8 +31,7 @@ export function founderLines(kind:unknown,founder:number,other:number,amount:num
 export class FounderAccountsController{
  constructor(private readonly db:DataSource,private readonly workflow:JournalWorkflowService){}
  private async actor(req:AuthenticatedRequest){
-  const [db]=await this.db.query('SELECT current_database() AS name');
-  if(db?.name!=='kora_test')throw new ServiceUnavailableException('Founder pilot requires kora_test');
+  await requireAcademyRelease(this.db,'founders');
   const [u]=await this.db.query("SELECT id FROM users WHERE id=$1 AND role IN ('admin','accountant')",[req.user.sub]);
   if(!u)throw new ForbiddenException('Finance access required');
   return u.id as number;
