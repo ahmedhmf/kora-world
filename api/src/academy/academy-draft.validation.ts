@@ -20,12 +20,20 @@ export function parseIdentity(body: unknown) {
   if (typeof b.categoryId !== 'number' || !Number.isSafeInteger(b.categoryId) || b.categoryId <= 0) return fail('categoryId');
   return { code, slug, categoryId: b.categoryId };
 }
+export function validateAcademyVideo(value: unknown, hosts = process.env.ACADEMY_VIDEO_HOSTS || ''): string | null {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value !== 'string' || value.length > 2000) return fail('videoUrl');
+  let url: URL;
+  try { url = new URL(value); } catch { return fail('videoUrl'); }
+  const allowed = hosts.split(',').map(h => h.trim().toLowerCase()).filter(Boolean);
+  if (url.protocol !== 'https:' || url.username || url.password || url.port || !allowed.includes(url.hostname)) return fail('videoUrl (host not approved)');
+  return url.href;
+}
 export function parseDraft(body: unknown) {
   const b = object(body, 'draft');
   const roles = b.allowedRoles === undefined ? ['admin','employee'] : b.allowedRoles;
   if (!Array.isArray(roles) || roles.length === 0 || roles.some(r => r !== 'admin' && r !== 'employee')) return fail('allowedRoles');
-  // Pilot: video links are disabled until a company-controlled provider is selected.
-  if (b.videoUrl !== undefined && b.videoUrl !== null && b.videoUrl !== '') return fail('videoUrl (not enabled)');
+  const videoUrl = validateAcademyVideo(b.videoUrl);
   if (!Array.isArray(b.steps) || b.steps.length > 100) return fail('steps');
   const steps = b.steps.map((raw, index) => {
     const s = object(raw, 'step');
@@ -41,6 +49,7 @@ export function parseDraft(body: unknown) {
     title: str(b.title, 'title', 180, true), summary: str(b.summary, 'summary', 2000),
     trigger: str(b.trigger, 'trigger', 4000), prerequisites: str(b.prerequisites, 'prerequisites', 8000),
     warnings: str(b.warnings, 'warnings', 8000), successCriteria: str(b.successCriteria, 'successCriteria', 8000),
+    videoUrl, transcript: str(b.transcript, 'transcript', 40000),
     allowedRoles: [...new Set(roles as string[])], steps,
   };
 }
