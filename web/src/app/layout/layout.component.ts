@@ -80,6 +80,7 @@ export class LayoutComponent {
       icon: 'landmark',
       subItems: [
         { label: 'Simple Accounting', route: '/accounting/simple', icon: 'wallet' },
+        { label: 'Founder Accounts', route: '/accounting/founders', icon: 'wallet', roles: ['admin','accountant'] },
         { label: 'Chart of Accounts', route: '/accounting/chart-of-accounts', icon: 'bar-chart-3' },
         { label: 'Journal Entries', route: '/accounting/journal', icon: 'book-open' },
         { label: 'Invoices', route: '/accounting/invoices', icon: 'receipt' },
