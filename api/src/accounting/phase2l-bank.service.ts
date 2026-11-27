@@ -79,6 +79,7 @@ export class Phase2LBankService {
     for (const line of input.lines) {
       if (!positiveId(line.accountId) ||
           !safeCents(line.debitCents) || !safeCents(line.creditCents) ||
+          line.debitCents < 0 || line.creditCents < 0 ||
           (line.debitCents > 0) === (line.creditCents > 0) ||
           used.has(line.accountId)) {
         throw new BadRequestException('Each distinct account must have exactly one positive debit OR credit in integer cents');
@@ -87,7 +88,7 @@ export class Phase2LBankService {
       debit += line.debitCents;
       credit += line.creditCents;
     }
-    if (!Number.isSafeInteger(debit) || debit <= 0 || debit !== credit) {
+    if (!Number.isSafeInteger(debit) || !Number.isSafeInteger(credit) || debit <= 0 || debit !== credit) {
       throw new BadRequestException('Opening balances must have exactly equal debit and credit totals');
     }
 
