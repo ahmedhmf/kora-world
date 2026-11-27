@@ -73,6 +73,7 @@ export class LayoutComponent {
         { label: 'Financial Reports', route: '/accounting/reports', icon: 'trending-up' },
         { label: 'Reconciliation Dashboard', route: '/accounting/reconciliation', icon: 'clipboard-check', roles: ['admin'] },
         { label: 'Bank Reconciliation', route: '/accounting/bank-reconciliation', icon: 'landmark', roles: ['admin'] },
+        { label: 'Production Readiness', route: '/accounting/production-readiness', icon: 'shield-check', roles: ['admin'] },
       ],
     },
     { label: 'Calendar', route: '/calendar', icon: 'calendar' },
