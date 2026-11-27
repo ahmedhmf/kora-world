@@ -124,6 +124,34 @@ export interface SupplierPilotInvoiceBalance {
   payments: SupplierPilotPaymentHistory[];
 }
 
+/** Phase 2J: local read-only snapshot. Null balances mean manual review required. */
+export interface Phase2JInvoiceRow {
+  invoiceId: number; number: string; counterparty: string;
+  currency: string; status: string; total: number;
+  paid: number | null; reversed: number | null; outstanding: number | null;
+  reviewRequired: boolean; issues: string[];
+}
+export interface Phase2JReport {
+  currency: 'EGP'; startDate: string; endDate: string; asOfDate: string;
+  ap: { invoices: Phase2JInvoiceRow[]; outstandingEgp: number; reviewCount: number };
+  ar: { invoices: Phase2JInvoiceRow[]; outstandingEgp: number; reviewCount: number };
+  profitLoss: {
+    revenue: Array<{ code: string; name: string; amount: number }>;
+    expenses: Array<{ code: string; name: string; amount: number }>;
+    grossProfit: number; netProfit: number;
+  };
+  balanceSheet: {
+    assets: Array<{ code: string; name: string; amount: number }>;
+    liabilities: Array<{ code: string; name: string; amount: number }>;
+    equity: Array<{ code: string; name: string; amount: number }>;
+    totalAssets: number; totalLiabilities: number; totalEquity: number;
+    difference: number; isBalanced: boolean;
+  };
+  cashFlow: Array<{ period: string; inflows: number; outflows: number; netChange: number }>;
+  issues: Array<{ code: string; detail: string; invoiceId?: number; journalId?: number }>;
+  journalCount: number; needsReview: boolean;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AccountingApiService {
   private readonly http = inject(HttpClient);
@@ -299,6 +327,11 @@ export class AccountingApiService {
   }
 
   // Reports
+  getPhase2JReport(startDate: string, endDate: string, asOfDate: string): Observable<Phase2JReport> {
+    const params = new URLSearchParams({ startDate, endDate, asOfDate });
+    return this.http.get<Phase2JReport>(`${this.base}/accounting/phase2j-report?${params.toString()}`);
+  }
+
   getProfitAndLoss(startDate: string, endDate: string, currency?: string): Observable<any> {
     let url = `${this.base}/accounting/reports/profit-loss?startDate=${startDate}&endDate=${endDate}`;
     if (currency) url += `&currency=${currency}`;
