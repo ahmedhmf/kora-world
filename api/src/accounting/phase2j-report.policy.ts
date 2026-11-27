@@ -27,11 +27,11 @@ export interface ReportJournal extends Pick<JournalEntry,
   lines: Array<{ accountId: number; debit: number; credit: number; amountBase: number; currency: string }>;
 }
 export type ReportInvoice = Pick<Invoice,
-  'id' | 'number' | 'type' | 'currency' | 'status' | 'total' | 'supplierId' | 'customerName'> & {
+  'id' | 'number' | 'date' | 'type' | 'currency' | 'status' | 'total' | 'supplierId' | 'customerName'> & {
     supplier?: { name: string } | null;
   };
 export type ReportPayment = Pick<Payment,
-  'id' | 'invoiceId' | 'amount' | 'currency' | 'reference' | 'exchangeRate'>;
+  'id' | 'invoiceId' | 'date' | 'amount' | 'currency' | 'reference' | 'exchangeRate'>;
 
 const cents = (n: number) => Math.round(Number(n) * 100);
 const money = (n: number) => Number((n / 100).toFixed(2));
@@ -85,7 +85,7 @@ export function buildPhase2JReport(input: {
 
   const makeLedger = (type: InvoiceType): Subledger => {
     const rows: SubledgerRow[] = [];
-    for (const inv of invoices.filter(i => i.type === type && i.status !== 'draft' && i.status !== 'cancelled')) {
+    for (const inv of invoices.filter(i => i.type === type && i.status !== 'draft' && i.status !== 'cancelled' && dateKey(i.date) <= asOfDate)) {
       const issueCodes = new Set<string>();
       const warn = (code: string, message: string) => {
         issueCodes.add(code);
@@ -93,7 +93,7 @@ export function buildPhase2JReport(input: {
       };
       const linked = journals.filter(j => j.invoiceId === inv.id);
       const booking = linked.filter(j => j.type === JournalEntryType.INVOICE);
-      const paymentsFor = payments.filter(p => p.invoiceId === inv.id);
+      const paymentsFor = payments.filter(p => p.invoiceId === inv.id && dateKey(p.date) <= asOfDate);
       const originals = linked.filter(j => j.type === JournalEntryType.PAYMENT && !j.reversalOfId);
       const reversals = linked.filter(j => j.type === JournalEntryType.PAYMENT && !!j.reversalOfId);
       if (booking.length !== 1 || booking[0].postingStatus !== 'posted') {
@@ -114,10 +114,18 @@ export function buildPhase2JReport(input: {
         const original = matches[0];
         linkedJournalIds.add(original.id);
         const reverse = reversals.filter(j => j.reversalOfId === original.id);
-        if (original.postingStatus === 'posted' && reverse.length === 0) {
+        // Effective as-of state uses posting dates, not merely the original
+        // journal's CURRENT reversed flag. A later reversal cannot erase a
+        // payment from an earlier balance sheet date.
+        const effectiveReversals = reverse.filter(j => dateKey(j.date) <= asOfDate);
+        if (dateKey(original.date) > asOfDate) {
+          warn('payment_date_mismatch', `Payment #${p.id} predates its journal posting date`);
+        } else if (effectiveReversals.length === 0 &&
+                   (original.postingStatus === 'posted' || original.postingStatus === 'reversed')) {
           paidCents += cents(p.amount);
-        } else if (original.postingStatus === 'reversed' && reverse.length === 1 &&
-                   reverse[0].postingStatus === 'posted') {
+        } else if (effectiveReversals.length === 1 &&
+                   original.postingStatus === 'reversed' &&
+                   effectiveReversals[0].postingStatus === 'posted') {
           reversedCents += cents(p.amount);
         } else {
           warn('payment_reversal_ambiguous', `Payment #${p.id} has inconsistent reversal history`);
