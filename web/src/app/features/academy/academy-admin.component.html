@@ -1,0 +1,41 @@
+<div class="mx-auto max-w-6xl space-y-6 p-4 md:p-8">
+  <a routerLink="/academy" class="text-sm text-zinc-500">← Academy library</a>
+  <header class="flex flex-wrap items-center justify-between gap-3"><div><h1 class="text-3xl font-bold">Manage Academy</h1><p class="text-zinc-500">Review, edit and publish versioned procedures.</p></div><button type="button" (click)="start()" [disabled]="busy()" class="rounded-lg bg-zinc-900 px-4 py-2 text-white">New procedure</button></header>
+  @if(error()){<p role="alert" class="rounded-lg border border-red-300 p-3 text-red-600">{{error()}}</p>}
+  @if(notice()){<p role="status" class="rounded-lg border border-green-300 p-3 text-green-700">{{notice()}}</p>}
+  @if(!editing()){
+    <div class="space-y-2">@for(r of rows();track r.id){<button type="button" [disabled]="busy()||!!r.archived_at" (click)="open(r.id)" class="flex w-full flex-wrap items-center justify-between gap-2 rounded-xl border border-zinc-300 p-4 text-left"><span><strong>{{r.code}} · {{r.title}}</strong><span class="block text-sm text-zinc-500">{{r.slug}}</span></span><span class="text-sm">{{r.archived_at?'Archived':r.published_at?'Published':'Draft'}} · v{{r.version}} →</span></button>}@empty{<p>No procedures yet. Create one to get started.</p>}</div>
+  }@else{
+    <form class="space-y-5" (ngSubmit)="save()">
+      <fieldset [disabled]="busy()" class="space-y-5">
+      <div class="grid gap-4 rounded-xl border border-zinc-300 p-4 md:grid-cols-3">
+        <label class="block text-sm">SOP code<input name="code" required maxlength="40" [readonly]="id!==null" [(ngModel)]="draft.code" (ngModelChange)="changed()" class="mt-1 w-full rounded border p-2 bg-transparent"></label>
+        <label class="block text-sm">Slug<input name="slug" required maxlength="120" [readonly]="id!==null" [(ngModel)]="draft.slug" (ngModelChange)="changed()" class="mt-1 w-full rounded border p-2 bg-transparent"></label>
+        <label class="block text-sm">Category<select name="category" [disabled]="id!==null" [(ngModel)]="draft.categoryId" (ngModelChange)="changed()" class="mt-1 w-full rounded border p-2 bg-transparent">@for(c of categories();track c.id){<option [ngValue]="c.id">{{c.name}}</option>}</select></label>
+      </div>
+      <section class="space-y-3 rounded-xl border border-zinc-300 p-4">
+        <label class="block text-sm">Title<input name="title" required maxlength="180" [(ngModel)]="draft.title" (ngModelChange)="changed()" class="mt-1 w-full rounded border p-2 bg-transparent"></label>
+        <label class="block text-sm">Summary<textarea name="summary" rows="2" [(ngModel)]="draft.summary" (ngModelChange)="changed()" class="mt-1 w-full rounded border p-2 bg-transparent"></textarea></label>
+        <label class="block text-sm">Trigger<textarea name="trigger" rows="2" [(ngModel)]="draft.trigger" (ngModelChange)="changed()" class="mt-1 w-full rounded border p-2 bg-transparent"></textarea></label>
+        <label class="block text-sm">Prerequisites<textarea name="prerequisites" rows="3" [(ngModel)]="draft.prerequisites" (ngModelChange)="changed()" class="mt-1 w-full rounded border p-2 bg-transparent"></textarea></label>
+        <label class="block text-sm">Stop / escalate<textarea name="warnings" rows="3" [(ngModel)]="draft.warnings" (ngModelChange)="changed()" class="mt-1 w-full rounded border p-2 bg-transparent"></textarea></label>
+        <label class="block text-sm">Done when<textarea name="success" rows="2" [(ngModel)]="draft.successCriteria" (ngModelChange)="changed()" class="mt-1 w-full rounded border p-2 bg-transparent"></textarea></label>
+        <div class="flex gap-4">@for(r of ['admin','employee'];track r){<label class="text-sm"><input type="checkbox" [checked]="draft.allowedRoles.includes(r)" (change)="role(r,$any($event.target).checked)"> {{r}}</label>}</div>
+        <p class="text-sm text-zinc-500">Video: placeholder until a secure provider is approved.</p>
+      </section>
+      <section class="space-y-3"><h2 class="text-xl font-semibold">Checklist steps</h2>
+        @for(s of draft.steps;track s;let i=$index){<article class="space-y-3 rounded-xl border border-zinc-300 p-4">
+          <div class="flex items-center justify-between"><strong>Step {{i+1}}</strong><div class="flex gap-3 text-sm"><button type="button" [disabled]="i===0" (click)="move(i,-1)">Up</button><button type="button" [disabled]="i===draft.steps.length-1" (click)="move(i,1)">Down</button><button type="button" class="text-red-600" (click)="remove(i)">Remove</button></div></div>
+          <label class="block text-sm">Step title<input [name]="'step-title-'+i" required maxlength="180" [(ngModel)]="s.title" (ngModelChange)="changed()" class="mt-1 w-full rounded border p-2 bg-transparent"></label>
+          <label class="block text-sm">Instructions<textarea [name]="'step-text-'+i" required rows="3" [(ngModel)]="s.instructions" (ngModelChange)="changed()" class="mt-1 w-full rounded border p-2 bg-transparent"></textarea></label>
+          <label class="block text-sm">Application link<select [name]="'step-route-'+i" [(ngModel)]="s.appRoute" (ngModelChange)="changed()" class="mt-1 w-full rounded border p-2 bg-transparent"><option value="">No link / manual step</option>@for(r of routes;track r){<option [value]="r">{{r}}</option>}</select></label>
+          <label class="block text-sm">Required evidence<input [name]="'step-evidence-'+i" [(ngModel)]="s.evidence" (ngModelChange)="changed()" class="mt-1 w-full rounded border p-2 bg-transparent"></label>
+        </article>}
+        <button type="button" [disabled]="draft.steps.length>=100" (click)="add()" class="rounded-lg border px-4 py-2">+ Add step</button>
+      </section>
+      </fieldset>
+      <div class="flex flex-wrap gap-3"><button type="submit" [disabled]="busy()" class="rounded-lg bg-zinc-900 px-4 py-2 text-white">Save draft</button><button type="button" [disabled]="busy()||saved?.status!=='draft'" (click)="publish()" class="rounded-lg bg-green-700 px-4 py-2 text-white disabled:opacity-40">Publish saved draft</button><button type="button" [disabled]="busy()" (click)="close()" class="rounded-lg border px-4 py-2">Back to list</button></div>
+      @if(saved?.status==='published'){<p class="text-sm text-zinc-500">This version is published. Saving again creates a new draft.</p>}
+    </form>
+  }
+</div>
