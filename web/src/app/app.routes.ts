@@ -251,6 +251,11 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/accounting/phase2l-bank.component').then(m => m.Phase2LBankComponent),
       },
+      {
+        path: 'accounting/production-readiness',
+        loadComponent: () =>
+          import('./features/accounting/phase2m-readiness.component').then(m => m.Phase2MReadinessComponent),
+      },
     ],
   },
 ];
