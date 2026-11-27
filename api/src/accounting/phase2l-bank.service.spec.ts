@@ -148,11 +148,11 @@ describe('Phase 2L bank/opening pilot guards', () => {
   it('imports validated bank rows without creating payment or journal records', async () => {
     expect(await importBank()).toEqual({ importId: 60, rowCount: 1 });
     expect(manager.save).not.toHaveBeenCalled();
-    const statements = manager.query.mock.calls.filter(([sql]: [string]) =>
-      sql.includes('INSERT INTO accounting_bank_statement'));
+    const statements = manager.query.mock.calls.filter(call =>
+      String(call[0]).includes('INSERT INTO accounting_bank_statement'));
     expect(statements).toHaveLength(2);
-    expect(manager.query.mock.calls.some(([sql]: [string]) =>
-      sql.includes('INSERT INTO journal_entries'))).toBe(false);
+    expect(manager.query.mock.calls.some(call =>
+      String(call[0]).includes('INSERT INTO journal_entries'))).toBe(false);
   });
 
   it('rejects same bank import key', async () => {
@@ -177,8 +177,8 @@ describe('Phase 2L bank/opening pilot guards', () => {
       return [];
     });
     await expect(service.match(3, 5, 'Verified from bank', 9)).rejects.toThrow(ConflictException);
-    expect(manager.query.mock.calls.some(([sql]: [string]) =>
-      sql.includes('UPDATE accounting_bank_statement_rows'))).toBe(false);
+    expect(manager.query.mock.calls.some(call =>
+      String(call[0]).includes('UPDATE accounting_bank_statement_rows'))).toBe(false);
   });
 
   it('prevents matching an already-matched row', async () => {
