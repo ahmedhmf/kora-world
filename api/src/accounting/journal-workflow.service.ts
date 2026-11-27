@@ -120,9 +120,9 @@ export class JournalWorkflowService {
     return journal;
   }
 
-  async createDraft(event: Omit<PostAccountingEvent, 'sourceEventKey' | 'type'>, userId: number) {
+  async createDraft(event: Omit<PostAccountingEvent, 'sourceEventKey' | 'type'>, userId: number, manager?: EntityManager) {
     this.validate({ ...event, sourceEventKey: '', type: JournalEntryType.MANUAL });
-    return this.db.transaction(async (m) => {
+    const create = async (m: EntityManager) => {
       const actor = await this.actor(m, userId);
       if (!['employee', 'accountant', 'admin'].includes(actor.role)) {
         throw new ForbiddenException('Your role cannot create manual journals');
@@ -148,7 +148,8 @@ export class JournalWorkflowService {
           });
         }),
       }));
-    });
+    };
+    return manager ? create(manager) : this.db.transaction(create);
   }
 
   async submit(id: number, userId: number) {
