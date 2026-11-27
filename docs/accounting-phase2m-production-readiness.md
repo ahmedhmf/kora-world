@@ -83,7 +83,7 @@ git pull --ff-only origin feature/accounting-redesign
 
 cd api
 npm run build
-npm test -- --runInBand phase2m-readiness.policy.spec.ts phase2m-readiness.service.spec.ts phase2j-report.policy.spec.ts phase2l-bank.service.spec.ts
+npm test -- --runInBand phase2m-readiness.policy.spec.ts phase2m-readiness.service.spec.ts phase2m-permissions.spec.ts phase2j-report.policy.spec.ts phase2l-bank.service.spec.ts
 node scripts/phase2m-preflight.mjs
 # Strict release gate is EXPECTED to fail until approved blockers are resolved:
 node scripts/phase2m-preflight.mjs --strict
@@ -148,3 +148,8 @@ The final approved rollout runbook should provide:
 - Exported diagnostic JSON may contain financial metadata and references; store and share securely.
 - The opening-balance historical transition and production-compatible bank staging migration are **deferred blockers** pending real financial and operational requirements.
 - An authorized production rollout is a future, separately approved change. This package is intentionally **not** production certified.
+
+
+## Phase 2M permission contract tests
+
+`api/src/accounting/phase2m-permissions.spec.ts` verifies role metadata for the admin-only historical audit, opening balances, bank imports, match/unmatch and controlled supplier booking, and allows accountant access to read-only Phase 2J and bank history. It is a static guard-configuration test; a separate authenticated HTTP integration test is still required to verify runtime authentication and rejection behavior. The CI workflow includes this test.
