@@ -167,6 +167,23 @@ export interface ReconciliationAudit {
   invoices: InvoiceAuditRow[];
 }
 
+export interface Phase2LRow {
+  id: number; importId: number; date: string; reference: string;
+  description: string; amountCents: string; matchedJournalLineId: number | null;
+  matchedAt: string | null; matchReason: string | null;
+}
+export interface Phase2LView {
+  imports: Array<{ id: number; accountId: number; statementKey: string;
+    openingBalanceCents: string | null; closingBalanceCents: string | null;
+    importedAt: string }>;
+  rows: Phase2LRow[];
+  candidates: Array<{ lineId: number; journalId: number; date: string;
+    description: string; reference: string; amountCents: string }>;
+  events: Array<{ id: number; action: string; actorId: number;
+    rowId: number | null; importId: number | null; journalLineId: number | null;
+    detail: string; createdAt: string }>;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AccountingApiService {
   private readonly http = inject(HttpClient);
@@ -339,6 +356,39 @@ export class AccountingApiService {
       paymentId: number; originalJournalId: number; reversalJournalId: number;
       status: string; remainingCents: number;
     }>(`${this.base}/payments/supplier-egp-pilot/${paymentId}/reverse`, { reason });
+  }
+
+  // Phase 2L — explicit EGP-only local bank and opening-balance pilot.
+  postOpeningBalances(input: {
+    date: string; reference: string;
+    lines: Array<{ accountId: number; debitCents: number; creditCents: number }>;
+  }): Observable<{ journalId: number; replayed: boolean }> {
+    return this.http.post<{ journalId: number; replayed: boolean }>(
+      `${this.base}/accounting/phase2l/opening`, input);
+  }
+
+  importBankStatement(input: {
+    accountId: number; statementKey: string;
+    openingBalanceCents?: number | null; closingBalanceCents?: number | null;
+    rows: Array<{ date: string; amountCents: number; reference?: string; description?: string }>;
+  }): Observable<{ importId: number; rowCount: number }> {
+    return this.http.post<{ importId: number; rowCount: number }>(
+      `${this.base}/accounting/phase2l/statements`, input);
+  }
+
+  getBankReconciliation(accountId: number): Observable<Phase2LView> {
+    return this.http.get<Phase2LView>(
+      `${this.base}/accounting/phase2l/statements?accountId=${encodeURIComponent(accountId)}`);
+  }
+
+  matchBankRow(rowId: number, journalLineId: number, reason: string): Observable<unknown> {
+    return this.http.post(`${this.base}/accounting/phase2l/rows/${rowId}/match`,
+      { journalLineId, reason });
+  }
+
+  unmatchBankRow(rowId: number, reason: string): Observable<unknown> {
+    return this.http.post(`${this.base}/accounting/phase2l/rows/${rowId}/unmatch`,
+      { reason });
   }
 
   // Reports
