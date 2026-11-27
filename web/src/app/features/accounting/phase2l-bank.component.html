@@ -1,0 +1,182 @@
+<div class="p-8 max-w-7xl mx-auto space-y-6">
+  <header>
+    <h1 class="text-2xl font-bold text-white">Opening Balances & Bank Reconciliation</h1>
+    <p class="mt-1 text-zinc-400 text-sm">Phase 2L · local kora_test only · EGP · audited manual controls</p>
+  </header>
+  @if (!allowed()) {
+    <div role="alert" class="p-4 border border-amber-800 rounded-lg text-amber-200">
+      Phase 2L is available only to administrators on the local application.
+    </div>
+  } @else {
+    @if (error(); as message) {
+      <p role="alert" class="border border-red-800 rounded-lg bg-red-950/30 text-red-200 text-sm p-3">{{ message }}</p>
+    }
+    @if (success(); as message) {
+      <p role="status" class="border border-emerald-900 rounded-lg bg-emerald-950/30 text-emerald-200 text-sm p-3">{{ message }}</p>
+    }
+
+    <section class="border border-zinc-800 bg-zinc-950 rounded-xl p-5 space-y-4">
+      <h2 class="font-bold text-white">2L-A · Verified opening balances</h2>
+      <p class="text-xs text-amber-300">Opening entries are posted only to eligible accounts with no existing posted history. For an account already used by Money Out, stop and review historical opening balances instead of backdating a journal.</p>
+      <div class="flex gap-3 flex-wrap">
+        <label class="text-xs text-zinc-400">Opening date
+          <input type="date" [(ngModel)]="openingDate" class="block mt-1 p-2 bg-zinc-900 text-white border border-zinc-700 rounded"/>
+        </label>
+        <label class="text-xs text-zinc-400">Unique reference (reuse for retry)
+          <input [(ngModel)]="openingReference" maxlength="80" placeholder="OPEN-2026-START" class="block mt-1 p-2 bg-zinc-900 text-white border border-zinc-700 rounded"/>
+        </label>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-xs">
+          <thead class="border-b border-zinc-800 text-zinc-400"><tr>
+            <th class="p-2 text-left">Account</th><th class="p-2 text-right">Debit EGP cents</th>
+            <th class="p-2 text-right">Credit EGP cents</th><th class="p-2"></th>
+          </tr></thead>
+          <tbody>
+            @for (line of openingRows; track $index; let index = $index) {
+              <tr>
+                <td class="p-2">
+                  <select [(ngModel)]="line.accountId" class="bg-zinc-900 text-white border border-zinc-700 rounded p-2 w-full">
+                    <option [ngValue]="null">Select EGP leaf account</option>
+                    @for (acc of openingAccounts(); track acc.id) {
+                      <option [ngValue]="acc.id">{{ acc.code }} · {{ acc.name }}</option>
+                    }
+                  </select>
+                </td>
+                <td class="p-2"><input type="number" min="0" step="1" [(ngModel)]="line.debitCents"
+                  class="w-full text-right bg-zinc-900 text-white border border-zinc-700 rounded p-2"/></td>
+                <td class="p-2"><input type="number" min="0" step="1" [(ngModel)]="line.creditCents"
+                  class="w-full text-right bg-zinc-900 text-white border border-zinc-700 rounded p-2"/></td>
+                <td><button type="button" (click)="removeOpeningRow(index)" [disabled]="openingRows.length <= 2"
+                  class="text-xs text-amber-300 disabled:opacity-30">Remove</button></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <button type="button" (click)="addOpeningRow()" class="text-xs underline text-blue-300">Add account</button>
+        <span class="text-xs text-zinc-300">Debits {{ debitSum }} cents · Credits {{ creditSum }} cents · Difference {{ debitSum - creditSum }} cents</span>
+        <button type="button" (click)="postOpening()" [disabled]="busy() || debitSum <= 0 || debitSum !== creditSum"
+          class="bg-white text-zinc-900 rounded px-4 py-2 text-xs font-bold disabled:opacity-40">Confirm & post balanced opening</button>
+      </div>
+    </section>
+
+    <section class="border border-zinc-800 bg-zinc-950 rounded-xl p-5 space-y-4">
+      <h2 class="font-bold text-white">2L-B · Import bank statement</h2>
+      <p class="text-xs text-zinc-400">CSV (UTF-8): <code>date,amount,reference,description</code>. Dates YYYY-MM-DD; signed amounts with exactly 2 decimals (− for outflow). Maximum 500 rows. EGP only. Imports are staging records, never ledger postings.</p>
+      <div class="flex flex-wrap gap-3 items-end">
+        <label class="text-xs text-zinc-400">Bank / cash account
+          <select [(ngModel)]="selectedAccountId" (ngModelChange)="view.set(null)"
+            class="block mt-1 p-2 bg-zinc-900 text-white border border-zinc-700 rounded">
+            <option [ngValue]="null">Select EGP bank account</option>
+            @for (acc of bankAccounts(); track acc.id) {
+              <option [ngValue]="acc.id">{{ acc.code }} · {{ acc.name }}</option>
+            }
+          </select>
+        </label>
+        <label class="text-xs text-zinc-400">Unique statement key
+          <input [(ngModel)]="statementKey" maxlength="120" placeholder="BANK-2026-11"
+            class="block mt-1 p-2 bg-zinc-900 text-white border border-zinc-700 rounded"/>
+        </label>
+        <label class="text-xs text-zinc-400">Opening EGP (optional)
+          <input [(ngModel)]="openingBalance" placeholder="50000.00"
+            class="block mt-1 p-2 bg-zinc-900 text-white border border-zinc-700 rounded"/>
+        </label>
+        <label class="text-xs text-zinc-400">Closing EGP (optional)
+          <input [(ngModel)]="closingBalance" placeholder="47655.00"
+            class="block mt-1 p-2 bg-zinc-900 text-white border border-zinc-700 rounded"/>
+        </label>
+      </div>
+      <div class="flex flex-wrap gap-3 items-center">
+        <input aria-label="Choose bank CSV" type="file" accept=".csv,text/csv" (change)="onFile($event)"
+          class="text-xs text-white"/>
+        <span class="text-xs text-zinc-400">{{ importedRows().length }} rows ready · Net {{ previewNet / 100 | number:'1.2-2' }} EGP</span>
+        <button type="button" (click)="importStatement()" [disabled]="busy() || !selectedAccountId || !importedRows().length"
+          class="bg-white text-zinc-900 rounded px-4 py-2 text-xs font-bold disabled:opacity-40">Confirm statement import</button>
+      </div>
+      @if (importedRows().length) {
+        <div class="max-h-48 overflow-auto border border-zinc-800 rounded">
+          <table class="w-full text-xs">
+            <thead><tr class="text-zinc-400"><th class="p-2">Date</th><th class="p-2 text-right">Signed EGP</th><th class="p-2">Reference</th><th class="p-2">Description</th></tr></thead>
+            <tbody>@for (r of importedRows(); track $index) {
+              <tr class="border-t border-zinc-900"><td class="p-2">{{ r.date }}</td>
+                <td class="p-2 text-right">{{ r.amountCents / 100 | number:'1.2-2' }}</td>
+                <td class="p-2">{{ r.reference }}</td><td class="p-2">{{ r.description }}</td></tr>
+            }</tbody>
+          </table>
+        </div>
+      }
+    </section>
+
+    <section class="border border-zinc-800 bg-zinc-950 rounded-xl p-5 space-y-4">
+      <div class="flex flex-wrap justify-between items-center gap-3">
+        <div>
+          <h2 class="font-bold text-white">2L-C / D · Reconciliation and audit history</h2>
+          <p class="text-xs text-zinc-400">Same-account, same-day, exact signed amount matches only. Each bank row and journal line can be matched once.</p>
+        </div>
+        <button (click)="reload()" [disabled]="busy() || !selectedAccountId" type="button"
+          class="border border-zinc-700 rounded px-4 py-2 text-xs text-white disabled:opacity-40">Refresh</button>
+      </div>
+      @if (view(); as data) {
+        <div class="grid grid-cols-3 gap-3 text-xs">
+          <div class="border border-zinc-800 rounded p-3"><span class="block text-zinc-400">Imports</span><strong class="text-lg text-white">{{ data.imports.length }}</strong></div>
+          <div class="border border-zinc-800 rounded p-3"><span class="block text-zinc-400">Statement rows</span><strong class="text-lg text-white">{{ data.rows.length }}</strong></div>
+          <div class="border border-zinc-800 rounded p-3"><span class="block text-zinc-400">Unmatched</span><strong class="text-lg text-amber-300">{{ unmatchedCount }}</strong></div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs text-left">
+            <thead class="border-b border-zinc-800 text-zinc-400"><tr>
+              <th class="p-2">Date</th><th class="p-2">Reference</th><th class="p-2">Description</th>
+              <th class="p-2 text-right">Signed EGP</th><th class="p-2">Status / action</th>
+            </tr></thead>
+            <tbody class="divide-y divide-zinc-900">
+              @for (r of data.rows; track r.id) {
+                <tr>
+                  <td class="p-2">{{ r.date | date:'dd MMM yyyy' }}</td>
+                  <td class="p-2">{{ r.reference }}</td>
+                  <td class="p-2">{{ r.description }}</td>
+                  <td class="p-2 text-right font-mono">{{ +r.amountCents / 100 | number:'1.2-2' }}</td>
+                  <td class="p-2">
+                    @if (r.matchedJournalLineId) {
+                      <div class="text-emerald-300">Matched to line #{{ r.matchedJournalLineId }}</div>
+                      <button (click)="unmatch(r.id)" [disabled]="busy()" type="button"
+                        class="mt-1 text-amber-300 underline disabled:opacity-40">Unmatch with reason</button>
+                    } @else {
+                      <div class="text-amber-300 mb-1">Unmatched · {{ candidatesFor(r).length }} exact candidates</div>
+                      @for (candidate of candidatesFor(r); track candidate.lineId) {
+                        <button type="button" (click)="match(r.id, candidate.lineId)" [disabled]="busy()"
+                          class="block mt-1 text-blue-300 underline disabled:opacity-40">
+                          Match journal #{{ candidate.journalId }} · line #{{ candidate.lineId }}
+                        </button>
+                      }
+                    }
+                  </td>
+                </tr>
+              } @empty {
+                <tr><td colspan="5" class="p-4 text-zinc-500">No imported statement rows yet.</td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        <div>
+          <h3 class="font-bold text-white text-sm mb-2">Immutable activity history</h3>
+          <div class="max-h-64 overflow-auto space-y-2">
+            @for (event of data.events; track event.id) {
+              <div class="border border-zinc-800 rounded p-2 text-xs text-zinc-300">
+                <strong class="uppercase">{{ event.action }}</strong> · {{ event.createdAt | date:'medium' }}
+                · Actor #{{ event.actorId }} · Row #{{ event.rowId || '—' }}
+                · Journal line #{{ event.journalLineId || '—' }}
+                <p class="text-zinc-500">{{ event.detail }}</p>
+              </div>
+            } @empty {
+              <p class="text-xs text-zinc-500">No reconciliation activity yet.</p>
+            }
+          </div>
+        </div>
+      } @else {
+        <p class="text-sm text-zinc-500">Select an EGP bank account and click Refresh.</p>
+      }
+    </section>
+  }
+</div>
