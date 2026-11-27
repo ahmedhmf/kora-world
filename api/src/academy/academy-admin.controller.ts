@@ -24,17 +24,17 @@ export class AcademyAdminController {
 
   private async writeDraft(tx: EntityManager, id: number, actor: number, d: ReturnType<typeof parseDraft>) {
     const [draft] = await tx.query('SELECT id, version FROM academy_process_versions WHERE process_id=$1 AND published_at IS NULL ORDER BY version DESC LIMIT 1', [id]);
-    const params = [d.title,d.summary,d.trigger,d.prerequisites,d.warnings,d.successCriteria,d.allowedRoles];
+    const params = [d.title,d.summary,d.trigger,d.prerequisites,d.warnings,d.successCriteria,d.allowedRoles,d.videoUrl,d.transcript];
     let versionId: number;
     let version: number;
     if (draft) {
       versionId = draft.id; version = draft.version;
-      await tx.query('UPDATE academy_process_versions SET title=$1,summary=$2,trigger=$3,prerequisites=$4,warnings=$5,success_criteria=$6,allowed_roles=$7 WHERE id=$8 AND published_at IS NULL', [...params,versionId]);
+      await tx.query('UPDATE academy_process_versions SET title=$1,summary=$2,trigger=$3,prerequisites=$4,warnings=$5,success_criteria=$6,allowed_roles=$7,video_url=$8,transcript=$9 WHERE id=$10 AND published_at IS NULL', [...params,versionId]);
       await tx.query('DELETE FROM academy_steps WHERE version_id=$1', [versionId]);
     } else {
       const [v] = await tx.query(`INSERT INTO academy_process_versions
-        (title,summary,trigger,prerequisites,warnings,success_criteria,allowed_roles,process_id,created_by,version)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,(SELECT COALESCE(MAX(version),0)+1 FROM academy_process_versions WHERE process_id=$8))
+        (title,summary,trigger,prerequisites,warnings,success_criteria,allowed_roles,video_url,transcript,process_id,created_by,version)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,(SELECT COALESCE(MAX(version),0)+1 FROM academy_process_versions WHERE process_id=$10))
         RETURNING id,version`, [...params,id,actor]);
       versionId = v.id; version = v.version;
     }
