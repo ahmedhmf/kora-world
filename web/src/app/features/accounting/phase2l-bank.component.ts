@@ -166,12 +166,29 @@ export class Phase2LBankComponent implements OnInit {
   importStatement() {
     if (!this.allowed() || this.busy() || !this.selectedAccountId || !this.importedRows().length) return;
     if (!confirm(`Import ${this.importedRows().length} statement rows to the selected EGP bank account? This does NOT post payments.`)) return;
-    const parseBalance = (v: string) => v.trim() === '' ? null : Math.round(Number(v) * 100);
+    const parseBalance = (v: string): number | null => {
+      if (v.trim() === '') return null;
+      if (!/^-?\\d{1,9}\\.\\d{2}$/.test(v.trim())) {
+        throw new Error('Opening and closing statement balances must be EGP amounts with exactly two decimals');
+      }
+      const cents = Math.round(Number(v.trim()) * 100);
+      if (!Number.isSafeInteger(cents)) throw new Error('Balance exceeds supported EGP range');
+      return cents;
+    };
+    let first: number | null;
+    let last: number | null;
+    try {
+      first = parseBalance(this.openingBalance);
+      last = parseBalance(this.closingBalance);
+    } catch (e) {
+      this.error.set(e instanceof Error ? e.message : 'Invalid statement balance');
+      return;
+    }
     this.busy.set(true); this.error.set(null);
     this.api.importBankStatement({
       accountId: Number(this.selectedAccountId), statementKey: this.statementKey.trim(),
-      openingBalanceCents: parseBalance(this.openingBalance),
-      closingBalanceCents: parseBalance(this.closingBalance),
+      openingBalanceCents: first,
+      closingBalanceCents: last,
       rows: this.importedRows(),
     }).subscribe({
       next: result => {
